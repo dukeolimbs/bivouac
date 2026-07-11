@@ -8,6 +8,7 @@
   --bivouac-z: 1;                 /* above the canvas, below Foundry's UI panels */
   --bivouac-drawer-z: 60;
   --bivouac-drawer-w: min(380px, 90vw);
+  --bivouac-dmtab-inset: 44px;    /* gap from the right edge, clearing the UI column — tune to taste */
   --bivouac-radius: 10px;
   --bivouac-gap: 8px;
   --bivouac-blur: 7px;
@@ -336,41 +337,39 @@
   transform: translateX(0);
 }
 
-/* GM-only toggle tab on the right edge; rides the drawer's edge as its handle. */
+/* GM-only DM-screen toggle: a detached pill that sits just left of the right-hand
+   UI column and tucks *under* it (low z-index) rather than floating over it. */
 .bivouac-dmscreen-tab {
   position: absolute;
   top: 50%;
-  right: 0;
+  right: var(--bivouac-dmtab-inset);
   transform: translateY(-50%);
-  z-index: calc(var(--bivouac-drawer-z) + 1);
+  z-index: 5;                     /* above the canvas, below Foundry's UI panels */
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 68px;
+  width: 34px;
+  height: 60px;
   padding: 0;
   color: var(--bivouac-text);
   font-size: 15px;
   cursor: pointer;
   border: 1px solid var(--bivouac-panel-border);
-  border-right: none;
-  border-radius: 8px 0 0 8px;
+  border-radius: 9px;
   background: var(--bivouac-panel-bg-strong);
-  box-shadow: -4px 0 14px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
   backdrop-filter: blur(var(--bivouac-blur));
   -webkit-backdrop-filter: blur(var(--bivouac-blur));
-  transition:
-    right 220ms cubic-bezier(0.4, 0, 0.2, 1),
-    background 120ms ease,
-    color 120ms ease;
+  transition: background 120ms ease, color 120ms ease, transform 120ms ease;
 }
 .bivouac-dmscreen-tab:hover {
   color: var(--bivouac-accent);
+  background: color-mix(in srgb, var(--bivouac-accent) 18%, var(--bivouac-panel-bg-strong));
+  transform: translateY(-50%) translateX(-2px);
 }
 .bivouac-dmscreen-tab--open {
-  right: var(--bivouac-drawer-w);
   color: var(--bivouac-accent);
-  background: color-mix(in srgb, var(--bivouac-accent) 30%, var(--bivouac-panel-bg-strong));
+  border-color: var(--bivouac-frame-border);
 }
 .bivouac-drawer__header {
   display: flex;

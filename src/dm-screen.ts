@@ -16,9 +16,10 @@ class DMScreen {
     return this.#open;
   }
 
-  /** Mount the persistent, GM-only toggle tab on the right edge. It lives
-   *  outside the scene-controls group so opening the DM screen never forces
-   *  edit mode, and it rides the drawer's edge, acting as open/close handle. */
+  /** Mount the persistent, GM-only toggle tab. It lives outside the
+   *  scene-controls group (so opening the DM screen never forces edit mode) and
+   *  sits at a low z-index just left of the right-hand UI column, tucking under
+   *  it rather than overlapping. Inset is tunable via `--bivouac-dmtab-inset`. */
   mountControl(): void {
     if (!game.user?.isGM || this.#tab) return;
     const iface = document.getElementById("interface") ?? document.body;
@@ -47,8 +48,8 @@ class DMScreen {
     // baseline before flipping to open, so the transition runs the first time.
     if (firstMount) void this.#el?.offsetWidth;
     this.#el?.classList.toggle("bivouac-drawer--open", this.#open);
-    // Sync our own toggle tab (we own its highlight, unlike the old toolbar
-    // toggle) and let it slide with the drawer.
+    // Sync our own toggle tab's highlight (we own it directly, unlike the old
+    // toolbar toggle). The drawer slides over the stationary tab when open.
     this.#tab?.classList.toggle("bivouac-dmscreen-tab--open", this.#open);
     this.#tab?.setAttribute("aria-pressed", String(this.#open));
     if (this.#open) this.render();

@@ -15,6 +15,8 @@ export const SETTINGS = {
   landingSceneId: "landingSceneId",
   /** Client setting: px the DM-screen tab keeps left of the sidebar edge. */
   dmTabPad: "dmTabPad",
+  /** Client setting: vertical position of the DM-screen tab, as a % of height. */
+  dmTabTop: "dmTabTop",
 } as const;
 
 /** Widget geometry, measured in whole scene grid squares. */

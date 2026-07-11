@@ -9,6 +9,7 @@
   --bivouac-drawer-z: 60;
   --bivouac-drawer-w: min(380px, 90vw);
   --bivouac-dmtab-pad: 16px;      /* gap the tab keeps to the LEFT of the sidebar edge; driven by the "DM screen tab — edge padding" setting (this is the fallback) */
+  --bivouac-dmtab-top: 50%;       /* vertical position of the tab; driven by the "DM screen tab — vertical position" setting */
   --bivouac-dmtab-inset: 168px;   /* JS-driven from the sidebar's live edge; this is only the pre-measure fallback */
   --bivouac-radius: 10px;
   --bivouac-gap: 8px;
@@ -343,7 +344,7 @@
    open (closed via the drawer ✕ or Esc), so it never floats over the panel. */
 .bivouac-dmscreen-tab {
   position: absolute;
-  top: 50%;
+  top: var(--bivouac-dmtab-top);
   right: var(--bivouac-dmtab-inset);
   transform: translateY(-50%);
   z-index: calc(var(--bivouac-drawer-z) + 1);   /* above Foundry's UI */

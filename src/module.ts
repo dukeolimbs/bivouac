@@ -53,7 +53,19 @@ Hooks.once("init", () => {
     type: Number,
     range: { min: 0, max: 400, step: 2 },
     default: 16,
-    onChange: () => applyDmTabPad(),
+    onChange: () => applyTabSettings(),
+  });
+
+  // Vertical position of the DM-screen tab, as a percentage of viewport height.
+  game.settings.register(MODULE_ID, SETTINGS.dmTabTop, {
+    name: "BIVOUAC.Settings.DmTabTop.Name",
+    hint: "BIVOUAC.Settings.DmTabTop.Hint",
+    scope: "client",
+    config: true,
+    type: Number,
+    range: { min: 0, max: 100, step: 1 },
+    default: 50,
+    onChange: () => applyTabSettings(),
   });
 });
 
@@ -131,14 +143,17 @@ Hooks.once("ready", () => {
   const mod = game.modules.get(MODULE_ID);
   if (mod) mod.api = { worldLayer, dmScreen };
   if (game.user?.isGM) dmScreen.mountControl();
-  applyDmTabPad();
+  applyTabSettings();
   log("Ready");
 });
 
-/** Push the DM-tab padding setting into the CSS var and reposition the tab. */
-function applyDmTabPad(): void {
+/** Push the DM-tab settings into their CSS vars and reposition the tab. */
+function applyTabSettings(): void {
+  const root = document.documentElement.style;
   const pad = Number(game.settings.get(MODULE_ID, SETTINGS.dmTabPad) ?? 16);
-  document.documentElement.style.setProperty("--bivouac-dmtab-pad", `${pad}px`);
+  const top = Number(game.settings.get(MODULE_ID, SETTINGS.dmTabTop) ?? 50);
+  root.setProperty("--bivouac-dmtab-pad", `${pad}px`);
+  root.setProperty("--bivouac-dmtab-top", `${top}%`);
   dmScreen.refreshTab();
 }
 

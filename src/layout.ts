@@ -29,7 +29,12 @@ export function activeLandingScene(): { id: string } | null {
 
 function normalize(raw: unknown): Layout {
   const layout = raw as Partial<Layout> | undefined;
-  return { widgets: Array.isArray(layout?.widgets) ? layout!.widgets : [] };
+  const widgets = Array.isArray(layout?.widgets) ? layout!.widgets : [];
+  // Deep-clone so callers mutate a PRIVATE copy, never the live flag object.
+  // Mutating the flag in place both corrupts undo snapshots (writeLayout would
+  // snapshot the already-changed state) and can make setFlag a no-op (Foundry
+  // diffs the update against flags we've already mutated to match).
+  return foundry.utils.deepClone({ widgets }) as Layout;
 }
 
 export function readLayout(scene: unknown): Layout {
@@ -50,7 +55,7 @@ const redoStack: Layout[] = [];
 let applyingHistory = false;
 
 function snapshot(scene: unknown): Layout {
-  return foundry.utils.deepClone(readLayout(scene)) as Layout;
+  return readLayout(scene); // readLayout already returns a deep copy
 }
 
 /** Drop all recorded history — e.g. when the landing scene designation changes. */

@@ -38,9 +38,68 @@ export function readLayout(scene: unknown): Layout {
   return normalize(s.getFlag(MODULE_ID, FLAGS.layout));
 }
 
+/* -------------------------------------------- Undo / redo --------------- */
+// In-memory, per-session history of the landing layout. Every writeLayout
+// snapshots the pre-write state (deep-cloned) onto the undo stack, so undo/redo
+// can restore it. Guarded by `applyingHistory` so re-applying a snapshot
+// doesn't record itself.
+
+const HISTORY_MAX = 50;
+const undoStack: Layout[] = [];
+const redoStack: Layout[] = [];
+let applyingHistory = false;
+
+function snapshot(scene: unknown): Layout {
+  return foundry.utils.deepClone(readLayout(scene)) as Layout;
+}
+
+/** Drop all recorded history — e.g. when the landing scene designation changes. */
+export function clearLayoutHistory(): void {
+  undoStack.length = 0;
+  redoStack.length = 0;
+}
+
+/** Restore the layout as it was before the last change. Returns false if there
+ *  is nothing to undo (or no active landing scene). */
+export async function undoLayout(): Promise<boolean> {
+  if (applyingHistory) return false;
+  const scene = activeLandingScene();
+  if (!scene || undoStack.length === 0) return false;
+  redoStack.push(snapshot(scene));
+  const prev = undoStack.pop() as Layout;
+  applyingHistory = true;
+  try {
+    await writeLayout(scene, prev);
+  } finally {
+    applyingHistory = false;
+  }
+  return true;
+}
+
+/** Re-apply a layout that undoLayout reverted. */
+export async function redoLayout(): Promise<boolean> {
+  if (applyingHistory) return false;
+  const scene = activeLandingScene();
+  if (!scene || redoStack.length === 0) return false;
+  undoStack.push(snapshot(scene));
+  const next = redoStack.pop() as Layout;
+  applyingHistory = true;
+  try {
+    await writeLayout(scene, next);
+  } finally {
+    applyingHistory = false;
+  }
+  return true;
+}
+
 /** Persist a landing layout to the scene. GM only (enforced by Foundry permissions). */
 export async function writeLayout(scene: unknown, layout: Layout): Promise<void> {
   const s = scene as { setFlag?: (m: string, k: string, v: unknown) => Promise<unknown> } | null;
+  if (!applyingHistory) {
+    undoStack.push(snapshot(scene)); // pre-write state
+    if (undoStack.length > HISTORY_MAX) undoStack.shift();
+    redoStack.length = 0; // a fresh edit invalidates the redo trail
+  }
   await s?.setFlag?.(MODULE_ID, FLAGS.layout, layout);
 }
 

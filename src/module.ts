@@ -11,7 +11,15 @@
  */
 
 import { GRID, MODULE_ID, SETTINGS, log } from "./constants";
-import { getLandingSceneId, isLandingScene, setLandingSceneId } from "./layout";
+import {
+  activeLandingScene,
+  clearLayoutHistory,
+  getLandingSceneId,
+  isLandingScene,
+  redoLayout,
+  setLandingSceneId,
+  undoLayout,
+} from "./layout";
 import { worldLayer } from "./world-layer";
 import { dmScreen } from "./dm-screen";
 import { pickWidgetType } from "./widget-config";
@@ -78,6 +86,33 @@ Hooks.once("init", () => {
     range: { min: 4, max: 100, step: 1 },
     default: GRID.max,
   });
+
+  // Ctrl+Z / Ctrl+Y undo & redo of the landing layout. Foundry's own undo only
+  // covers canvas placeables, not our scene-flag layout, so we run our own
+  // history. Both consume the key (and pre-empt core undo) ONLY while editing
+  // the landing board; otherwise they return false so core undo still works.
+  game.keybindings.register(MODULE_ID, "undo", {
+    name: "BIVOUAC.Keybindings.Undo",
+    editable: [{ key: "KeyZ", modifiers: ["Control"] }],
+    restricted: true,
+    precedence: CONST.KEYBINDING_PRECEDENCE.PRIORITY,
+    onDown: () => {
+      if (!worldLayer.editMode || !activeLandingScene()) return false;
+      void undoLayout();
+      return true;
+    },
+  });
+  game.keybindings.register(MODULE_ID, "redo", {
+    name: "BIVOUAC.Keybindings.Redo",
+    editable: [{ key: "KeyY", modifiers: ["Control"] }],
+    restricted: true,
+    precedence: CONST.KEYBINDING_PRECEDENCE.PRIORITY,
+    onDown: () => {
+      if (!worldLayer.editMode || !activeLandingScene()) return false;
+      void redoLayout();
+      return true;
+    },
+  });
 });
 
 // Add the Bivouac control group to the scene-controls toolbar (GM only).
@@ -143,6 +178,7 @@ Hooks.on("updateScene", (scene: { id: string }, changes: object) => {
 // React to a change of which scene is the landing scene (cross-client).
 function onSettingChange(setting: { key?: string }): void {
   if (setting?.key === `${MODULE_ID}.${SETTINGS.landingSceneId}`) {
+    clearLayoutHistory(); // old history belongs to the previous landing scene
     worldLayer.refresh();
     ui.controls?.render();
   }

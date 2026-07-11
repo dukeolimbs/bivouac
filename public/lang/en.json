@@ -74,7 +74,9 @@
       "Empty": "No tools yet. Use + to add a widget."
     },
     "Keybindings": {
-      "CloseDMScreen": "Close the DM screen"
+      "CloseDMScreen": "Close the DM screen",
+      "Undo": "Undo landing layout change",
+      "Redo": "Redo landing layout change"
     },
     "Settings": {
       "DmTabPad": {

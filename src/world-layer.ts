@@ -207,6 +207,10 @@ class WorldLayer {
         const current = this.#readWidget(widget.id) ?? widget;
         openWidgetConfig(current, (updated) => this.#saveConfigured(widget.id, updated));
       }));
+      header.appendChild(this.#iconButton("fa-solid fa-clone", "BIVOUAC.Edit.Duplicate", (e) => {
+        e.stopPropagation();
+        void this.duplicateWidget(widget.id);
+      }));
       header.appendChild(this.#iconButton("fa-solid fa-trash", "BIVOUAC.Edit.Delete", (e) => {
         e.stopPropagation();
         void this.deleteWidget(widget.id);
@@ -386,6 +390,22 @@ class WorldLayer {
   #saveConfigured(id: string, updated: Widget): void {
     const live = this.#readWidget(id);
     void this.updateWidget(live ? { ...updated, cell: live.cell } : updated);
+  }
+
+  /** Clone a widget with a fresh id, offset one full width to the right so the
+   *  copy lands flush beside the original (no overlap), and select the copy. */
+  async duplicateWidget(id: string): Promise<void> {
+    const scene = activeLandingScene();
+    if (!scene) return;
+    const src = this.#readWidget(id);
+    if (!src) return;
+    const clone: Widget = foundry.utils.deepClone(src);
+    clone.id = foundry.utils.randomID();
+    clone.cell = { ...src.cell, gx: src.cell.gx + src.cell.gw };
+    const layout = readLayout(scene);
+    layout.widgets.push(clone);
+    await writeLayout(scene, layout);
+    this.#selectWidget(clone.id, false);
   }
 
   async deleteWidget(id: string): Promise<void> {

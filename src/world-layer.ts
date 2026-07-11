@@ -368,9 +368,9 @@ class WorldLayer {
     const gx = Math.max(0, Math.round(center.x / gs) - Math.floor(GRID.defaultSize / 2));
     const gy = Math.max(0, Math.round(center.y / gs) - Math.floor(GRID.defaultSize / 2));
     const widget = createWidget(type, gx, gy);
-    const layout = readLayout(scene);
-    layout.widgets.push(widget);
-    await writeLayout(scene, layout);
+    // Configure first, then commit on Save (#saveConfigured → updateWidget
+    // inserts the not-yet-present widget). So adding is a SINGLE undoable step
+    // and cancelling the dialog leaves no empty widget behind.
     openWidgetConfig(widget, (updated) => this.#saveConfigured(widget.id, updated));
   }
 

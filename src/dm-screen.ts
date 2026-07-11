@@ -18,7 +18,13 @@ class DMScreen {
   toggle(force?: boolean): void {
     if (!game.user?.isGM) return;
     this.#open = force ?? !this.#open;
+    const firstMount = !this.#el;
     this.#mount();
+    // On first mount the element is inserted already closed (translateX(100%))
+    // and opened in the same frame, so the browser never paints the closed
+    // state and the slide-in is skipped. Force a reflow to commit that
+    // baseline before flipping to open, so the transition runs the first time.
+    if (firstMount) void this.#el?.offsetWidth;
     this.#el?.classList.toggle("bivouac-drawer--open", this.#open);
     if (this.#open) this.render();
   }
@@ -166,6 +172,12 @@ class DMScreen {
   }
 
   async #delete(id: string): Promise<void> {
+    const ok = await foundry.applications.api.DialogV2.confirm({
+      window: { title: game.i18n.localize("BIVOUAC.Confirm.DeleteTitle") },
+      content: `<p>${game.i18n.format("BIVOUAC.Confirm.DeleteBody", { count: 1 })}</p>`,
+      modal: true,
+    });
+    if (!ok) return;
     const layout = readDMLayout();
     layout.widgets = layout.widgets.filter((w) => w.id !== id);
     await writeDMLayout(layout);

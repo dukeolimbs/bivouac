@@ -1,7 +1,7 @@
 /** Bivouac — the world layer: a DOM surface over the canvas whose transform
  *  tracks the scene's pan/zoom, hosting widgets placed on scene grid squares. */
 
-import { GRID, LOD, type Widget, type WidgetType } from "./constants";
+import { GRID, LOD, type Widget, type WidgetCell, type WidgetType } from "./constants";
 import { activeLandingScene, readLayout, writeLayout } from "./layout";
 import { attachInteractions, createWidget, getWidgetType, type RenderContext } from "./widgets";
 import { openWidgetConfig } from "./widget-config";
@@ -258,53 +258,74 @@ class WorldLayer {
     const rec = this.#rendered.get(widgetId);
     if (!widget || !rec) return;
 
-    // Grabbing a widget selects it (this path stops propagation, so the
-    // widget's own select listener won't fire).
-    this.#selectWidget(widgetId, event.shiftKey || event.ctrlKey || event.metaKey);
+    // Grabbing a widget selects it — but keep an existing multi-selection intact
+    // when grabbing one of its members, so the whole group can be moved together.
+    this.#selectForDrag(widgetId, event.shiftKey || event.ctrlKey || event.metaKey);
 
     event.preventDefault();
     event.stopPropagation();
-    const el = rec.el;
     const gs = this.#gridSize();
     const scale = canvas?.stage?.scale?.x ?? 1;
-    const start = { x: event.clientX, y: event.clientY, cell: { ...widget.cell } };
+
+    // A move on any member of a multi-selection drags the whole group; a resize
+    // only ever affects the grabbed widget.
+    const group = mode === "move" && this.#selected.has(widgetId) && this.#selected.size > 1;
+    const ids = group ? [...this.#selected] : [widgetId];
+    const dragees: { id: string; el: HTMLElement; cell: WidgetCell }[] = [];
+    for (const id of ids) {
+      const w = this.#readWidget(id);
+      const r = this.#rendered.get(id);
+      if (!w || !r) continue;
+      dragees.push({ id, el: r.el, cell: { ...w.cell } });
+      r.el.classList.add("bivouac-dragging");
+    }
+
+    const primary = rec.el;
+    const start = { x: event.clientX, y: event.clientY };
     this.#dragging = true;
-    el.classList.add("bivouac-dragging");
-    el.setPointerCapture(event.pointerId);
+    primary.setPointerCapture(event.pointerId);
 
     const onMove = (ev: PointerEvent) => {
       const dx = (ev.clientX - start.x) / scale;
       const dy = (ev.clientY - start.y) / scale;
       if (mode === "move") {
-        el.style.left = `${start.cell.gx * gs + dx}px`;
-        el.style.top = `${start.cell.gy * gs + dy}px`;
+        for (const d of dragees) {
+          d.el.style.left = `${d.cell.gx * gs + dx}px`;
+          d.el.style.top = `${d.cell.gy * gs + dy}px`;
+        }
       } else {
-        el.style.width = `${Math.max(GRID.min * gs, start.cell.gw * gs + dx)}px`;
-        el.style.height = `${Math.max(GRID.min * gs, start.cell.gh * gs + dy)}px`;
+        const d = dragees[0];
+        d.el.style.width = `${Math.max(GRID.min * gs, d.cell.gw * gs + dx)}px`;
+        d.el.style.height = `${Math.max(GRID.min * gs, d.cell.gh * gs + dy)}px`;
       }
     };
 
     const onUp = (ev: PointerEvent) => {
-      el.releasePointerCapture(ev.pointerId);
-      el.removeEventListener("pointermove", onMove);
-      el.removeEventListener("pointerup", onUp);
-      el.classList.remove("bivouac-dragging");
+      primary.releasePointerCapture(ev.pointerId);
+      primary.removeEventListener("pointermove", onMove);
+      primary.removeEventListener("pointerup", onUp);
+      for (const d of dragees) d.el.classList.remove("bivouac-dragging");
       this.#dragging = false;
 
       const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
-      const snapped = { ...start.cell };
+      const updates = new Map<string, WidgetCell>();
       if (mode === "move") {
-        snapped.gx = Math.max(0, Math.round(parseFloat(el.style.left) / gs));
-        snapped.gy = Math.max(0, Math.round(parseFloat(el.style.top) / gs));
+        for (const d of dragees) {
+          const gx = Math.max(0, Math.round(parseFloat(d.el.style.left) / gs));
+          const gy = Math.max(0, Math.round(parseFloat(d.el.style.top) / gs));
+          updates.set(d.id, { ...d.cell, gx, gy });
+        }
       } else {
-        snapped.gw = clamp(Math.round(parseFloat(el.style.width) / gs), GRID.min, GRID.max);
-        snapped.gh = clamp(Math.round(parseFloat(el.style.height) / gs), GRID.min, GRID.max);
+        const d = dragees[0];
+        const gw = clamp(Math.round(parseFloat(d.el.style.width) / gs), GRID.min, GRID.max);
+        const gh = clamp(Math.round(parseFloat(d.el.style.height) / gs), GRID.min, GRID.max);
+        updates.set(d.id, { ...d.cell, gw, gh });
       }
-      void this.updateWidget({ ...widget, cell: snapped });
+      void this.#applyCellUpdates(updates);
     };
 
-    el.addEventListener("pointermove", onMove);
-    el.addEventListener("pointerup", onUp);
+    primary.addEventListener("pointermove", onMove);
+    primary.addEventListener("pointerup", onUp);
   }
 
   /* ---------------------------------------- mutations ------------------ */
@@ -340,16 +361,40 @@ class WorldLayer {
     return this.deleteWidgets([id]);
   }
 
-  /** Remove several widgets in a single layout write. */
+  /** Remove several widgets in a single layout write, after a confirm. */
   async deleteWidgets(ids: string[]): Promise<void> {
     const scene = activeLandingScene();
     if (!scene || ids.length === 0) return;
+
+    const ok = await foundry.applications.api.DialogV2.confirm({
+      window: { title: game.i18n.localize("BIVOUAC.Confirm.DeleteTitle") },
+      content: `<p>${game.i18n.format("BIVOUAC.Confirm.DeleteBody", { count: ids.length })}</p>`,
+      modal: true,
+    });
+    if (!ok) return;
+
     const kill = new Set(ids);
     const layout = readLayout(scene);
     const before = layout.widgets.length;
     layout.widgets = layout.widgets.filter((w) => !kill.has(w.id));
     for (const id of ids) this.#selected.delete(id);
     if (layout.widgets.length !== before) await writeLayout(scene, layout);
+  }
+
+  /** Commit a batch of cell changes (from a single- or group-drag) in one write. */
+  async #applyCellUpdates(updates: Map<string, WidgetCell>): Promise<void> {
+    const scene = activeLandingScene();
+    if (!scene || updates.size === 0) return;
+    const layout = readLayout(scene);
+    let changed = false;
+    for (const w of layout.widgets) {
+      const cell = updates.get(w.id);
+      if (cell) {
+        w.cell = cell;
+        changed = true;
+      }
+    }
+    if (changed) await writeLayout(scene, layout);
   }
 
   /* ---------------------------------------- selection ----------------- */
@@ -362,6 +407,18 @@ class WorldLayer {
       this.#selected = new Set([id]);
     }
     this.#applySelectionClasses();
+  }
+
+  /** Like #selectWidget, but a plain grab of an already-selected widget keeps
+   *  the current (possibly multi-) selection so a group drag can start. */
+  #selectForDrag(id: string, additive: boolean): void {
+    if (additive) {
+      if (this.#selected.has(id)) this.#selected.delete(id);
+      else this.#selected.add(id);
+      this.#applySelectionClasses();
+    } else if (!this.#selected.has(id)) {
+      this.#selectWidget(id, false);
+    }
   }
 
   #applySelectionClasses(): void {
@@ -469,7 +526,7 @@ class WorldLayer {
 
   #onKeyDown(event: KeyboardEvent): void {
     if (!this.#editMode || !this.#overlay) return;
-    if (event.key !== "Delete" && event.key !== "Backspace") return;
+    if (event.key !== "Delete") return;
     if (this.#selected.size === 0) return;
     const t = event.target as HTMLElement | null;
     const tag = t?.tagName;

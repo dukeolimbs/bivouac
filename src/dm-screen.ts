@@ -50,6 +50,11 @@ class DMScreen {
     return ui.sidebar?.element instanceof HTMLElement ? ui.sidebar.element : null;
   }
 
+  /** Reposition the tab now — e.g. after the padding setting changes. */
+  refreshTab(): void {
+    if (this.#tab) this.#scheduleSync();
+  }
+
   #tabPad(): number {
     const raw = getComputedStyle(document.documentElement).getPropertyValue("--bivouac-dmtab-pad");
     const n = parseFloat(raw);

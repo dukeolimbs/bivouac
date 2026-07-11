@@ -41,6 +41,20 @@ Hooks.once("init", () => {
       return true;
     },
   });
+
+  // Gap the DM-screen tab keeps to the left of the sidebar edge — exposed as a
+  // slider so it can be widened to clear other right-docked UI (e.g. a party
+  // HUD) without editing CSS. Applied live via `applyDmTabPad`.
+  game.settings.register(MODULE_ID, SETTINGS.dmTabPad, {
+    name: "BIVOUAC.Settings.DmTabPad.Name",
+    hint: "BIVOUAC.Settings.DmTabPad.Hint",
+    scope: "client",
+    config: true,
+    type: Number,
+    range: { min: 0, max: 400, step: 2 },
+    default: 16,
+    onChange: () => applyDmTabPad(),
+  });
 });
 
 // Add the Bivouac control group to the scene-controls toolbar (GM only).
@@ -117,8 +131,16 @@ Hooks.once("ready", () => {
   const mod = game.modules.get(MODULE_ID);
   if (mod) mod.api = { worldLayer, dmScreen };
   if (game.user?.isGM) dmScreen.mountControl();
+  applyDmTabPad();
   log("Ready");
 });
+
+/** Push the DM-tab padding setting into the CSS var and reposition the tab. */
+function applyDmTabPad(): void {
+  const pad = Number(game.settings.get(MODULE_ID, SETTINGS.dmTabPad) ?? 16);
+  document.documentElement.style.setProperty("--bivouac-dmtab-pad", `${pad}px`);
+  dmScreen.refreshTab();
+}
 
 /* -------------------------------------------- toolbar actions ----------- */
 

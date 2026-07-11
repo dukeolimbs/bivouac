@@ -13,6 +13,8 @@ export const FLAGS = {
 export const SETTINGS = {
   /** World setting: the id of the Scene designated as the landing page. */
   landingSceneId: "landingSceneId",
+  /** Client setting: px the DM-screen tab keeps left of the sidebar edge. */
+  dmTabPad: "dmTabPad",
 } as const;
 
 /** Widget geometry, measured in whole scene grid squares. */

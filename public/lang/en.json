@@ -74,6 +74,12 @@
     },
     "Keybindings": {
       "CloseDMScreen": "Close the DM screen"
+    },
+    "Settings": {
+      "DmTabPad": {
+        "Name": "DM screen tab — edge padding",
+        "Hint": "Horizontal gap (px) the DM-screen toggle tab keeps to the left of the sidebar. Increase it to clear other UI docked there, such as a party HUD."
+      }
     }
   }
 }

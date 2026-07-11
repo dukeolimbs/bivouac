@@ -11,6 +11,8 @@ class DMScreen {
   #tab: HTMLElement | null = null;
   #open = false;
   #dragId: string | null = null;
+  #sidebarMaxOccupied = 0;
+  #sidebarRO: ResizeObserver | null = null;
 
   get isOpen(): boolean {
     return this.#open;
@@ -36,6 +38,51 @@ class DMScreen {
     this.#tab = tab;
 
     document.addEventListener("keydown", this.#onEscape);
+    this.#trackSidebar();
+  }
+
+  /* -------------------------------------------- sidebar tracking -------- */
+
+  #sidebarEl(): HTMLElement | null {
+    const el = document.getElementById("sidebar");
+    if (el) return el;
+    return ui.sidebar?.element instanceof HTMLElement ? ui.sidebar.element : null;
+  }
+
+  /** Keep the tab a constant distance to the left of Foundry's right-hand
+   *  sidebar. `--bivouac-dmtab-inset` is the position with the sidebar at its
+   *  widest (open); as it collapses we pull the tab right by however much the
+   *  sidebar shrank (`--bivouac-dmtab-shift`). Self-calibrates off the widest
+   *  sidebar seen, so it needs no version-specific width constants. */
+  #syncTabToSidebar = (): void => {
+    const el = this.#sidebarEl();
+    if (!el || !this.#tab) return;
+    const occupied = window.innerWidth - el.getBoundingClientRect().left;
+    if (occupied > this.#sidebarMaxOccupied) this.#sidebarMaxOccupied = occupied;
+    const shift = Math.max(0, this.#sidebarMaxOccupied - occupied);
+    document.documentElement.style.setProperty("--bivouac-dmtab-shift", `${Math.round(shift)}px`);
+  };
+
+  #trackSidebar(): void {
+    const el = this.#sidebarEl();
+    // Width-based collapse/expand: fires per frame, so the tab tracks live.
+    if (el && "ResizeObserver" in window) {
+      this.#sidebarRO = new ResizeObserver(this.#syncTabToSidebar);
+      this.#sidebarRO.observe(el);
+    }
+    // Backup for transform-based transitions (no size change): follow a few
+    // frames after Foundry reports the collapse/expand.
+    Hooks.on("collapseSidebar", () => {
+      let n = 0;
+      const step = (): void => {
+        this.#syncTabToSidebar();
+        if (++n < 20) requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);
+    });
+    window.addEventListener("resize", this.#syncTabToSidebar);
+    this.#syncTabToSidebar();
+    window.setTimeout(this.#syncTabToSidebar, 500); // after initial layout settles
   }
 
   /** Close the drawer on Esc while it's open — unless something else already

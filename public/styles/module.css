@@ -8,7 +8,8 @@
   --bivouac-z: 1;                 /* above the canvas, below Foundry's UI panels */
   --bivouac-drawer-z: 60;
   --bivouac-drawer-w: min(380px, 90vw);
-  --bivouac-dmtab-inset: 52px;    /* gap from the right edge, clearing the UI column — tune to taste */
+  --bivouac-dmtab-inset: 164px;   /* gap from the right edge with the sidebar open — tune to taste */
+  --bivouac-dmtab-shift: 0px;     /* JS-driven: how far to pull the tab right as the sidebar collapses */
   --bivouac-radius: 10px;
   --bivouac-gap: 8px;
   --bivouac-blur: 7px;
@@ -343,7 +344,7 @@
 .bivouac-dmscreen-tab {
   position: absolute;
   top: 50%;
-  right: var(--bivouac-dmtab-inset);
+  right: calc(var(--bivouac-dmtab-inset) - var(--bivouac-dmtab-shift));
   transform: translateY(-50%);
   z-index: calc(var(--bivouac-drawer-z) + 1);   /* above Foundry's UI */
   display: flex;

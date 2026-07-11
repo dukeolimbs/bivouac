@@ -69,15 +69,8 @@ Hooks.on("getSceneControlButtons", (controls: Record<string, unknown>) => {
         button: true,
         onChange: () => void addWidget(),
       },
-      dmscreen: {
-        name: "dmscreen",
-        order: 4,
-        title: "BIVOUAC.Controls.DMScreen",
-        icon: "fa-solid fa-chalkboard-user",
-        toggle: true,
-        active: dmScreen.isOpen,
-        onChange: (_event: Event, active: boolean) => dmScreen.toggle(active),
-      },
+      // The DM screen lives on its own right-side tab (see dmScreen.mountControl),
+      // not in this group — opening it shouldn't force edit mode.
     },
   };
 });
@@ -107,6 +100,7 @@ Hooks.on("createSetting", onSettingChange);
 Hooks.once("ready", () => {
   const mod = game.modules.get(MODULE_ID);
   if (mod) mod.api = { worldLayer, dmScreen };
+  if (game.user?.isGM) dmScreen.mountControl();
   log("Ready");
 });
 

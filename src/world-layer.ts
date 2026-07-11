@@ -1,7 +1,7 @@
 /** Bivouac — the world layer: a DOM surface over the canvas whose transform
  *  tracks the scene's pan/zoom, hosting widgets placed on scene grid squares. */
 
-import { GRID, LOD, type Widget, type WidgetCell, type WidgetType } from "./constants";
+import { GRID, LOD, MODULE_ID, SETTINGS, type Widget, type WidgetCell, type WidgetType } from "./constants";
 import { activeLandingScene, readLayout, writeLayout } from "./layout";
 import { attachInteractions, createWidget, getWidgetType, type RenderContext } from "./widgets";
 import { openWidgetConfig } from "./widget-config";
@@ -34,6 +34,12 @@ class WorldLayer {
   /** Pixel size of one scene grid square. */
   #gridSize(): number {
     return canvas?.grid?.size || 100;
+  }
+
+  /** Max widget size in squares (GM-configurable; falls back to GRID.max). */
+  #maxCells(): number {
+    const v = Number(game.settings.get(MODULE_ID, SETTINGS.maxWidgetSize));
+    return Number.isFinite(v) && v >= GRID.min ? v : GRID.max;
   }
 
   #readWidget(id: string): Widget | null {
@@ -272,6 +278,8 @@ class WorldLayer {
     event.stopPropagation();
     const gs = this.#gridSize();
     const scale = canvas?.stage?.scale?.x ?? 1;
+    const maxCells = this.#maxCells();
+    const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
 
     // A move on any member of a multi-selection drags the whole group; a resize
     // only ever affects the grabbed widget.
@@ -300,9 +308,11 @@ class WorldLayer {
           d.el.style.top = `${d.cell.gy * gs + dy}px`;
         }
       } else {
+        // Clamp live to [min, max] so the widget can't grow past the cap and
+        // then snap back on release (the old surprise).
         const d = dragees[0];
-        d.el.style.width = `${Math.max(GRID.min * gs, d.cell.gw * gs + dx)}px`;
-        d.el.style.height = `${Math.max(GRID.min * gs, d.cell.gh * gs + dy)}px`;
+        d.el.style.width = `${clamp(d.cell.gw * gs + dx, GRID.min * gs, maxCells * gs)}px`;
+        d.el.style.height = `${clamp(d.cell.gh * gs + dy, GRID.min * gs, maxCells * gs)}px`;
       }
     };
 
@@ -313,7 +323,6 @@ class WorldLayer {
       for (const d of dragees) d.el.classList.remove("bivouac-dragging");
       this.#dragging = false;
 
-      const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
       const updates = new Map<string, WidgetCell>();
       if (mode === "move") {
         for (const d of dragees) {
@@ -323,8 +332,8 @@ class WorldLayer {
         }
       } else {
         const d = dragees[0];
-        const gw = clamp(Math.round(parseFloat(d.el.style.width) / gs), GRID.min, GRID.max);
-        const gh = clamp(Math.round(parseFloat(d.el.style.height) / gs), GRID.min, GRID.max);
+        const gw = clamp(Math.round(parseFloat(d.el.style.width) / gs), GRID.min, maxCells);
+        const gh = clamp(Math.round(parseFloat(d.el.style.height) / gs), GRID.min, maxCells);
         updates.set(d.id, { ...d.cell, gw, gh });
       }
 

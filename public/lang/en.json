@@ -83,6 +83,10 @@
       "DmTabTop": {
         "Name": "DM screen tab — vertical position",
         "Hint": "Vertical position of the DM-screen toggle tab, as a percentage of the screen height (0 = top, 50 = middle, 100 = bottom)."
+      },
+      "MaxWidgetSize": {
+        "Name": "Maximum widget size",
+        "Hint": "The largest a widget can be resized to, measured in grid squares (applies to width and height)."
       }
     }
   }

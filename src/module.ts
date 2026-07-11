@@ -10,7 +10,7 @@
  * web views. See docs/landing-page-design-spec.md.
  */
 
-import { MODULE_ID, SETTINGS, log } from "./constants";
+import { GRID, MODULE_ID, SETTINGS, log } from "./constants";
 import { getLandingSceneId, isLandingScene, setLandingSceneId } from "./layout";
 import { worldLayer } from "./world-layer";
 import { dmScreen } from "./dm-screen";
@@ -66,6 +66,17 @@ Hooks.once("init", () => {
     range: { min: 0, max: 100, step: 1 },
     default: 50,
     onChange: () => applyTabSettings(),
+  });
+
+  // Largest a widget may be resized to, in grid squares (read live on resize).
+  game.settings.register(MODULE_ID, SETTINGS.maxWidgetSize, {
+    name: "BIVOUAC.Settings.MaxWidgetSize.Name",
+    hint: "BIVOUAC.Settings.MaxWidgetSize.Hint",
+    scope: "world",
+    config: true,
+    type: Number,
+    range: { min: 4, max: 100, step: 1 },
+    default: GRID.max,
   });
 });
 

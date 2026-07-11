@@ -17,6 +17,8 @@ export const SETTINGS = {
   dmTabPad: "dmTabPad",
   /** Client setting: vertical position of the DM-screen tab, as a % of height. */
   dmTabTop: "dmTabTop",
+  /** World setting: max widget size in grid squares (resize cap). */
+  maxWidgetSize: "maxWidgetSize",
 } as const;
 
 /** Widget geometry, measured in whole scene grid squares. */
@@ -57,9 +59,10 @@ export interface Layout {
 export const GRID = {
   /** Default size of a freshly-added widget, in squares. */
   defaultSize: 2,
-  /** Clamp for widget dimensions, in squares. */
+  /** Clamp for widget dimensions, in squares. `max` is the default cap; the GM
+   *  can override it via the `maxWidgetSize` setting. */
   min: 1,
-  max: 10,
+  max: 40,
 } as const;
 
 /** Level-of-detail: only degrade web views to placeholders when the board is

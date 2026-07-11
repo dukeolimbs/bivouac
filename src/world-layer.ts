@@ -138,11 +138,11 @@ class WorldLayer {
 
       const existing = this.#rendered.get(widget.id);
       if (existing && existing.sig === sig) {
-        this.#position(existing.el, widget, gs); // move only — no rebuild
+        this.#position(existing.el, widget.cell, gs); // move only — no rebuild
         continue;
       }
       const el = this.#buildWidget(widget, { gs, isGM, lod });
-      this.#position(el, widget, gs);
+      this.#position(el, widget.cell, gs);
       if (existing) existing.el.replaceWith(el);
       else this.#world.appendChild(el);
       this.#rendered.set(widget.id, { el, sig });
@@ -160,11 +160,11 @@ class WorldLayer {
     this.#applySelectionClasses();
   }
 
-  #position(el: HTMLElement, widget: Widget, gs: number): void {
-    el.style.left = `${widget.cell.gx * gs}px`;
-    el.style.top = `${widget.cell.gy * gs}px`;
-    el.style.width = `${widget.cell.gw * gs}px`;
-    el.style.height = `${widget.cell.gh * gs}px`;
+  #position(el: HTMLElement, cell: WidgetCell, gs: number): void {
+    el.style.left = `${cell.gx * gs}px`;
+    el.style.top = `${cell.gy * gs}px`;
+    el.style.width = `${cell.gw * gs}px`;
+    el.style.height = `${cell.gh * gs}px`;
   }
 
   #buildWidget(widget: Widget, extra: { gs: number; isGM: boolean; lod: boolean }): HTMLElement {
@@ -320,6 +320,14 @@ class WorldLayer {
         const gw = clamp(Math.round(parseFloat(d.el.style.width) / gs), GRID.min, GRID.max);
         const gh = clamp(Math.round(parseFloat(d.el.style.height) / gs), GRID.min, GRID.max);
         updates.set(d.id, { ...d.cell, gw, gh });
+      }
+
+      // Snap the elements to the grid immediately. A drag whose snapped cell
+      // equals the current cell writes identical data → no updateScene → no
+      // render, which would otherwise leave the element at its raw drag offset.
+      for (const d of dragees) {
+        const cell = updates.get(d.id);
+        if (cell) this.#position(d.el, cell, gs);
       }
       void this.#applyCellUpdates(updates);
     };

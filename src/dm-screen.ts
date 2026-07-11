@@ -17,7 +17,9 @@ class DMScreen {
 
   toggle(force?: boolean): void {
     if (!game.user?.isGM) return;
-    this.#open = force ?? !this.#open;
+    const next = force ?? !this.#open;
+    if (next === this.#open && this.#el) return;
+    this.#open = next;
     const firstMount = !this.#el;
     this.#mount();
     // On first mount the element is inserted already closed (translateX(100%))
@@ -27,6 +29,10 @@ class DMScreen {
     if (firstMount) void this.#el?.offsetWidth;
     this.#el?.classList.toggle("bivouac-drawer--open", this.#open);
     if (this.#open) this.render();
+    // Re-render the scene controls so the toolbar toggle's highlight matches
+    // the drawer state — Foundry only clears it for clicks on the toggle
+    // itself, not when we close from the drawer's own ✕ button.
+    ui.controls?.render();
   }
 
   #mount(): void {

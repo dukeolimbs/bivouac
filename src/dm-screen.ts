@@ -272,12 +272,7 @@ class DMScreen {
   }
 
   async #delete(id: string): Promise<void> {
-    const ok = await foundry.applications.api.DialogV2.confirm({
-      window: { title: game.i18n.localize("BIVOUAC.Confirm.DeleteTitle") },
-      content: `<p>${game.i18n.format("BIVOUAC.Confirm.DeleteBody", { count: 1 })}</p>`,
-      modal: true,
-    });
-    if (!ok) return;
+    // Single-card delete — no confirm (matches the landing board's per-widget delete).
     const layout = readDMLayout();
     layout.widgets = layout.widgets.filter((w) => w.id !== id);
     await writeDMLayout(layout);

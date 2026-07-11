@@ -11,8 +11,10 @@ class DMScreen {
   #tab: HTMLElement | null = null;
   #open = false;
   #dragId: string | null = null;
-  #sidebarMaxOccupied = 0;
   #sidebarRO: ResizeObserver | null = null;
+  #sidebarMO: MutationObserver | null = null;
+  #syncFrames = 0;
+  #syncRunning = false;
 
   get isOpen(): boolean {
     return this.#open;
@@ -48,40 +50,58 @@ class DMScreen {
     return ui.sidebar?.element instanceof HTMLElement ? ui.sidebar.element : null;
   }
 
-  /** Keep the tab a constant distance to the left of Foundry's right-hand
-   *  sidebar. `--bivouac-dmtab-inset` is the position with the sidebar at its
-   *  widest (open); as it collapses we pull the tab right by however much the
-   *  sidebar shrank (`--bivouac-dmtab-shift`). Self-calibrates off the widest
-   *  sidebar seen, so it needs no version-specific width constants. */
-  #syncTabToSidebar = (): void => {
+  #tabPad(): number {
+    const raw = getComputedStyle(document.documentElement).getPropertyValue("--bivouac-dmtab-pad");
+    const n = parseFloat(raw);
+    return Number.isFinite(n) ? n : 16;
+  }
+
+  /** Park the tab `--bivouac-dmtab-pad` px to the left of the sidebar's *live*
+   *  left edge, so it stays just clear of the sidebar whatever its current
+   *  width. Measured directly each call — no cached baseline — and clamped so
+   *  it can never slide off-screen. (Clearing extra neighbours like a party-HUD
+   *  is done by widening the pad for now; auto-avoidance is a backlog item.) */
+  #syncTab = (): void => {
     const el = this.#sidebarEl();
     if (!el || !this.#tab) return;
-    const occupied = window.innerWidth - el.getBoundingClientRect().left;
-    if (occupied > this.#sidebarMaxOccupied) this.#sidebarMaxOccupied = occupied;
-    const shift = Math.max(0, this.#sidebarMaxOccupied - occupied);
-    document.documentElement.style.setProperty("--bivouac-dmtab-shift", `${Math.round(shift)}px`);
+    const rect = el.getBoundingClientRect();
+    if (rect.width === 0) return; // not laid out (e.g. mid-transition) — keep last position
+    const inset = Math.max(8, window.innerWidth - rect.left + this.#tabPad());
+    document.documentElement.style.setProperty("--bivouac-dmtab-inset", `${Math.round(inset)}px`);
+  };
+
+  /** Re-sync each frame for a short window so the tab follows the sidebar's
+   *  expand/collapse animation to its settled position. Re-triggering extends
+   *  the window rather than stacking loops. */
+  #scheduleSync = (): void => {
+    this.#syncFrames = 25;
+    if (this.#syncRunning) return;
+    this.#syncRunning = true;
+    const step = (): void => {
+      this.#syncTab();
+      if (--this.#syncFrames > 0) requestAnimationFrame(step);
+      else this.#syncRunning = false;
+    };
+    requestAnimationFrame(step);
   };
 
   #trackSidebar(): void {
     const el = this.#sidebarEl();
-    // Width-based collapse/expand: fires per frame, so the tab tracks live.
-    if (el && "ResizeObserver" in window) {
-      this.#sidebarRO = new ResizeObserver(this.#syncTabToSidebar);
-      this.#sidebarRO.observe(el);
+    if (el) {
+      // Width-based expand/collapse.
+      if ("ResizeObserver" in window) {
+        this.#sidebarRO = new ResizeObserver(this.#scheduleSync);
+        this.#sidebarRO.observe(el);
+      }
+      // Class/style toggles (covers collapses that animate via transform, which
+      // a ResizeObserver wouldn't see).
+      this.#sidebarMO = new MutationObserver(this.#scheduleSync);
+      this.#sidebarMO.observe(el, { attributes: true, attributeFilter: ["class", "style"] });
     }
-    // Backup for transform-based transitions (no size change): follow a few
-    // frames after Foundry reports the collapse/expand.
-    Hooks.on("collapseSidebar", () => {
-      let n = 0;
-      const step = (): void => {
-        this.#syncTabToSidebar();
-        if (++n < 20) requestAnimationFrame(step);
-      };
-      requestAnimationFrame(step);
-    });
-    window.addEventListener("resize", this.#syncTabToSidebar);
-    this.#syncTabToSidebar();
-    window.setTimeout(this.#syncTabToSidebar, 500); // after initial layout settles
+    Hooks.on("collapseSidebar", this.#scheduleSync);
+    window.addEventListener("resize", this.#scheduleSync);
+    this.#scheduleSync();
+    window.setTimeout(this.#scheduleSync, 500); // after initial layout settles
   }
 
   toggle(force?: boolean): void {

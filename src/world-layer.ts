@@ -193,7 +193,13 @@ class WorldLayer {
     if (this.#editMode) {
       header.appendChild(this.#iconButton("fa-solid fa-gear", "BIVOUAC.Edit.Configure", (e) => {
         e.stopPropagation();
-        openWidgetConfig(widget, (updated) => void this.updateWidget(updated));
+        // Read the CURRENT widget by id: a move repositions the element without
+        // rebuilding, so this closure's `widget` holds the stale build-time
+        // cell. Editing from that copy is what made the widget jump back on
+        // Save. Also re-read the live cell at save time in case it moved while
+        // the dialog was open.
+        const current = this.#readWidget(widget.id) ?? widget;
+        openWidgetConfig(current, (updated) => this.#saveConfigured(widget.id, updated));
       }));
       header.appendChild(this.#iconButton("fa-solid fa-trash", "BIVOUAC.Edit.Delete", (e) => {
         e.stopPropagation();
@@ -352,7 +358,7 @@ class WorldLayer {
     const layout = readLayout(scene);
     layout.widgets.push(widget);
     await writeLayout(scene, layout);
-    openWidgetConfig(widget, (updated) => void this.updateWidget(updated));
+    openWidgetConfig(widget, (updated) => this.#saveConfigured(widget.id, updated));
   }
 
   async updateWidget(widget: Widget): Promise<void> {
@@ -363,6 +369,14 @@ class WorldLayer {
     if (idx === -1) layout.widgets.push(widget);
     else layout.widgets[idx] = widget;
     await writeLayout(scene, layout);
+  }
+
+  /** Persist a widget edited via the config form, always keeping whatever cell
+   *  it currently has in the layout — position/size are owned by drag/resize,
+   *  never the config dialog, so a move during editing is never clobbered. */
+  #saveConfigured(id: string, updated: Widget): void {
+    const live = this.#readWidget(id);
+    void this.updateWidget(live ? { ...updated, cell: live.cell } : updated);
   }
 
   async deleteWidget(id: string): Promise<void> {

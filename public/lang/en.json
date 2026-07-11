@@ -13,6 +13,10 @@
       "LandingCleared": "Bivouac landing page cleared.",
       "NotLanding": "Switch to the Bivouac landing scene to add widgets."
     },
+    "Confirm": {
+      "ClearLandingTitle": "Clear landing page?",
+      "ClearLandingBody": "This removes the Bivouac landing-page designation from this scene. Your widgets are kept, but the board will no longer appear. You can set it again anytime."
+    },
     "Edit": {
       "Add": "Add widget",
       "AddTitle": "Add a widget",

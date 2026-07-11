@@ -18,6 +18,14 @@ class WorldLayer {
   #editMode = false;
   #lodTimer = 0;
   #dragging = false;
+  #selected = new Set<string>();
+
+  constructor() {
+    // Global listeners, installed once. Both no-op unless we're in edit mode
+    // with a mounted board, so they're cheap when Bivouac isn't in use.
+    document.addEventListener("keydown", (e) => this.#onKeyDown(e));
+    document.addEventListener("pointerdown", (e) => this.#onGlobalPointerDown(e), true);
+  }
 
   get editMode(): boolean {
     return this.#editMode;
@@ -87,6 +95,7 @@ class WorldLayer {
   setEditMode(on: boolean): void {
     this.#editMode = on;
     this.#overlay?.classList.toggle("bivouac-edit", on);
+    if (!on) this.#selected.clear(); // no lingering selection outside edit mode
     this.render("edit-mode");
   }
 
@@ -145,6 +154,10 @@ class WorldLayer {
         this.#rendered.delete(id);
       }
     }
+
+    // Reconciling rebuilds elements, and gone widgets can't stay selected.
+    for (const id of [...this.#selected]) if (!seen.has(id)) this.#selected.delete(id);
+    this.#applySelectionClasses();
   }
 
   #position(el: HTMLElement, widget: Widget, gs: number): void {
@@ -159,6 +172,15 @@ class WorldLayer {
     el.className = `bivouac-widget bivouac-chrome-${widget.chrome}`;
     el.dataset.id = widget.id;
     if (widget.scope === "dm") el.classList.add("bivouac-dm-scope");
+
+    // Click anywhere on a widget (except its buttons) to select it; the
+    // header/resize drag path selects too (it stops propagation before this).
+    if (this.#editMode) {
+      el.addEventListener("pointerdown", (e) => {
+        if ((e.target as HTMLElement).closest("button")) return;
+        this.#selectWidget(widget.id, e.shiftKey || e.ctrlKey || e.metaKey);
+      });
+    }
 
     const header = document.createElement("header");
     header.className = "bivouac-widget__header";
@@ -236,6 +258,10 @@ class WorldLayer {
     const rec = this.#rendered.get(widgetId);
     if (!widget || !rec) return;
 
+    // Grabbing a widget selects it (this path stops propagation, so the
+    // widget's own select listener won't fire).
+    this.#selectWidget(widgetId, event.shiftKey || event.ctrlKey || event.metaKey);
+
     event.preventDefault();
     event.stopPropagation();
     const el = rec.el;
@@ -311,11 +337,146 @@ class WorldLayer {
   }
 
   async deleteWidget(id: string): Promise<void> {
+    return this.deleteWidgets([id]);
+  }
+
+  /** Remove several widgets in a single layout write. */
+  async deleteWidgets(ids: string[]): Promise<void> {
     const scene = activeLandingScene();
-    if (!scene) return;
+    if (!scene || ids.length === 0) return;
+    const kill = new Set(ids);
     const layout = readLayout(scene);
-    layout.widgets = layout.widgets.filter((w) => w.id !== id);
-    await writeLayout(scene, layout);
+    const before = layout.widgets.length;
+    layout.widgets = layout.widgets.filter((w) => !kill.has(w.id));
+    for (const id of ids) this.#selected.delete(id);
+    if (layout.widgets.length !== before) await writeLayout(scene, layout);
+  }
+
+  /* ---------------------------------------- selection ----------------- */
+
+  #selectWidget(id: string, additive: boolean): void {
+    if (additive) {
+      if (this.#selected.has(id)) this.#selected.delete(id);
+      else this.#selected.add(id);
+    } else {
+      this.#selected = new Set([id]);
+    }
+    this.#applySelectionClasses();
+  }
+
+  #applySelectionClasses(): void {
+    for (const [id, rec] of this.#rendered) {
+      rec.el.classList.toggle("bivouac-selected", this.#selected.has(id));
+    }
+  }
+
+  /** Ids of widgets whose world-space rect intersects the box between two
+   *  client-space points. Players never see dm-scope widgets, so skip them. */
+  #widgetsInBox(a: { x: number; y: number }, b: { x: number; y: number }): string[] {
+    const scene = activeLandingScene();
+    if (!scene || !canvas) return [];
+    const pa = canvas.canvasCoordinatesFromClient(a);
+    const pb = canvas.canvasCoordinatesFromClient(b);
+    const rx0 = Math.min(pa.x, pb.x);
+    const ry0 = Math.min(pa.y, pb.y);
+    const rx1 = Math.max(pa.x, pb.x);
+    const ry1 = Math.max(pa.y, pb.y);
+    const gs = this.#gridSize();
+    const isGM = !!game.user?.isGM;
+    let widgets = readLayout(scene).widgets;
+    if (!isGM) widgets = widgets.filter((w) => w.scope !== "dm");
+    const out: string[] = [];
+    for (const w of widgets) {
+      const wx0 = w.cell.gx * gs;
+      const wy0 = w.cell.gy * gs;
+      const wx1 = (w.cell.gx + w.cell.gw) * gs;
+      const wy1 = (w.cell.gy + w.cell.gh) * gs;
+      if (!(wx1 < rx0 || wx0 > rx1 || wy1 < ry0 || wy0 > ry1)) out.push(w.id);
+    }
+    return out;
+  }
+
+  /* ---------------------------------------- marquee ------------------- */
+
+  /** Left-drag on the *empty* canvas (not on a widget or UI) draws a selection
+   *  box. Bound in the capture phase so we can pre-empt Foundry's own drag
+   *  without a surface overlay that would eat panning / zoom. */
+  #onGlobalPointerDown(event: PointerEvent): void {
+    if (!this.#editMode || !this.#world) return;
+    if (event.button !== 0) return;
+    const target = event.target as HTMLElement | null;
+    const view = canvas?.app?.view ?? canvas?.app?.canvas;
+    const onEmptyCanvas = !!target && (target.id === "board" || target === view);
+    if (!onEmptyCanvas) return;
+    this.#beginMarquee(event);
+  }
+
+  #beginMarquee(event: PointerEvent): void {
+    const overlay = this.#overlay;
+    if (!overlay) return;
+    event.preventDefault();
+    event.stopPropagation();
+
+    const rect = overlay.getBoundingClientRect();
+    const startClient = { x: event.clientX, y: event.clientY };
+    const sx = event.clientX - rect.left;
+    const sy = event.clientY - rect.top;
+    const additive = event.shiftKey || event.ctrlKey || event.metaKey;
+    const base = additive ? new Set(this.#selected) : new Set<string>();
+
+    const marquee = document.createElement("div");
+    marquee.className = "bivouac-marquee";
+    overlay.appendChild(marquee);
+    let moved = false;
+
+    const onMove = (ev: PointerEvent) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const cx = ev.clientX - rect.left;
+      const cy = ev.clientY - rect.top;
+      const w = Math.abs(cx - sx);
+      const h = Math.abs(cy - sy);
+      if (w > 3 || h > 3) moved = true;
+      marquee.style.left = `${Math.min(sx, cx)}px`;
+      marquee.style.top = `${Math.min(sy, cy)}px`;
+      marquee.style.width = `${w}px`;
+      marquee.style.height = `${h}px`;
+
+      this.#selected = new Set(base);
+      for (const id of this.#widgetsInBox(startClient, { x: ev.clientX, y: ev.clientY })) {
+        this.#selected.add(id);
+      }
+      this.#applySelectionClasses();
+    };
+
+    const onUp = (ev: PointerEvent) => {
+      ev.stopPropagation();
+      document.removeEventListener("pointermove", onMove, true);
+      document.removeEventListener("pointerup", onUp, true);
+      marquee.remove();
+      // A bare click on empty space clears the selection (unless adding).
+      if (!moved && !additive) {
+        this.#selected.clear();
+        this.#applySelectionClasses();
+      }
+    };
+
+    document.addEventListener("pointermove", onMove, true);
+    document.addEventListener("pointerup", onUp, true);
+  }
+
+  /* ---------------------------------------- keyboard ------------------ */
+
+  #onKeyDown(event: KeyboardEvent): void {
+    if (!this.#editMode || !this.#overlay) return;
+    if (event.key !== "Delete" && event.key !== "Backspace") return;
+    if (this.#selected.size === 0) return;
+    const t = event.target as HTMLElement | null;
+    const tag = t?.tagName;
+    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || t?.isContentEditable) return;
+    event.preventDefault();
+    event.stopPropagation();
+    void this.deleteWidgets([...this.#selected]);
   }
 
   /* ---------------------------------------- LOD ------------------------ */

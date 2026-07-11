@@ -111,7 +111,20 @@ Hooks.once("ready", () => {
 async function toggleLandingScene(): Promise<void> {
   const scene = canvas?.scene;
   if (!scene) return;
-  const next = getLandingSceneId() === scene.id ? "" : scene.id;
+  const clearing = getLandingSceneId() === scene.id;
+
+  // Clearing hides the whole board in one click, so guard it behind a confirm.
+  // Setting a landing scene is harmless and stays immediate.
+  if (clearing) {
+    const ok = await foundry.applications.api.DialogV2.confirm({
+      window: { title: game.i18n.localize("BIVOUAC.Confirm.ClearLandingTitle") },
+      content: `<p>${game.i18n.localize("BIVOUAC.Confirm.ClearLandingBody")}</p>`,
+      modal: true,
+    });
+    if (!ok) return;
+  }
+
+  const next = clearing ? "" : scene.id;
   await setLandingSceneId(next);
   ui.notifications?.info(
     game.i18n.localize(next ? "BIVOUAC.Notify.LandingSet" : "BIVOUAC.Notify.LandingCleared"),

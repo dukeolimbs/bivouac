@@ -78,6 +78,26 @@
   z-index: 3;
 }
 
+/* Selected in edit mode (via click, shift-click, or marquee). */
+.bivouac-widget.bivouac-selected {
+  outline: 2px solid var(--bivouac-accent);
+  outline-offset: 1px;
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--bivouac-accent) 45%, transparent),
+    0 8px 24px rgba(0, 0, 0, 0.4);
+  z-index: 2;
+}
+
+/* Rubber-band selection box, drawn in screen space over the board. */
+.bivouac-marquee {
+  position: absolute;
+  z-index: 5;
+  pointer-events: none;
+  border: 1px solid var(--bivouac-accent);
+  background: color-mix(in srgb, var(--bivouac-accent) 16%, transparent);
+  border-radius: 2px;
+}
+
 /* --- Chrome variants: clearly distinct --------------------------------- */
 
 /* none — content floats bare, part of the scene */

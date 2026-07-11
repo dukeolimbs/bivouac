@@ -17,9 +17,10 @@ class DMScreen {
   }
 
   /** Mount the persistent, GM-only toggle tab. It lives outside the
-   *  scene-controls group (so opening the DM screen never forces edit mode) and
-   *  sits at a low z-index just left of the right-hand UI column, tucking under
-   *  it rather than overlapping. Inset is tunable via `--bivouac-dmtab-inset`. */
+   *  scene-controls group (so opening the DM screen never forces edit mode),
+   *  sits just left of the right-hand UI column (inset via
+   *  `--bivouac-dmtab-inset`) and above other elements. Also wires Esc-to-close
+   *  while the drawer is open. */
   mountControl(): void {
     if (!game.user?.isGM || this.#tab) return;
     const iface = document.getElementById("interface") ?? document.body;
@@ -33,7 +34,17 @@ class DMScreen {
     tab.addEventListener("click", () => this.toggle());
     iface.appendChild(tab);
     this.#tab = tab;
+
+    document.addEventListener("keydown", this.#onEscape);
   }
+
+  /** Close the drawer on Esc while it's open — unless something else already
+   *  handled the key (e.g. an open dialog claims it first). */
+  #onEscape = (ev: KeyboardEvent): void => {
+    if (ev.key !== "Escape" || !this.#open || ev.defaultPrevented) return;
+    ev.preventDefault();
+    this.toggle(false);
+  };
 
   toggle(force?: boolean): void {
     if (!game.user?.isGM) return;

@@ -1,0 +1,61 @@
+name: Release
+
+# Publishes a module release when you push a version tag, e.g.:
+#   git tag v0.1.0 && git push origin v0.1.0
+#
+# It builds dist/, rewrites dist/module.json with the tag version and the
+# GitHub release URLs, zips the module, and attaches module.json + module.zip
+# to a GitHub Release. Users install via the "latest" manifest URL:
+#   https://github.com/<owner>/<repo>/releases/latest/download/module.json
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build
+
+      - name: Write release version and URLs into dist/module.json
+        env:
+          VERSION: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          node --input-type=module <<'EOF'
+          import { readFileSync, writeFileSync } from "node:fs";
+          const version = process.env.VERSION.replace(/^v/, "");
+          const repo = process.env.REPO;
+          const base = `https://github.com/${repo}/releases`;
+          const path = "dist/module.json";
+          const m = JSON.parse(readFileSync(path, "utf8"));
+          m.version = version;
+          m.url = `https://github.com/${repo}`;
+          m.manifest = `${base}/latest/download/module.json`;
+          m.download = `${base}/download/v${version}/module.zip`;
+          writeFileSync(path, JSON.stringify(m, null, 2));
+          console.log(`module.json -> version ${version}`);
+          EOF
+
+      - name: Zip module
+        run: cd dist && zip -r ../module.zip . && cd ..
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/module.json
+            module.zip

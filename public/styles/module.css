@@ -1,0 +1,405 @@
+/* ============================================================================
+   Bivouac — subtle, Foundry-native styling.
+   Widgets are quiet frames so embedded content and the atmospheric scene do
+   the talking. Theme-aware via a light-scheme override. Namespaced `bivouac`.
+   ========================================================================== */
+
+:root {
+  --bivouac-z: 1;                 /* above the canvas, below Foundry's UI panels */
+  --bivouac-drawer-z: 60;
+  --bivouac-radius: 10px;
+  --bivouac-gap: 8px;
+  --bivouac-blur: 7px;
+  --bivouac-accent: var(--color-warm-2, #d98b3a);
+
+  --bivouac-panel-bg: rgba(16, 18, 25, 0.40);
+  --bivouac-panel-bg-strong: rgba(16, 18, 25, 0.86);
+  --bivouac-panel-border: rgba(255, 255, 255, 0.10);
+  --bivouac-frame-border: color-mix(in srgb, var(--bivouac-accent) 65%, rgba(255, 255, 255, 0.18));
+
+  --bivouac-text: var(--color-text-primary, #ecebe6);
+  --bivouac-muted: rgba(255, 255, 255, 0.55);
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bivouac-panel-bg: rgba(250, 249, 246, 0.55);
+    --bivouac-panel-bg-strong: rgba(250, 249, 246, 0.92);
+    --bivouac-panel-border: rgba(0, 0, 0, 0.14);
+    --bivouac-text: var(--color-text-primary, #1c1c1c);
+    --bivouac-muted: rgba(0, 0, 0, 0.5);
+  }
+}
+
+/* ---------------------------------------------------------------- overlay */
+
+#bivouac-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: var(--bivouac-z);
+  overflow: hidden;
+  pointer-events: none;
+}
+
+#bivouac-world {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  pointer-events: none;
+}
+
+/* Faint grid guides while editing (square size supplied by JS). */
+#bivouac-overlay.bivouac-edit #bivouac-world {
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+  background-size: var(--bivouac-grid, 100px) var(--bivouac-grid, 100px);
+  width: 20000px;
+  height: 20000px;
+}
+
+/* ---------------------------------------------------------------- widget */
+
+.bivouac-widget {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--bivouac-radius);
+  overflow: hidden;
+  pointer-events: auto;
+  color: var(--bivouac-text);
+  font-family: var(--font-primary, "Signika", sans-serif);
+  transition: box-shadow 120ms ease;
+}
+.bivouac-widget.bivouac-dragging {
+  transition: none;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.55);
+  z-index: 3;
+}
+
+/* --- Chrome variants: clearly distinct --------------------------------- */
+
+/* none — content floats bare, part of the scene */
+.bivouac-chrome-none {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
+/* subtle — quiet frosted hairline card */
+.bivouac-chrome-subtle {
+  background: var(--bivouac-panel-bg);
+  border: 1px solid var(--bivouac-panel-border);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.22);
+  backdrop-filter: blur(var(--bivouac-blur));
+  -webkit-backdrop-filter: blur(var(--bivouac-blur));
+}
+
+/* framed — a defined panel: opaque, accent border + top accent, deeper shadow */
+.bivouac-chrome-framed {
+  background: var(--bivouac-panel-bg-strong);
+  border: 1.5px solid var(--bivouac-frame-border);
+  border-radius: calc(var(--bivouac-radius) + 3px);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.48), inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(calc(var(--bivouac-blur) + 3px));
+  -webkit-backdrop-filter: blur(calc(var(--bivouac-blur) + 3px));
+}
+.bivouac-chrome-framed::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, var(--bivouac-accent), transparent);
+  opacity: 0.85;
+  z-index: 2;
+  pointer-events: none;
+}
+
+/* Header — hidden for players; shown only in edit mode. */
+.bivouac-widget__header {
+  display: none;
+}
+#bivouac-overlay.bivouac-edit .bivouac-widget__header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 6px;
+  font-size: 12px;
+  cursor: grab;
+  background: rgba(0, 0, 0, 0.3);
+  border-bottom: 1px solid var(--bivouac-panel-border);
+  z-index: 3;
+}
+.bivouac-widget.bivouac-dragging .bivouac-widget__header {
+  cursor: grabbing;
+}
+.bivouac-widget__title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.bivouac-widget__body {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+}
+
+.bivouac-widget__btn,
+.bivouac-drawer__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--bivouac-text);
+  cursor: pointer;
+  transition: background 100ms ease;
+}
+.bivouac-widget__btn:hover,
+.bivouac-drawer__btn:hover {
+  background: color-mix(in srgb, var(--bivouac-accent) 60%, transparent);
+}
+
+.bivouac-widget__resize {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 16px;
+  height: 16px;
+  cursor: nwse-resize;
+  background: linear-gradient(135deg, transparent 50%, var(--bivouac-accent) 50%);
+  opacity: 0.7;
+  z-index: 3;
+}
+
+/* ---------------------------------------------------------------- content */
+
+.bivouac-webview,
+.bivouac-image {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+}
+.bivouac-webview__frame {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #fff;
+  display: block;
+}
+.bivouac-webview__popout {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 120ms ease;
+  z-index: 2;
+}
+.bivouac-webview:hover .bivouac-webview__popout {
+  opacity: 1;
+}
+
+/* Graceful LOD card — quiet, no dev chrome */
+.bivouac-webview__lod {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--bivouac-muted);
+  background: radial-gradient(120% 100% at 50% 40%, rgba(255, 255, 255, 0.04), transparent);
+}
+.bivouac-webview__lod-icon {
+  font-size: 1.5em;
+  opacity: 0.5;
+  animation: bivouac-pulse 2.4s ease-in-out infinite;
+}
+.bivouac-webview__lod-host {
+  font-size: 0.8em;
+  letter-spacing: 0.02em;
+  opacity: 0.75;
+}
+@keyframes bivouac-pulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.6; }
+}
+
+.bivouac-image__img {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.bivouac-interactive {
+  cursor: pointer;
+}
+.bivouac-interactive::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  outline: 0 solid transparent;
+  transition: outline-width 120ms ease;
+  pointer-events: none;
+  z-index: 1;
+}
+.bivouac-interactive:hover::after {
+  outline: 3px solid color-mix(in srgb, var(--bivouac-accent) 80%, transparent);
+  outline-offset: -3px;
+}
+
+.bivouac-note {
+  height: 100%;
+  overflow: auto;
+  padding: 10px 12px;
+  line-height: 1.5;
+}
+
+.bivouac-placeholder {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px;
+  text-align: center;
+  color: var(--bivouac-muted);
+}
+.bivouac-placeholder__icon {
+  font-size: 1.6em;
+  opacity: 0.7;
+}
+.bivouac-placeholder__label {
+  font-weight: 600;
+}
+
+/* ---------------------------------------------------------------- drawer */
+
+.bivouac-drawer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(380px, 90vw);
+  z-index: var(--bivouac-drawer-z);
+  display: flex;
+  flex-direction: column;
+  color: var(--bivouac-text);
+  background: var(--bivouac-panel-bg-strong);
+  border-left: 1px solid var(--bivouac-panel-border);
+  box-shadow: -8px 0 24px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(calc(var(--bivouac-blur) + 4px));
+  -webkit-backdrop-filter: blur(calc(var(--bivouac-blur) + 4px));
+  transform: translateX(100%);
+  transition: transform 220ms cubic-bezier(0.4, 0, 0.2, 1);
+  font-family: var(--font-primary, "Signika", sans-serif);
+}
+.bivouac-drawer--open {
+  transform: translateX(0);
+}
+.bivouac-drawer__header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--bivouac-panel-border);
+}
+.bivouac-drawer__title {
+  flex: 1;
+  font-weight: 600;
+  font-size: 15px;
+}
+.bivouac-drawer__body {
+  flex: 1;
+  overflow: auto;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--bivouac-gap);
+}
+.bivouac-drawer__empty {
+  margin: auto;
+  color: var(--bivouac-muted);
+  text-align: center;
+}
+
+.bivouac-card {
+  border-radius: 8px;
+  overflow: hidden;
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+  background: rgba(0, 0, 0, 0.18);
+  border: 1px solid var(--bivouac-panel-border);
+  transition: box-shadow 100ms ease, opacity 100ms ease;
+}
+.bivouac-card--dragging {
+  opacity: 0.5;
+}
+.bivouac-card.bivouac-drop-before {
+  box-shadow: inset 0 3px 0 0 var(--bivouac-accent);
+}
+.bivouac-card.bivouac-drop-after {
+  box-shadow: inset 0 -3px 0 0 var(--bivouac-accent);
+}
+.bivouac-card__header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 8px;
+  font-weight: 600;
+  font-size: 13px;
+  background: rgba(0, 0, 0, 0.22);
+  border-bottom: 1px solid var(--bivouac-panel-border);
+}
+.bivouac-card__grip {
+  cursor: grab;
+  opacity: 0.45;
+  padding: 0 3px;
+}
+.bivouac-card__grip:hover {
+  opacity: 1;
+}
+.bivouac-card__title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bivouac-card__body {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+
+/* ---------------------------------------------------------------- config */
+
+.bivouac-config .form-group {
+  margin: 6px 0;
+}
+.bivouac-config textarea {
+  width: 100%;
+  resize: vertical;
+  font-family: var(--font-mono, monospace);
+}
+.bivouac-pick-hint {
+  margin: 0 0 8px;
+  opacity: 0.8;
+}

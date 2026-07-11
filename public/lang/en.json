@@ -1,0 +1,70 @@
+{
+  "BIVOUAC": {
+    "Controls": {
+      "Title": "Bivouac",
+      "SetLanding": "Set this scene as the Bivouac landing page",
+      "UnsetLanding": "Clear the Bivouac landing page",
+      "EditMode": "Toggle edit mode",
+      "AddWidget": "Add a widget",
+      "DMScreen": "Toggle the DM screen"
+    },
+    "Notify": {
+      "LandingSet": "This scene is now the Bivouac landing page.",
+      "LandingCleared": "Bivouac landing page cleared.",
+      "NotLanding": "Switch to the Bivouac landing scene to add widgets."
+    },
+    "Edit": {
+      "Add": "Add widget",
+      "AddTitle": "Add a widget",
+      "AddHint": "Choose a widget to add to the landing page.",
+      "Configure": "Configure",
+      "Delete": "Delete",
+      "ConfigTitle": "Configure widget",
+      "Save": "Save"
+    },
+    "Widgets": {
+      "Webview": {
+        "Label": "Web view",
+        "Empty": "No URL set — configure this web view.",
+        "ZoomIn": "Zoom in to load",
+        "Popout": "Open in a new window"
+      },
+      "Image": {
+        "Label": "Image",
+        "Empty": "No image set — configure this image."
+      },
+      "Note": {
+        "Label": "Note",
+        "Empty": "Empty note — configure this note."
+      }
+    },
+    "Config": {
+      "Title": "Title",
+      "TitlePlaceholder": "Optional label (shown in edit mode)",
+      "Scope": "Visibility",
+      "ScopeShared": "Everyone",
+      "ScopeDM": "GM only",
+      "Chrome": "Frame style",
+      "Chrome_none": "None",
+      "Chrome_subtle": "Subtle",
+      "Chrome_framed": "Framed",
+      "Url": "URL",
+      "Src": "Image path",
+      "Fit": "Image fit",
+      "OnClick": "On click",
+      "Action_none": "Nothing",
+      "Action_openSheet": "Open actor/item sheet",
+      "Action_openJournal": "Open journal",
+      "Action_runMacro": "Run macro",
+      "TargetUuid": "Target UUID",
+      "Html": "Content",
+      "HtmlPlaceholder": "Notes, rules, HTML…"
+    },
+    "DMScreen": {
+      "Title": "DM Screen",
+      "Close": "Close",
+      "Reorder": "Drag to reorder",
+      "Empty": "No tools yet. Use + to add a widget."
+    }
+  }
+}

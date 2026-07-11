@@ -1,0 +1,26 @@
+{
+  "name": "bivouac",
+  "version": "0.1.0",
+  "description": "A FoundryVTT module built with TypeScript and Vite.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "vite build",
+    "watch": "vite build --watch",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src",
+    "link": "node ../scripts/link-module.mjs .",
+    "unlink": "node ../scripts/link-module.mjs . --remove",
+    "package": "npm run build && node ../scripts/package.mjs ."
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "eslint": "^9.17.0",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.18.0",
+    "vite": "^6.0.5"
+  },
+  "allowScripts": {
+    "esbuild@0.25.12": true
+  }
+}

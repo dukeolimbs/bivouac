@@ -1,0 +1,21 @@
+{
+  "id": "bivouac",
+  "title": "Bivouac",
+  "description": "A persistent, modular campaign landing page: a zoomable table surface of web views, clickable images, and notes, with a GM-only DM screen.",
+  "version": "0.1.0",
+  "authors": [
+    { "name": "Owen" }
+  ],
+  "compatibility": {
+    "minimum": "13",
+    "verified": "14"
+  },
+  "esmodules": ["module.js"],
+  "styles": [{ "src": "styles/module.css" }],
+  "languages": [
+    { "lang": "en", "name": "English", "path": "lang/en.json" }
+  ],
+  "url": "",
+  "manifest": "",
+  "download": ""
+}

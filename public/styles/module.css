@@ -8,7 +8,7 @@
   --bivouac-z: 1;                 /* above the canvas, below Foundry's UI panels */
   --bivouac-drawer-z: 60;
   --bivouac-drawer-w: min(380px, 90vw);
-  --bivouac-dmtab-inset: 164px;   /* gap from the right edge with the sidebar open — tune to taste */
+  --bivouac-dmtab-inset: 168px;   /* gap from the right edge with the sidebar open — tune to taste */
   --bivouac-dmtab-shift: 0px;     /* JS-driven: how far to pull the tab right as the sidebar collapses */
   --bivouac-radius: 10px;
   --bivouac-gap: 8px;

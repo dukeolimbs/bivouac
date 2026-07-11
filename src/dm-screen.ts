@@ -37,7 +37,6 @@ class DMScreen {
     iface.appendChild(tab);
     this.#tab = tab;
 
-    document.addEventListener("keydown", this.#onEscape);
     this.#trackSidebar();
   }
 
@@ -84,14 +83,6 @@ class DMScreen {
     this.#syncTabToSidebar();
     window.setTimeout(this.#syncTabToSidebar, 500); // after initial layout settles
   }
-
-  /** Close the drawer on Esc while it's open — unless something else already
-   *  handled the key (e.g. an open dialog claims it first). */
-  #onEscape = (ev: KeyboardEvent): void => {
-    if (ev.key !== "Escape" || !this.#open || ev.defaultPrevented) return;
-    ev.preventDefault();
-    this.toggle(false);
-  };
 
   toggle(force?: boolean): void {
     if (!game.user?.isGM) return;

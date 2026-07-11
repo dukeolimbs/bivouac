@@ -25,6 +25,22 @@ Hooks.once("init", () => {
     type: String,
     default: "",
   });
+
+  // Esc closes the DM screen. Registered as a PRIORITY keybinding that consumes
+  // the key (returns true) only while the drawer is open, so it pre-empts
+  // Foundry's core "dismiss" action (which would otherwise open the Esc menu).
+  // When the drawer is closed it returns false and Esc behaves normally.
+  game.keybindings.register(MODULE_ID, "closeDMScreen", {
+    name: "BIVOUAC.Keybindings.CloseDMScreen",
+    editable: [{ key: "Escape" }],
+    restricted: true,
+    precedence: CONST.KEYBINDING_PRECEDENCE.PRIORITY,
+    onDown: () => {
+      if (!dmScreen.isOpen) return false;
+      dmScreen.toggle(false);
+      return true;
+    },
+  });
 });
 
 // Add the Bivouac control group to the scene-controls toolbar (GM only).

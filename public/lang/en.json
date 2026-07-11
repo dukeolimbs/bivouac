@@ -71,6 +71,9 @@
       "Close": "Close",
       "Reorder": "Drag to reorder",
       "Empty": "No tools yet. Use + to add a widget."
+    },
+    "Keybindings": {
+      "CloseDMScreen": "Close the DM screen"
     }
   }
 }

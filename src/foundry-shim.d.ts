@@ -14,6 +14,7 @@ declare const game: any;
 declare const ui: any;
 declare const canvas: any;
 declare const CONFIG: any;
+declare const CONST: any;
 declare const Hooks: any;
 declare const foundry: any;
 declare function fromUuid(uuid: string, options?: any): Promise<any>;

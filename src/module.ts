@@ -38,24 +38,28 @@ Hooks.on("getSceneControlButtons", (controls: Record<string, unknown>) => {
     title: "BIVOUAC.Controls.Title",
     icon: "fa-solid fa-campground",
     order: 90,
-    onChange: () => {},
+    // Being in the Bivouac control group *is* edit mode: activating the group
+    // turns editing on, switching to any other control group turns it off.
+    onChange: (_event: Event, active: boolean) => worldLayer.setEditMode(active),
+    activeTool: "arrange",
     tools: {
+      // Plain default tool — required as the group's activeTool (buttons/toggles
+      // can't be active). It carries no behaviour of its own; the group's
+      // onChange drives edit mode. It reads as the "select / move" cursor.
+      arrange: {
+        name: "arrange",
+        order: 1,
+        title: "BIVOUAC.Controls.Arrange",
+        icon: "fa-solid fa-arrow-pointer",
+        onChange: () => {},
+      },
       landing: {
         name: "landing",
-        order: 1,
+        order: 2,
         title: onLanding ? "BIVOUAC.Controls.UnsetLanding" : "BIVOUAC.Controls.SetLanding",
         icon: "fa-solid fa-map-location-dot",
         button: true,
         onChange: () => void toggleLandingScene(),
-      },
-      edit: {
-        name: "edit",
-        order: 2,
-        title: "BIVOUAC.Controls.EditMode",
-        icon: "fa-solid fa-pen-ruler",
-        toggle: true,
-        active: worldLayer.editMode,
-        onChange: (_event: Event, active: boolean) => worldLayer.setEditMode(active),
       },
       add: {
         name: "add",

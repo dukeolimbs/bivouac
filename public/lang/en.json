@@ -4,7 +4,7 @@
       "Title": "Bivouac",
       "SetLanding": "Set this scene as the Bivouac landing page",
       "UnsetLanding": "Clear the Bivouac landing page",
-      "EditMode": "Toggle edit mode",
+      "Arrange": "Arrange widgets (edit mode)",
       "AddWidget": "Add a widget",
       "DMScreen": "Toggle the DM screen"
     },

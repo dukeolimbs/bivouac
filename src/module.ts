@@ -157,6 +157,14 @@ Hooks.on("getSceneControlButtons", (controls: Record<string, unknown>) => {
         button: true,
         onChange: () => void addWidget(),
       },
+      fit: {
+        name: "fit",
+        order: 4,
+        title: "BIVOUAC.Controls.Fit",
+        icon: "fa-solid fa-expand",
+        button: true,
+        onChange: () => worldLayer.fitToTiles(),
+      },
       // The DM screen lives on its own right-side tab (see dmScreen.mountControl),
       // not in this group — opening it shouldn't force edit mode.
     },

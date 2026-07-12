@@ -32,10 +32,11 @@ class WorldLayer {
   #selected = new Set<string>();
 
   constructor() {
-    // Global listeners, installed once. Both no-op unless we're in edit mode
-    // with a mounted board, so they're cheap when Bivouac isn't in use.
+    // Global listeners, installed once. All no-op unless the board is mounted,
+    // so they're cheap when Bivouac isn't in use.
     document.addEventListener("keydown", (e) => this.#onKeyDown(e));
     document.addEventListener("pointerdown", (e) => this.#onGlobalPointerDown(e), true);
+    window.addEventListener("wheel", this.#onWheel, { capture: true, passive: false });
   }
 
   get editMode(): boolean {
@@ -588,13 +589,128 @@ class WorldLayer {
    *  box. Bound in the capture phase so we can pre-empt Foundry's own drag
    *  without a surface overlay that would eat panning / zoom. */
   #onGlobalPointerDown(event: PointerEvent): void {
-    if (!this.#editMode || !this.#world) return;
-    if (event.button !== 0) return;
+    if (!this.#world) return;
+    // Right-drag pans the canvas even when it starts on a tile (tiles otherwise
+    // capture the gesture, leaving no empty canvas to grab on a full board).
+    if (event.button === 2) {
+      this.#maybeBeginRightPan(event);
+      return;
+    }
+    if (event.button !== 0 || !this.#editMode) return;
     const target = event.target as HTMLElement | null;
     const view = canvas?.app?.view ?? canvas?.app?.canvas;
     const onEmptyCanvas = !!target && (target.id === "board" || target === view);
     if (!onEmptyCanvas) return;
     this.#beginMarquee(event);
+  }
+
+  /* ---------------------------------------- pan / zoom over tiles ------ */
+
+  /** Right-drag that starts on a tile drives a canvas pan ourselves (Foundry's
+   *  own right-drag pan never fires because the tile captured the pointer).
+   *  On empty canvas we do nothing and let Foundry pan natively. */
+  #maybeBeginRightPan(event: PointerEvent): void {
+    const target = event.target;
+    const stage = canvas?.stage;
+    if (!this.#overlay || !stage || !(target instanceof HTMLElement) || !target.closest(".bivouac-widget")) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    const scale = stage.scale.x || 1;
+    const startCx = stage.pivot.x;
+    const startCy = stage.pivot.y;
+    const startX = event.clientX;
+    const startY = event.clientY;
+    let moved = false;
+
+    const onMove = (ev: PointerEvent) => {
+      const dx = ev.clientX - startX;
+      const dy = ev.clientY - startY;
+      if (Math.abs(dx) > 2 || Math.abs(dy) > 2) moved = true;
+      canvas.pan({ x: startCx - dx / scale, y: startCy - dy / scale });
+    };
+    const onUp = () => {
+      document.removeEventListener("pointermove", onMove, true);
+      document.removeEventListener("pointerup", onUp, true);
+      // Swallow the context menu that follows a right-release after a drag.
+      if (moved) {
+        const kill = (e: Event) => e.preventDefault();
+        window.addEventListener("contextmenu", kill, { capture: true, once: true });
+        window.setTimeout(() => window.removeEventListener("contextmenu", kill, true), 0);
+      }
+    };
+    document.addEventListener("pointermove", onMove, true);
+    document.addEventListener("pointerup", onUp, true);
+  }
+
+  /** Wheel over a tile that consumes scroll (a web view, or a note tall enough
+   *  to scroll) scrolls that content instead of zooming the map; over any other
+   *  tile we forward the wheel to the canvas so Foundry zooms (toward the
+   *  cursor). Over empty canvas we don't interfere — Foundry zooms natively. */
+  #onWheel = (event: WheelEvent): void => {
+    if (!this.#overlay) return;
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+    if (!target.closest(".bivouac-widget")) return; // empty canvas / UI → native zoom
+
+    if (target.closest(".bivouac-webview")) {
+      event.stopPropagation(); // let the iframe scroll; block map zoom
+      return;
+    }
+    const note = target.closest(".bivouac-note");
+    if (note instanceof HTMLElement && note.scrollHeight - note.clientHeight > 1) {
+      event.stopPropagation(); // let the note scroll
+      return;
+    }
+
+    // Non-scrolling tile → forward the wheel to the canvas for a native zoom.
+    event.preventDefault();
+    event.stopPropagation();
+    const view = canvas?.app?.view ?? canvas?.app?.canvas ?? document.getElementById("board");
+    if (view instanceof HTMLElement || view instanceof HTMLCanvasElement) {
+      view.dispatchEvent(
+        new WheelEvent("wheel", {
+          deltaX: event.deltaX,
+          deltaY: event.deltaY,
+          deltaZ: event.deltaZ,
+          deltaMode: event.deltaMode,
+          clientX: event.clientX,
+          clientY: event.clientY,
+          ctrlKey: event.ctrlKey,
+          shiftKey: event.shiftKey,
+          altKey: event.altKey,
+          metaKey: event.metaKey,
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+    }
+  };
+
+  /** Pan/zoom the canvas to frame all tiles (toolbar "Fit"). */
+  fitToTiles(): void {
+    const scene = activeLandingScene();
+    if (!scene || !canvas?.stage) return;
+    const widgets = readLayout(scene).widgets;
+    if (!widgets.length) return;
+    const gs = this.#gridSize();
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (const w of widgets) {
+      minX = Math.min(minX, w.cell.gx * gs);
+      minY = Math.min(minY, w.cell.gy * gs);
+      maxX = Math.max(maxX, (w.cell.gx + w.cell.gw) * gs);
+      maxY = Math.max(maxY, (w.cell.gy + w.cell.gh) * gs);
+    }
+    const w = maxX - minX;
+    const h = maxY - minY;
+    if (w <= 0 || h <= 0) return;
+    const pad = 1.15; // leave a margin (also absorbs the sidebar's viewport bite)
+    const scale = Math.max(0.05, Math.min(3, Math.min(window.innerWidth / (w * pad), window.innerHeight / (h * pad))));
+    canvas.animatePan({ x: (minX + maxX) / 2, y: (minY + maxY) / 2, scale });
   }
 
   #beginMarquee(event: PointerEvent): void {

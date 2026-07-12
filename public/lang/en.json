@@ -6,6 +6,7 @@
       "UnsetLanding": "Disable the Landing Page",
       "Arrange": "Arrange tiles (edit mode)",
       "AddWidget": "Add a tile",
+      "Fit": "Fit all tiles to view",
       "DMScreen": "Toggle the DM screen"
     },
     "Notify": {

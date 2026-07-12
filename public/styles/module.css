@@ -402,6 +402,40 @@
 .bivouac-drawer--open {
   transform: translateX(0);
 }
+/* Inner-edge drag handle — a thin strip on the drawer's left side. */
+.bivouac-drawer__resize {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 7px;
+  z-index: 2;
+  cursor: ew-resize;
+  touch-action: none;
+}
+.bivouac-drawer__resize::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 2px;
+  width: 2px;
+  background: transparent;
+  transition: background 120ms ease;
+}
+.bivouac-drawer__resize:hover::before,
+body.bivouac-resizing-drawer .bivouac-drawer__resize::before {
+  background: var(--bivouac-accent);
+}
+/* While dragging the edge: kill text selection and let the handle's pointer
+   capture win over any iframe content it passes over. */
+body.bivouac-resizing-drawer {
+  cursor: ew-resize;
+  user-select: none;
+}
+body.bivouac-resizing-drawer iframe {
+  pointer-events: none;
+}
 
 /* GM-only DM-screen toggle: a detached, glassy pill that sits just left of the
    right-hand UI column, above other elements. It fades out while the drawer is

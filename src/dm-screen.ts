@@ -4,7 +4,11 @@
 import { attachInteractions, createWidget, getWidgetType, type RenderContext } from "./widgets";
 import { readDMLayout, writeDMLayout } from "./layout";
 import { openWidgetConfig, pickWidgetType } from "./widget-config";
-import type { Widget, WidgetType } from "./constants";
+import { MODULE_ID, SETTINGS, type Widget, type WidgetType } from "./constants";
+
+/** Drag-resize bounds for the drawer, in px (upper bound also capped at 90vw). */
+const DRAWER_MIN = 280;
+const DRAWER_MAX = 900;
 
 class DMScreen {
   #el: HTMLElement | null = null;
@@ -40,6 +44,45 @@ class DMScreen {
     this.#tab = tab;
 
     this.#trackSidebar();
+    this.applyDrawerWidth();
+    window.addEventListener("resize", () => this.applyDrawerWidth());
+  }
+
+  /* ------------------------------------------------ drawer width -------- */
+
+  /** Push the persisted drawer width into `--bivouac-drawer-w`, clamped to the
+   *  resize bounds and never wider than 90vw. */
+  applyDrawerWidth(): void {
+    const saved = Number(game.settings.get(MODULE_ID, SETTINGS.dmDrawerWidth) ?? 380);
+    const maxW = Math.min(DRAWER_MAX, window.innerWidth * 0.9);
+    const w = Math.min(maxW, Math.max(DRAWER_MIN, Number.isFinite(saved) ? saved : 380));
+    document.documentElement.style.setProperty("--bivouac-drawer-w", `${Math.round(w)}px`);
+  }
+
+  /** Drag the drawer's inner (left) edge to resize; persist on release.
+   *  Pointer capture keeps the drag alive over iframe content. */
+  #startResize(e: PointerEvent, handle: HTMLElement): void {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    const maxW = Math.min(DRAWER_MAX, window.innerWidth * 0.9);
+    let width = this.#el?.getBoundingClientRect().width ?? 380;
+    handle.setPointerCapture(e.pointerId);
+    document.body.classList.add("bivouac-resizing-drawer");
+    const onMove = (ev: PointerEvent): void => {
+      // Drawer is docked to the right edge, so its width is the gap from the
+      // pointer to the viewport's right side.
+      width = Math.min(maxW, Math.max(DRAWER_MIN, window.innerWidth - ev.clientX));
+      document.documentElement.style.setProperty("--bivouac-drawer-w", `${Math.round(width)}px`);
+    };
+    const onUp = (ev: PointerEvent): void => {
+      handle.releasePointerCapture(ev.pointerId);
+      handle.removeEventListener("pointermove", onMove);
+      handle.removeEventListener("pointerup", onUp);
+      document.body.classList.remove("bivouac-resizing-drawer");
+      void game.settings.set(MODULE_ID, SETTINGS.dmDrawerWidth, Math.round(width));
+    };
+    handle.addEventListener("pointermove", onMove);
+    handle.addEventListener("pointerup", onUp);
   }
 
   /* -------------------------------------------- sidebar tracking -------- */
@@ -138,6 +181,13 @@ class DMScreen {
     const drawer = document.createElement("aside");
     drawer.id = "bivouac-dmscreen";
     drawer.className = "bivouac-drawer";
+
+    // Inner-edge drag handle to resize the drawer width.
+    const handle = document.createElement("div");
+    handle.className = "bivouac-drawer__resize";
+    handle.title = game.i18n.localize("BIVOUAC.DMScreen.Resize");
+    handle.addEventListener("pointerdown", (e) => this.#startResize(e, handle));
+    drawer.appendChild(handle);
 
     const header = document.createElement("header");
     header.className = "bivouac-drawer__header";

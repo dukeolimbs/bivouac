@@ -19,6 +19,8 @@ export const SETTINGS = {
   dmTabTop: "dmTabTop",
   /** World setting: max widget size in grid squares (resize cap). */
   maxWidgetSize: "maxWidgetSize",
+  /** Client setting: DM-screen drawer width in px (set by dragging its edge). */
+  dmDrawerWidth: "dmDrawerWidth",
 } as const;
 
 /** Widget geometry, measured in whole scene grid squares. */

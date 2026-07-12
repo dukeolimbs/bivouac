@@ -94,6 +94,7 @@
     "DMScreen": {
       "Title": "DM Screen",
       "Close": "Close",
+      "Resize": "Drag to resize the drawer",
       "Reorder": "Drag to reorder",
       "Empty": "No tools yet. Use + to add a tile."
     },

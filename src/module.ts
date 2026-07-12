@@ -87,6 +87,16 @@ Hooks.once("init", () => {
     default: GRID.max,
   });
 
+  // DM-screen drawer width (px). Set by dragging the drawer's inner edge, so it
+  // is hidden from the settings menu and persisted per-GM (applied on mount by
+  // `dmScreen.applyDrawerWidth`).
+  game.settings.register(MODULE_ID, SETTINGS.dmDrawerWidth, {
+    scope: "client",
+    config: false,
+    type: Number,
+    default: 380,
+  });
+
   // Ctrl+Z / Ctrl+Y undo & redo of the landing layout. Foundry's own undo only
   // covers canvas placeables, not our scene-flag layout, so we run our own
   // history. Both consume the key (and pre-empt core undo) ONLY while editing

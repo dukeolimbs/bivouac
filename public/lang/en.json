@@ -1,30 +1,30 @@
 {
   "BIVOUAC": {
     "Controls": {
-      "Title": "Bivouac",
-      "SetLanding": "Set this scene as the Bivouac landing page",
-      "UnsetLanding": "Clear the Bivouac landing page",
-      "Arrange": "Arrange widgets (edit mode)",
-      "AddWidget": "Add a widget",
+      "Title": "Landing Page",
+      "SetLanding": "Set this scene as the Landing Page",
+      "UnsetLanding": "Disable the Landing Page",
+      "Arrange": "Arrange tiles (edit mode)",
+      "AddWidget": "Add a tile",
       "DMScreen": "Toggle the DM screen"
     },
     "Notify": {
-      "LandingSet": "This scene is now the Bivouac landing page.",
-      "LandingCleared": "Bivouac landing page cleared.",
-      "NotLanding": "Switch to the Bivouac landing scene to add widgets."
+      "LandingSet": "This scene is now the Landing Page.",
+      "LandingCleared": "Landing Page cleared.",
+      "NotLanding": "Switch to the Landing Page scene to add tiles."
     },
     "Confirm": {
-      "ClearLandingTitle": "Clear landing page?",
-      "ClearLandingBody": "This removes the Bivouac landing-page designation from this scene. Your widgets are kept, but the board will no longer appear. You can set it again anytime."
+      "ClearLandingTitle": "Disable landing page?",
+      "ClearLandingBody": "This removes the Landing Page designation from this scene. Your tiles are kept, but the board will no longer appear. You can set it again anytime."
     },
     "Edit": {
-      "Add": "Add widget",
-      "AddTitle": "Add a widget",
-      "AddHint": "Choose a widget to add to the landing page.",
+      "Add": "Add tile",
+      "AddTitle": "Add a tile",
+      "AddHint": "Choose a tile to add to the landing page.",
       "Configure": "Configure",
       "Duplicate": "Duplicate",
       "Delete": "Delete",
-      "ConfigTitle": "Configure widget",
+      "ConfigTitle": "Configure tile",
       "Save": "Save"
     },
     "Widgets": {
@@ -42,7 +42,7 @@
         "Label": "Note",
         "Empty": "Empty note — configure this note."
       },
-      "Unknown": "Unknown widget: {type}"
+      "Unknown": "Unknown tile: {type}"
     },
     "Config": {
       "Title": "Title",
@@ -75,7 +75,7 @@
       "Title": "DM Screen",
       "Close": "Close",
       "Reorder": "Drag to reorder",
-      "Empty": "No tools yet. Use + to add a widget."
+      "Empty": "No tools yet. Use + to add a tile."
     },
     "Keybindings": {
       "CloseDMScreen": "Close the DM screen",
@@ -92,8 +92,8 @@
         "Hint": "Vertical position of the DM-screen toggle tab, as a percentage of the screen height (0 = top, 50 = middle, 100 = bottom)."
       },
       "MaxWidgetSize": {
-        "Name": "Maximum widget size",
-        "Hint": "The largest a widget can be resized to, measured in grid squares (applies to width and height)."
+        "Name": "Maximum tile size",
+        "Hint": "The largest a tile can be resized to, measured in grid squares (applies to width and height)."
       }
     }
   }

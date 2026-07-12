@@ -519,6 +519,7 @@ body.bivouac-dnd-active .bivouac-card__body iframe {
 }
 /* Row of up to 3 tiles that share the drawer width. */
 .bivouac-drawer__row {
+  position: relative;
   display: flex;
   gap: var(--bivouac-gap);
   align-items: stretch;
@@ -527,18 +528,32 @@ body.bivouac-dnd-active .bivouac-card__body iframe {
   flex: 1 1 0;
   min-width: 0;
 }
-/* Drop-zone indicators: an accent bar on the edge the tile will land against. */
+/* Join a row → an accent bar on the target card's left/right edge. */
 .bivouac-card.bivouac-drop-left {
-  box-shadow: inset 3px 0 0 0 var(--bivouac-accent);
+  box-shadow: inset 4px 0 0 0 var(--bivouac-accent);
 }
 .bivouac-card.bivouac-drop-right {
-  box-shadow: inset -3px 0 0 0 var(--bivouac-accent);
+  box-shadow: inset -4px 0 0 0 var(--bivouac-accent);
 }
-.bivouac-card.bivouac-drop-top {
-  box-shadow: inset 0 3px 0 0 var(--bivouac-accent);
+/* New row → a full-width line across the drawer, centred in the gap above/below
+   the whole row (spans the entire horizontal axis, not just one card). */
+.bivouac-drawer__row.bivouac-drop-top::before,
+.bivouac-drawer__row.bivouac-drop-bottom::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--bivouac-accent);
+  box-shadow: 0 0 7px var(--bivouac-accent);
+  pointer-events: none;
 }
-.bivouac-card.bivouac-drop-bottom {
-  box-shadow: inset 0 -3px 0 0 var(--bivouac-accent);
+.bivouac-drawer__row.bivouac-drop-top::before {
+  top: calc(-0.5 * var(--bivouac-gap) - 1.5px);
+}
+.bivouac-drawer__row.bivouac-drop-bottom::after {
+  bottom: calc(-0.5 * var(--bivouac-gap) - 1.5px);
 }
 /* Active edit toggle in the drawer header. */
 .bivouac-drawer__btn--active {

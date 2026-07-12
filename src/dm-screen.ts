@@ -276,6 +276,7 @@ class DMScreen {
       grip.addEventListener("dragend", () => {
         el.classList.remove("bivouac-card--dragging");
         document.body.classList.remove("bivouac-dnd-active");
+        this.#clearDropMarks();
       });
       header.appendChild(grip);
 
@@ -290,23 +291,23 @@ class DMScreen {
       header.appendChild(this.#toolButton("fa-solid fa-trash", "BIVOUAC.Edit.Delete", () => void this.#delete(widget.id)));
       el.appendChild(header);
 
-      // Four-zone drop: left/right joins the target's row (max 3), top/bottom
-      // makes a new row above/below.
-      const clearDrop = (): void =>
-        el.classList.remove("bivouac-drop-left", "bivouac-drop-right", "bivouac-drop-top", "bivouac-drop-bottom");
+      // Four-zone drop: left/right joins the target's row (max 3) — a bar on the
+      // card edge; top/bottom makes a new row — a full-width line across the row
+      // (drawn on the row element, so it spans the whole horizontal axis).
       el.addEventListener("dragover", (e) => {
         if (!this.#dragId || this.#dragId === widget.id) return;
         e.preventDefault();
         const zone = this.#zoneFor(e, el, widget.id);
-        clearDrop();
-        el.classList.add(`bivouac-drop-${zone}`);
+        this.#clearDropMarks();
+        const mark = zone === "left" || zone === "right" ? el : el.parentElement;
+        mark?.classList.add(`bivouac-drop-${zone}`);
         el.dataset.dropZone = zone;
       });
-      el.addEventListener("dragleave", clearDrop);
+      el.addEventListener("dragleave", () => this.#clearDropMarks());
       el.addEventListener("drop", (e) => {
         e.preventDefault();
         const zone = el.dataset.dropZone ?? "bottom";
-        clearDrop();
+        this.#clearDropMarks();
         if (this.#dragId) void this.#drop(this.#dragId, widget.id, zone);
       });
     }
@@ -364,6 +365,16 @@ class DMScreen {
     const row = this.#currentRows().find((r) => r.some((w) => w.id === targetId));
     if (!row) return false;
     return row.some((w) => w.id === this.#dragId) || row.length < 3;
+  }
+
+  /** Remove every drop indicator across the drawer (cards + rows) — robust to
+   *  dragover/dragleave ordering as the pointer crosses tiles. */
+  #clearDropMarks(): void {
+    this.#el
+      ?.querySelectorAll(".bivouac-drop-left, .bivouac-drop-right, .bivouac-drop-top, .bivouac-drop-bottom")
+      .forEach((n) =>
+        n.classList.remove("bivouac-drop-left", "bivouac-drop-right", "bivouac-drop-top", "bivouac-drop-bottom"),
+      );
   }
 
   #zoneFor(e: DragEvent, el: HTMLElement, targetId: string): "left" | "right" | "top" | "bottom" {

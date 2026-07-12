@@ -204,6 +204,27 @@ function applyTabSettings(): void {
   dmScreen.refreshTab();
 }
 
+/** Live-preview the DM-tab settings as the user drags the sliders in the
+ *  Settings window — a setting's `onChange` only fires on Save, so we read the
+ *  form's *current* values and apply them (without persisting). */
+function previewTabSettings(root: HTMLElement): void {
+  const style = document.documentElement.style;
+  const pad = root.querySelector(`[name="${MODULE_ID}.${SETTINGS.dmTabPad}"]`) as { value?: string } | null;
+  const top = root.querySelector(`[name="${MODULE_ID}.${SETTINGS.dmTabTop}"]`) as { value?: string } | null;
+  if (pad?.value != null && pad.value !== "") style.setProperty("--bivouac-dmtab-pad", `${Number(pad.value)}px`);
+  if (top?.value != null && top.value !== "") style.setProperty("--bivouac-dmtab-top", `${Number(top.value)}%`);
+  dmScreen.refreshTab();
+}
+
+// While the Settings window is open, preview our tab settings live on any input;
+// on close, re-apply the SAVED values so Cancel reverts the preview (and Save
+// confirms it — its onChange fires applyTabSettings too).
+Hooks.on("renderSettingsConfig", (_app: unknown, html: unknown) => {
+  const root = html instanceof HTMLElement ? html : (html as { [0]?: HTMLElement } | null)?.[0];
+  if (root) root.addEventListener("input", () => previewTabSettings(root));
+});
+Hooks.on("closeSettingsConfig", () => applyTabSettings());
+
 /* -------------------------------------------- toolbar actions ----------- */
 
 async function toggleLandingScene(): Promise<void> {

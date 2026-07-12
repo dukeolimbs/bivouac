@@ -15,9 +15,7 @@
     },
     "Confirm": {
       "ClearLandingTitle": "Clear landing page?",
-      "ClearLandingBody": "This removes the Bivouac landing-page designation from this scene. Your widgets are kept, but the board will no longer appear. You can set it again anytime.",
-      "DeleteTitle": "Delete widgets?",
-      "DeleteBody": "Delete {count} widget(s)? This cannot be undone."
+      "ClearLandingBody": "This removes the Bivouac landing-page designation from this scene. Your widgets are kept, but the board will no longer appear. You can set it again anytime."
     },
     "Edit": {
       "Add": "Add widget",

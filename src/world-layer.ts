@@ -412,21 +412,11 @@ class WorldLayer {
     return this.deleteWidgets([id]);
   }
 
-  /** Remove several widgets in a single layout write. Only a multi-widget
-   *  delete asks to confirm — deleting a single widget is cheap to redo. */
+  /** Remove several widgets in a single layout write. No confirm — Ctrl+Z
+   *  undoes a mistaken delete. */
   async deleteWidgets(ids: string[]): Promise<void> {
     const scene = activeLandingScene();
     if (!scene || ids.length === 0) return;
-
-    if (ids.length > 1) {
-      const ok = await foundry.applications.api.DialogV2.confirm({
-        window: { title: game.i18n.localize("BIVOUAC.Confirm.DeleteTitle") },
-        content: `<p>${game.i18n.format("BIVOUAC.Confirm.DeleteBody", { count: ids.length })}</p>`,
-        modal: true,
-      });
-      if (!ok) return;
-    }
-
     const kill = new Set(ids);
     const layout = readLayout(scene);
     const before = layout.widgets.length;

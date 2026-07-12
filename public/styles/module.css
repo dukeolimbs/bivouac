@@ -8,6 +8,7 @@
   --bivouac-z: 1;                 /* above the canvas, below Foundry's UI panels */
   --bivouac-drawer-z: 60;
   --bivouac-drawer-w: min(380px, 90vw);
+  --bivouac-drawer-right: 0px;    /* JS-driven: drawer's right edge sits at the sidebar's left edge, so it docks beside the sidebar (not over chat/dice) */
   --bivouac-dmtab-pad: 16px;      /* gap the tab keeps to the LEFT of the sidebar edge; driven by the "DM screen tab — edge padding" setting (this is the fallback) */
   --bivouac-dmtab-top: 50%;       /* vertical position of the tab; driven by the "DM screen tab — vertical position" setting */
   --bivouac-dmtab-inset: 168px;   /* JS-driven from the sidebar's live edge; this is only the pre-measure fallback */
@@ -413,7 +414,7 @@
 .bivouac-drawer {
   position: absolute;
   top: 0;
-  right: 0;
+  right: var(--bivouac-drawer-right, 0px);
   bottom: 0;
   width: var(--bivouac-drawer-w);
   z-index: var(--bivouac-drawer-z);
@@ -425,7 +426,10 @@
   box-shadow: -8px 0 24px rgba(0, 0, 0, 0.35);
   backdrop-filter: blur(calc(var(--bivouac-blur) + 4px));
   -webkit-backdrop-filter: blur(calc(var(--bivouac-blur) + 4px));
-  transform: translateX(100%);
+  /* Closed = fully off the right viewport edge regardless of the right inset
+     (own width + the beside-sidebar offset), so a closed drawer never covers
+     the sidebar; open slides in beside it. */
+  transform: translateX(calc(100% + var(--bivouac-drawer-right, 0px)));
   transition: transform 220ms cubic-bezier(0.4, 0, 0.2, 1);
   font-family: var(--font-primary, "Signika", sans-serif);
 }

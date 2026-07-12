@@ -67,13 +67,15 @@ class DMScreen {
     if (e.button !== 0) return;
     e.preventDefault();
     const maxW = Math.min(DRAWER_MAX, window.innerWidth * 0.9);
+    // The drawer's right edge is fixed during a resize (it's docked to the
+    // sidebar's left edge, not necessarily the viewport edge), so width = that
+    // right edge minus the pointer.
+    const rightEdge = this.#el?.getBoundingClientRect().right ?? window.innerWidth;
     let width = this.#el?.getBoundingClientRect().width ?? 380;
     handle.setPointerCapture(e.pointerId);
     document.body.classList.add("bivouac-resizing-drawer");
     const onMove = (ev: PointerEvent): void => {
-      // Drawer is docked to the right edge, so its width is the gap from the
-      // pointer to the viewport's right side.
-      width = Math.min(maxW, Math.max(DRAWER_MIN, window.innerWidth - ev.clientX));
+      width = Math.min(maxW, Math.max(DRAWER_MIN, rightEdge - ev.clientX));
       document.documentElement.style.setProperty("--bivouac-drawer-w", `${Math.round(width)}px`);
     };
     const onUp = (ev: PointerEvent): void => {
@@ -113,13 +115,20 @@ class DMScreen {
    *  is done by widening the pad for now; auto-avoidance is a backlog item.) */
   #syncTab = (): void => {
     const el = this.#sidebarEl();
-    if (!el || !this.#tab) return;
+    if (!el) return;
     const rect = el.getBoundingClientRect();
     if (rect.width === 0) return; // not laid out (e.g. mid-transition) — keep last position
+    // Tab: park it `--bivouac-dmtab-pad` px left of the sidebar's live left edge.
     // Floor at 0 so negative padding can slide the tab right to the screen edge
     // (flush at most), without ever pushing it off-screen.
-    const inset = Math.max(0, window.innerWidth - rect.left + this.#tabPad());
-    document.documentElement.style.setProperty("--bivouac-dmtab-inset", `${Math.round(inset)}px`);
+    if (this.#tab) {
+      const inset = Math.max(0, window.innerWidth - rect.left + this.#tabPad());
+      document.documentElement.style.setProperty("--bivouac-dmtab-inset", `${Math.round(inset)}px`);
+    }
+    // Drawer: anchor its right edge flush to the sidebar's left edge so the open
+    // drawer sits BESIDE the sidebar and never covers chat / dice.
+    const drawerRight = Math.max(0, window.innerWidth - rect.left);
+    document.documentElement.style.setProperty("--bivouac-drawer-right", `${Math.round(drawerRight)}px`);
   };
 
   /** Re-sync each frame for a short window so the tab follows the sidebar's

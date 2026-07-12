@@ -274,7 +274,7 @@ class WorldLayer {
         openWidgetConfig(
           current,
           (updated) => this.#saveConfigured(widget.id, updated),
-          (updated) => this.previewStyle(updated),
+          (updated) => this.previewWidget(updated),
         );
       }));
       header.appendChild(this.#iconButton("fa-solid fa-clone", "BIVOUAC.Edit.Duplicate", (e) => {
@@ -327,7 +327,7 @@ class WorldLayer {
   #applyTileStyle(el: HTMLElement, widget: Widget): void {
     el.classList.remove(
       "bivouac-frame-none", "bivouac-frame-subtle", "bivouac-frame-framed",
-      "bivouac-bg-none", "bivouac-bg-solid", "bivouac-bg-frosted", "bivouac-bg-gradient",
+      "bivouac-bg-none", "bivouac-bg-solid", "bivouac-bg-frosted", "bivouac-bg-gradient", "bivouac-bg-image",
     );
     el.classList.add(`bivouac-frame-${frameOf(widget)}`, `bivouac-bg-${backgroundOf(widget)}`);
     applyFrameStyle(el, widget);
@@ -339,12 +339,26 @@ class WorldLayer {
     }
   }
 
-  /** Live-preview a tile's style (frame/background/colour/opacity/title) from a
-   *  config dialog, in place and WITHOUT touching the layout. Content changes
-   *  (url / note text / image / zoom) are not previewed — they commit on Save. */
-  previewStyle(widget: Widget): void {
+  /** Live-preview a tile from its config dialog, in place and WITHOUT touching
+   *  the layout: always the style (frame/background/colour/opacity/title); and
+   *  for note/image tiles also the CONTENT (text/font/src). Web views are left
+   *  alone so their iframe never reloads mid-edit — those commit on Save. */
+  previewWidget(widget: Widget): void {
     const rec = this.#rendered.get(widget.id);
-    if (rec) this.#applyTileStyle(rec.el, widget);
+    if (!rec) return;
+    this.#applyTileStyle(rec.el, widget);
+    if (widget.type !== "note" && widget.type !== "image") return; // never re-render a web view live
+    const scaler = rec.el.querySelector(".bivouac-scaler");
+    const def = getWidgetType(widget.type);
+    if (!scaler || !def) return;
+    const ctx: RenderContext = {
+      widget,
+      gridSize: this.#gridSize(),
+      editMode: this.#editMode,
+      isGM: !!game.user?.isGM,
+      lod: false,
+    };
+    scaler.replaceChildren(def.renderBody(ctx));
   }
 
   #unknown(type: string): HTMLElement {

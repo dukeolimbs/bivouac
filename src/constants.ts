@@ -21,6 +21,8 @@ export const SETTINGS = {
   maxWidgetSize: "maxWidgetSize",
   /** Client setting: DM-screen drawer width in px (set by dragging its edge). */
   dmDrawerWidth: "dmDrawerWidth",
+  /** Client setting: how many web views may be live before LOD can kick in. */
+  lodMinWebviews: "lodMinWebviews",
 } as const;
 
 /** Widget geometry, measured in whole scene grid squares. */

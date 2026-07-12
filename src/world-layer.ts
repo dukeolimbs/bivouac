@@ -168,7 +168,11 @@ class WorldLayer {
     if (!isGM) widgets = widgets.filter((w) => w.scope !== "dm"); // filter, don't just hide
 
     const webviewCount = widgets.filter((w) => w.type === "webview").length;
-    const lodActive = webviewCount >= LOD.minWebviews && t.scale <= LOD.farScale;
+    // How many web views may be live before LOD can kick in — a per-client
+    // setting (falls back to the built-in default).
+    const rawMin = Number(game.settings.get(MODULE_ID, SETTINGS.lodMinWebviews));
+    const lodMin = Number.isFinite(rawMin) && rawMin > 0 ? rawMin : LOD.minWebviews;
+    const lodActive = webviewCount >= lodMin && t.scale <= LOD.farScale;
 
     const seen = new Set<string>();
     for (const widget of widgets) {

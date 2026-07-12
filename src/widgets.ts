@@ -194,6 +194,7 @@ registerWidgetType({
     }
 
     const wrap = el("div", "bivouac-webview");
+    const zoomBox = el("div", "bivouac-webview__zoom");
     const frame = document.createElement("iframe");
     frame.className = "bivouac-webview__frame";
     frame.src = url;
@@ -201,35 +202,45 @@ registerWidgetType({
     frame.setAttribute("referrerpolicy", "no-referrer");
     frame.setAttribute("loading", "lazy");
 
-    // Consistent content scale: render the iframe at a logical resolution based
-    // on the widget's square count, then scale it to fit. Same square-aspect →
-    // same content magnification, independent of absolute pixel size.
-    // Per-widget content zoom (config.zoom, default 1): higher renders the page
-    // at fewer logical px so it appears larger; lower shows more of the page.
+    // Consistent content scale: the iframe renders at a logical resolution based
+    // on the widget's square count, then scales to fit. Same square-aspect → same
+    // content magnification, independent of absolute pixel size.
+    //
+    // Content zoom (config.zoom, default 1) — and the LegendKeeper invariant:
+    // embedded apps like LK only stay healthy when the *iframe itself* matches
+    // the known-good baseline (viewport gw·L, own transform scale(gs/L)). A
+    // changing transform on an ANCESTOR is fine — that's exactly how map zoom
+    // works, on .bivouac-scaler. So for zoom ≥ 1 we keep the iframe byte-
+    // identical to the baseline and magnify on the .bivouac-webview__zoom
+    // wrapper (crop-to-fill). Only zoom < 1 ("show more of the page") enlarges
+    // the iframe's logical viewport — a *larger* viewport is LK-safe; a smaller
+    // one is what used to crash it (`useMapContext … MapScope`).
     const zoom = Number(ctx.widget.config.zoom) || 1;
-    // Content zoom must NOT shrink the iframe's logical VIEWPORT below the base
-    // (gw·L): some embedded apps (LegendKeeper) crash at small viewports
-    // (`useMapContext … MapScope`). Clamp the viewport with min(zoom, 1) —
-    // zoom < 1 grows it (shows more of the page), zoom > 1 keeps it at the base
-    // and magnifies via the (constant) transform, cropping the overflow. zoom = 1
-    // is byte-identical to the working baseline. The transform stays constant
-    // (map zoom lives on the .bivouac-scaler ancestor), which is what lets the
-    // iframe embed cleanly.
-    const vpZoom = Math.min(zoom, 1);
+    const L = WEBVIEW.logicalPerSquare;
     if (!ctx.fillContainer) {
-      const L = WEBVIEW.logicalPerSquare;
-      frame.style.width = `${(ctx.widget.cell.gw * L) / vpZoom}px`;
-      frame.style.height = `${(ctx.widget.cell.gh * L) / vpZoom}px`;
       frame.style.transformOrigin = "0 0";
-      frame.style.transform = `scale(${(ctx.gridSize * zoom) / L})`;
-    } else if (zoom !== 1) {
-      // DM-screen fill mode, same clamp: viewport never below 100% of the card.
-      frame.style.width = `${100 / vpZoom}%`;
-      frame.style.height = `${100 / vpZoom}%`;
+      if (zoom < 1) {
+        frame.style.width = `${(ctx.widget.cell.gw * L) / zoom}px`;
+        frame.style.height = `${(ctx.widget.cell.gh * L) / zoom}px`;
+        frame.style.transform = `scale(${(ctx.gridSize * zoom) / L})`;
+      } else {
+        frame.style.width = `${ctx.widget.cell.gw * L}px`;
+        frame.style.height = `${ctx.widget.cell.gh * L}px`;
+        frame.style.transform = `scale(${ctx.gridSize / L})`;
+        if (zoom > 1) zoomBox.style.transform = `scale(${zoom})`;
+      }
+    } else if (zoom < 1) {
+      // DM-screen fill: a bigger viewport shows more of the page.
       frame.style.transformOrigin = "0 0";
+      frame.style.width = `${100 / zoom}%`;
+      frame.style.height = `${100 / zoom}%`;
       frame.style.transform = `scale(${zoom})`;
+    } else if (zoom > 1) {
+      // DM-screen fill: iframe fills 100% (baseline); magnify on the wrapper.
+      zoomBox.style.transform = `scale(${zoom})`;
     }
-    wrap.appendChild(frame);
+    zoomBox.appendChild(frame);
+    wrap.appendChild(zoomBox);
 
     // Pop-out fallback for sites that refuse embedding.
     const popout = el("button", "bivouac-webview__popout");

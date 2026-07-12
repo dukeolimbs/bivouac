@@ -10,7 +10,7 @@
  * web views. See docs/landing-page-design-spec.md.
  */
 
-import { GRID, MODULE_ID, SETTINGS, log } from "./constants";
+import { GRID, LOD, MODULE_ID, SETTINGS, log } from "./constants";
 import {
   activeLandingScene,
   clearLayoutHistory,
@@ -95,6 +95,20 @@ Hooks.once("init", () => {
     config: false,
     type: Number,
     default: 380,
+  });
+
+  // How many live web views the board may show before level-of-detail kicks in
+  // (LOD then swaps far-away web views for a quiet placeholder while zoomed out).
+  // Per-client performance knob; set high to keep every web view live.
+  game.settings.register(MODULE_ID, SETTINGS.lodMinWebviews, {
+    name: "BIVOUAC.Settings.LodMinWebviews.Name",
+    hint: "BIVOUAC.Settings.LodMinWebviews.Hint",
+    scope: "client",
+    config: true,
+    type: Number,
+    range: { min: 1, max: 60, step: 1 },
+    default: LOD.minWebviews,
+    onChange: () => worldLayer.render("lod"),
   });
 
   // Ctrl+Z / Ctrl+Y undo & redo of the landing layout. Foundry's own undo only

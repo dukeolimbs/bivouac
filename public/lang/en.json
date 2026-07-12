@@ -54,6 +54,7 @@
       "Chrome_subtle": "Subtle",
       "Chrome_framed": "Framed",
       "Url": "URL",
+      "WebviewZoom": "Content zoom",
       "Src": "Image path",
       "Fit": "Image fit",
       "OnClick": "On click",

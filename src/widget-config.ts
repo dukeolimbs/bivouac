@@ -43,6 +43,8 @@ function buildForm(widget: Widget): string {
     case "webview":
       rows.push(group(t("BIVOUAC.Config.Url"),
         `<input type="text" name="url" value="${esc(widget.config.url ?? "")}" placeholder="https://…">`));
+      rows.push(group(t("BIVOUAC.Config.WebviewZoom"),
+        `<input type="number" name="zoom" value="${esc(Number(widget.config.zoom) || 1)}" min="0.25" max="4" step="0.05" title="1 = default. Higher zooms the page in; lower shows more of it.">`));
       break;
     case "image": {
       rows.push(group(t("BIVOUAC.Config.Src"),
@@ -90,9 +92,12 @@ function applyForm(widget: Widget, data: Record<string, string>): Widget {
   updated.chrome = (["none", "subtle", "framed"].includes(data.chrome) ? data.chrome : "subtle") as WidgetChrome;
 
   switch (widget.type) {
-    case "webview":
+    case "webview": {
       updated.config.url = data.url?.trim() ?? "";
+      const z = Number(data.zoom);
+      updated.config.zoom = Number.isFinite(z) ? Math.min(4, Math.max(0.25, z)) : 1;
       break;
+    }
     case "image":
       updated.config.src = data.src?.trim() ?? "";
       updated.config.fit = data.fit === "contain" ? "contain" : "cover";

@@ -136,17 +136,27 @@ registerWidgetType({
     // Consistent content scale: render the iframe at a logical resolution based
     // on the widget's square count, then scale it to fit. Same square-aspect →
     // same content magnification, independent of absolute pixel size.
+    // Per-widget content zoom (config.zoom, default 1): higher renders the page
+    // at fewer logical px so it appears larger; lower shows more of the page.
+    const zoom = Number(ctx.widget.config.zoom) || 1;
     if (!ctx.fillContainer) {
       // Logical-resolution iframe: rendered at a fixed logical size and scaled
-      // to fit at scale 1. The ZOOM scaling is applied by the per-widget
-      // .bivouac-scaler wrapper (an ancestor), so this transform is CONSTANT —
+      // to fit at map scale 1. The map ZOOM is applied by the per-widget
+      // .bivouac-scaler ancestor, so this transform is otherwise constant —
       // matching how the old scaled-world layer treated the iframe, which
       // embeds cleanly (a per-frame-changing iframe transform breaks some apps).
       const L = WEBVIEW.logicalPerSquare;
-      frame.style.width = `${ctx.widget.cell.gw * L}px`;
-      frame.style.height = `${ctx.widget.cell.gh * L}px`;
+      frame.style.width = `${(ctx.widget.cell.gw * L) / zoom}px`;
+      frame.style.height = `${(ctx.widget.cell.gh * L) / zoom}px`;
       frame.style.transformOrigin = "0 0";
-      frame.style.transform = `scale(${ctx.gridSize / L})`;
+      frame.style.transform = `scale(${(ctx.gridSize * zoom) / L})`;
+    } else if (zoom !== 1) {
+      // DM-screen fill mode: honor zoom by rendering at a larger logical area
+      // and scaling it back to fill the card.
+      frame.style.width = `${100 / zoom}%`;
+      frame.style.height = `${100 / zoom}%`;
+      frame.style.transformOrigin = "0 0";
+      frame.style.transform = `scale(${zoom})`;
     }
     wrap.appendChild(frame);
 

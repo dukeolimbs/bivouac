@@ -25,6 +25,7 @@
   --bivouac-muted: rgba(255, 255, 255, 0.55);
 }
 
+/* Default (no explicit Foundry theme): follow the OS / browser preference. */
 @media (prefers-color-scheme: light) {
   :root {
     --bivouac-panel-bg: rgba(250, 249, 246, 0.55);
@@ -33,6 +34,25 @@
     --bivouac-text: var(--color-text-primary, #1c1c1c);
     --bivouac-muted: rgba(0, 0, 0, 0.5);
   }
+}
+
+/* An explicit Foundry theme (v13 applies .theme-dark / .theme-light on an
+   ancestor) OVERRIDES the OS preference, so Bivouac matches the rest of the
+   Foundry UI rather than diverging per client's OS setting. Defined after the
+   media query so, at equal specificity, these win. */
+.theme-dark {
+  --bivouac-panel-bg: rgba(16, 18, 25, 0.40);
+  --bivouac-panel-bg-strong: rgba(16, 18, 25, 0.86);
+  --bivouac-panel-border: rgba(255, 255, 255, 0.10);
+  --bivouac-text: var(--color-text-primary, #ecebe6);
+  --bivouac-muted: rgba(255, 255, 255, 0.55);
+}
+.theme-light {
+  --bivouac-panel-bg: rgba(250, 249, 246, 0.55);
+  --bivouac-panel-bg-strong: rgba(250, 249, 246, 0.92);
+  --bivouac-panel-border: rgba(0, 0, 0, 0.14);
+  --bivouac-text: var(--color-text-primary, #1c1c1c);
+  --bivouac-muted: rgba(0, 0, 0, 0.5);
 }
 
 /* ---------------------------------------------------------------- overlay */

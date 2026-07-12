@@ -108,6 +108,9 @@ export function applyFrameStyle(el: HTMLElement, widget: Widget): void {
   const edge = hexToRgba(color, opacity);
   el.style.setProperty("--bivouac-panel-border", edge);
   el.style.setProperty("--bivouac-frame-border", edge);
+  // Framed tiles also have a top gradient accent bar — tint it to the frame
+  // colour too (solid; its own ::before opacity keeps it a visible accent).
+  el.style.setProperty("--bivouac-frame-accent", color);
 }
 
 function placeholder(icon: string, label: string): HTMLElement {

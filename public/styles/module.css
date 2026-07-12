@@ -154,7 +154,7 @@
   position: absolute;
   inset: 0 0 auto 0;
   height: 3px;
-  background: linear-gradient(90deg, transparent, var(--bivouac-accent), transparent);
+  background: linear-gradient(90deg, transparent, var(--bivouac-frame-accent, var(--bivouac-accent)), transparent);
   opacity: 0.85;
   z-index: 2;
   pointer-events: none;

@@ -1,7 +1,7 @@
 /** Bivouac — per-widget configuration dialog (DialogV2). */
 
-import type { Widget, WidgetChrome, WidgetScope, WidgetType } from "./constants";
-import { widgetTypes } from "./widgets";
+import type { Widget, WidgetBackground, WidgetFrame, WidgetScope, WidgetType } from "./constants";
+import { backgroundOf, frameOf, widgetTypes } from "./widgets";
 
 type SaveFn = (updated: Widget) => void;
 
@@ -33,20 +33,36 @@ function buildForm(widget: Widget): string {
        <option value="dm"${widget.scope === "dm" ? " selected" : ""}>${esc(t("BIVOUAC.Config.ScopeDM"))}</option>
      </select>`));
 
-  const chromes: WidgetChrome[] = ["none", "subtle", "framed"];
-  rows.push(group(t("BIVOUAC.Config.Chrome"),
-    `<select name="chrome">${chromes
-      .map((c) => `<option value="${c}"${widget.chrome === c ? " selected" : ""}>${esc(t(`BIVOUAC.Config.Chrome_${c}`))}</option>`)
+  // ---- Frame (border) axis: style + colour + opacity -----------------------
+  const frames: WidgetFrame[] = ["none", "subtle", "framed"];
+  const curFrame = frameOf(widget);
+  rows.push(group(t("BIVOUAC.Config.Frame"),
+    `<select name="frame">${frames
+      .map((f) => `<option value="${f}"${curFrame === f ? " selected" : ""}>${esc(t(`BIVOUAC.Config.Chrome_${f}`))}</option>`)
       .join("")}</select>`));
-
-  // Per-tile frame colour + opacity (overrides the theme panel bg for the
-  // Subtle/Framed styles). Defaults to the accent orange.
   const frameColor = typeof widget.config.frameColor === "string" ? widget.config.frameColor : "#d98b3a";
   const frameOpacity = Number.isFinite(Number(widget.config.frameOpacity)) ? Number(widget.config.frameOpacity) : 0.4;
   rows.push(group(t("BIVOUAC.Config.FrameColor"),
     `<input type="color" name="frameColor" value="${esc(frameColor)}">`));
   rows.push(group(t("BIVOUAC.Config.FrameOpacity"),
     `<input type="number" name="frameOpacity" value="${esc(frameOpacity)}" min="0" max="1" step="0.05" title="${esc(t("BIVOUAC.Config.FrameOpacityHint"))}">`));
+
+  // ---- Background (fill) axis: style + colour(s) + opacity ------------------
+  const backgrounds: WidgetBackground[] = ["none", "solid", "frosted", "gradient"];
+  const curBg = backgroundOf(widget);
+  rows.push(group(t("BIVOUAC.Config.Background"),
+    `<select name="background">${backgrounds
+      .map((b) => `<option value="${b}"${curBg === b ? " selected" : ""}>${esc(t(`BIVOUAC.Config.Bg_${b}`))}</option>`)
+      .join("")}</select>`));
+  const bgColor = typeof widget.config.bgColor === "string" ? widget.config.bgColor : "#101219";
+  const bgColor2 = typeof widget.config.bgColor2 === "string" ? widget.config.bgColor2 : bgColor;
+  const bgOpacity = Number.isFinite(Number(widget.config.bgOpacity)) ? Number(widget.config.bgOpacity) : 0.4;
+  rows.push(group(t("BIVOUAC.Config.BgColor"),
+    `<input type="color" name="bgColor" value="${esc(bgColor)}">`));
+  rows.push(group(t("BIVOUAC.Config.BgColor2"),
+    `<input type="color" name="bgColor2" value="${esc(bgColor2)}">`));
+  rows.push(group(t("BIVOUAC.Config.BgOpacity"),
+    `<input type="number" name="bgOpacity" value="${esc(bgOpacity)}" min="0" max="1" step="0.05" title="${esc(t("BIVOUAC.Config.BgOpacityHint"))}">`));
 
   switch (widget.type) {
     case "webview":
@@ -100,11 +116,23 @@ function applyForm(widget: Widget, data: Record<string, string>): Widget {
   };
   updated.title = data.title?.trim() || undefined;
   updated.scope = (data.scope === "dm" ? "dm" : "shared") as WidgetScope;
-  updated.chrome = (["none", "subtle", "framed"].includes(data.chrome) ? data.chrome : "subtle") as WidgetChrome;
 
+  // Frame (border) axis.
+  updated.config.frame = (["none", "subtle", "framed"].includes(data.frame) ? data.frame : "subtle") as WidgetFrame;
   updated.config.frameColor = /^#[0-9a-fA-F]{6}$/.test(data.frameColor ?? "") ? data.frameColor : "#d98b3a";
   const frameOp = Number(data.frameOpacity);
   updated.config.frameOpacity = Number.isFinite(frameOp) ? Math.min(1, Math.max(0, frameOp)) : 0.4;
+
+  // Background (fill) axis.
+  updated.config.background = (["none", "solid", "frosted", "gradient"].includes(data.background)
+    ? data.background
+    : "frosted") as WidgetBackground;
+  updated.config.bgColor = /^#[0-9a-fA-F]{6}$/.test(data.bgColor ?? "") ? data.bgColor : "#101219";
+  updated.config.bgColor2 = /^#[0-9a-fA-F]{6}$/.test(data.bgColor2 ?? "")
+    ? data.bgColor2
+    : (updated.config.bgColor as string);
+  const bgOp = Number(data.bgOpacity);
+  updated.config.bgOpacity = Number.isFinite(bgOp) ? Math.min(1, Math.max(0, bgOp)) : 0.4;
 
   switch (widget.type) {
     case "webview": {

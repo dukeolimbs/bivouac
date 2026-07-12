@@ -3,7 +3,16 @@
 
 import { GRID, LOD, MODULE_ID, SETTINGS, type Widget, type WidgetCell, type WidgetType } from "./constants";
 import { activeLandingScene, readLayout, writeLayout } from "./layout";
-import { applyFrameStyle, attachInteractions, createWidget, getWidgetType, type RenderContext } from "./widgets";
+import {
+  applyBackground,
+  applyFrameStyle,
+  attachInteractions,
+  backgroundOf,
+  createWidget,
+  frameOf,
+  getWidgetType,
+  type RenderContext,
+} from "./widgets";
 import { openWidgetConfig } from "./widget-config";
 
 /** The PIXI stage transform, sampled per frame to map world coords → screen. */
@@ -227,10 +236,11 @@ class WorldLayer {
 
   #buildWidget(widget: Widget, extra: { gs: number; isGM: boolean; lod: boolean }): HTMLElement {
     const el = document.createElement("div");
-    el.className = `bivouac-widget bivouac-chrome-${widget.chrome}`;
+    el.className = `bivouac-widget bivouac-frame-${frameOf(widget)} bivouac-bg-${backgroundOf(widget)}`;
     el.dataset.id = widget.id;
     if (widget.scope === "dm") el.classList.add("bivouac-dm-scope");
     applyFrameStyle(el, widget);
+    applyBackground(el, widget);
 
     // Click anywhere on a widget (except its buttons) to select it; the
     // header/resize drag path selects too (it stops propagation before this).

@@ -122,34 +122,24 @@
   border-radius: 2px;
 }
 
-/* --- Chrome variants: clearly distinct --------------------------------- */
+/* --- Tile style: independent FRAME (border/edge) + BACKGROUND (fill) axes -- */
 
-/* none — content floats bare, part of the scene */
-.bivouac-chrome-none {
-  background: transparent;
+/* Frame axis — border, shadow, and (framed) the top accent gradient. Colour +
+   opacity come from applyFrameStyle → --bivouac-panel-border / -frame-border. */
+.bivouac-frame-none {
   border: none;
   box-shadow: none;
 }
-
-/* subtle — quiet frosted hairline card */
-.bivouac-chrome-subtle {
-  background: var(--bivouac-panel-bg);
+.bivouac-frame-subtle {
   border: 1px solid var(--bivouac-panel-border);
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.22);
-  backdrop-filter: blur(var(--bivouac-blur));
-  -webkit-backdrop-filter: blur(var(--bivouac-blur));
 }
-
-/* framed — a defined panel: opaque, accent border + top accent, deeper shadow */
-.bivouac-chrome-framed {
-  background: var(--bivouac-panel-bg-strong);
+.bivouac-frame-framed {
   border: 1.5px solid var(--bivouac-frame-border);
   border-radius: calc(var(--bivouac-radius) + 3px);
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.48), inset 0 0 0 1px rgba(255, 255, 255, 0.06);
-  backdrop-filter: blur(calc(var(--bivouac-blur) + 3px));
-  -webkit-backdrop-filter: blur(calc(var(--bivouac-blur) + 3px));
 }
-.bivouac-chrome-framed::before {
+.bivouac-frame-framed::before {
   content: "";
   position: absolute;
   inset: 0 0 auto 0;
@@ -158,6 +148,27 @@
   opacity: 0.85;
   z-index: 2;
   pointer-events: none;
+}
+
+/* Background axis — fill. Colour + opacity from applyBackground →
+   --bivouac-bg-fill / -fill2 (fall back to the theme panel when unset). */
+.bivouac-bg-none {
+  background: transparent;
+}
+.bivouac-bg-solid {
+  background: var(--bivouac-bg-fill, var(--bivouac-panel-bg));
+}
+.bivouac-bg-frosted {
+  background: var(--bivouac-bg-fill, var(--bivouac-panel-bg));
+  backdrop-filter: blur(var(--bivouac-blur));
+  -webkit-backdrop-filter: blur(var(--bivouac-blur));
+}
+.bivouac-bg-gradient {
+  background: linear-gradient(
+    135deg,
+    var(--bivouac-bg-fill, var(--bivouac-panel-bg)),
+    var(--bivouac-bg-fill2, var(--bivouac-panel-bg-strong))
+  );
 }
 
 /* Header — hidden for players; shown only in edit mode. */

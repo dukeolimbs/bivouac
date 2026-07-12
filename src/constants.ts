@@ -31,7 +31,13 @@ export interface WidgetCell {
 
 export type WidgetType = "webview" | "image" | "note";
 export type WidgetScope = "shared" | "dm";
+/** Legacy single "chrome" axis — migrated to separate `frame` + `background`
+ *  (stored in `config`); kept for reading old layouts. */
 export type WidgetChrome = "none" | "subtle" | "framed";
+/** Border/edge style (config.frame). */
+export type WidgetFrame = "none" | "subtle" | "framed";
+/** Fill style (config.background). `image` is a planned future value. */
+export type WidgetBackground = "none" | "solid" | "frosted" | "gradient";
 
 export interface WidgetInteraction {
   trigger: "click" | "dblclick";

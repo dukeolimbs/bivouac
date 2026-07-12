@@ -5,6 +5,8 @@ import {
   WEBVIEW,
   MODULE_ID,
   type Widget,
+  type WidgetBackground,
+  type WidgetFrame,
   type WidgetInteraction,
   type WidgetType,
 } from "./constants";
@@ -97,10 +99,25 @@ function hexToRgba(hex: string, alpha: number): string {
   return `rgba(${parseInt(m[1], 16)}, ${parseInt(m[2], 16)}, ${parseInt(m[3], 16)}, ${alpha})`;
 }
 
-/** Apply a tile's frame colour/opacity to its EDGE (border) only — not the
- *  panel fill. Overrides the border CSS vars inline (`--bivouac-panel-border`
- *  for Subtle, `--bivouac-frame-border` for Framed); the background stays the
- *  theme default. Defaults to the accent orange at 0.4 when unset. */
+/** Resolve a tile's frame (border) style — `config.frame`, falling back to the
+ *  legacy `chrome` for layouts saved before the frame/background split. */
+export function frameOf(widget: Widget): WidgetFrame {
+  const f = widget.config.frame;
+  if (f === "none" || f === "subtle" || f === "framed") return f;
+  return widget.chrome === "none" ? "none" : widget.chrome === "framed" ? "framed" : "subtle";
+}
+
+/** Resolve a tile's background (fill) style — `config.background`, falling back
+ *  to the legacy `chrome` (none → none; subtle/framed → frosted). */
+export function backgroundOf(widget: Widget): WidgetBackground {
+  const b = widget.config.background;
+  if (b === "none" || b === "solid" || b === "frosted" || b === "gradient") return b;
+  return widget.chrome === "none" ? "none" : "frosted";
+}
+
+/** Apply a tile's frame colour/opacity to its EDGE (border + framed top accent)
+ *  only — not the fill. Overrides the border CSS vars inline; defaults to the
+ *  accent orange at 0.4 when unset. */
 export function applyFrameStyle(el: HTMLElement, widget: Widget): void {
   const color = typeof widget.config.frameColor === "string" ? widget.config.frameColor : "#d98b3a";
   const raw = Number(widget.config.frameOpacity);
@@ -108,9 +125,19 @@ export function applyFrameStyle(el: HTMLElement, widget: Widget): void {
   const edge = hexToRgba(color, opacity);
   el.style.setProperty("--bivouac-panel-border", edge);
   el.style.setProperty("--bivouac-frame-border", edge);
-  // Framed tiles also have a top gradient accent bar — tint it to the frame
-  // colour too (solid; its own ::before opacity keeps it a visible accent).
   el.style.setProperty("--bivouac-frame-accent", color);
+}
+
+/** Apply a tile's background colour/opacity to the fill CSS vars inline. Used by
+ *  the Solid / Frosted / Gradient background styles (`--bivouac-bg-fill` and,
+ *  for gradients, `--bivouac-bg-fill2`). Defaults to the dark panel at 0.4. */
+export function applyBackground(el: HTMLElement, widget: Widget): void {
+  const raw = Number(widget.config.bgOpacity);
+  const opacity = Number.isFinite(raw) ? Math.min(1, Math.max(0, raw)) : 0.4;
+  const c1 = typeof widget.config.bgColor === "string" ? widget.config.bgColor : "#101219";
+  const c2 = typeof widget.config.bgColor2 === "string" ? widget.config.bgColor2 : c1;
+  el.style.setProperty("--bivouac-bg-fill", hexToRgba(c1, opacity));
+  el.style.setProperty("--bivouac-bg-fill2", hexToRgba(c2, opacity));
 }
 
 function placeholder(icon: string, label: string): HTMLElement {

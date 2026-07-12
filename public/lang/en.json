@@ -130,9 +130,12 @@
       },
       "DmDock": {
         "Name": "DM screen position",
-        "Hint": "Where the DM screen drawer opens. 'Beside the sidebar' keeps Foundry's chat and dice visible; 'Over the sidebar' opens at the screen edge, covering them (the original behaviour). Also switchable from the gear in the DM screen header.",
-        "Beside": "Beside the sidebar (keeps chat/dice visible)",
-        "Over": "Over the sidebar (screen edge)"
+        "Hint": "Which edge the DM screen drawer emerges from. 'Beside the sidebar' keeps Foundry's chat and dice visible; 'Over the sidebar' covers them at the right edge (original behaviour); Left / Top / Bottom emerge from those edges. Also switchable from the gear in the DM screen header.",
+        "Beside": "Right — beside the sidebar (keeps chat/dice visible)",
+        "Over": "Right — over the sidebar (screen edge)",
+        "Left": "Left",
+        "Top": "Top",
+        "Bottom": "Bottom"
       }
     }
   }

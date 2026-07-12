@@ -19,8 +19,10 @@ export const SETTINGS = {
   dmTabTop: "dmTabTop",
   /** World setting: max widget size in grid squares (resize cap). */
   maxWidgetSize: "maxWidgetSize",
-  /** Client setting: DM-screen drawer width in px (set by dragging its edge). */
+  /** Client setting: DM-screen drawer width in px (left/right dock; drag-set). */
   dmDrawerWidth: "dmDrawerWidth",
+  /** Client setting: DM-screen drawer height in px (top/bottom dock; drag-set). */
+  dmDrawerHeight: "dmDrawerHeight",
   /** Client setting: how many web views may be live before LOD can kick in. */
   lodMinWebviews: "lodMinWebviews",
   /** Client setting: DM-screen dock mode — "beside" the sidebar or "over" it. */

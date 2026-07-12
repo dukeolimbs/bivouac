@@ -97,6 +97,14 @@ Hooks.once("init", () => {
     default: 380,
   });
 
+  // DM-screen drawer height (px, top/bottom dock). Drag-set + persisted per-GM.
+  game.settings.register(MODULE_ID, SETTINGS.dmDrawerHeight, {
+    scope: "client",
+    config: false,
+    type: Number,
+    default: 320,
+  });
+
   // How many live web views the board may show before level-of-detail kicks in
   // (LOD then swaps far-away web views for a quiet placeholder while zoomed out).
   // Per-client performance knob; set high to keep every web view live.
@@ -122,6 +130,9 @@ Hooks.once("init", () => {
     choices: {
       beside: "BIVOUAC.Settings.DmDock.Beside",
       over: "BIVOUAC.Settings.DmDock.Over",
+      left: "BIVOUAC.Settings.DmDock.Left",
+      top: "BIVOUAC.Settings.DmDock.Top",
+      bottom: "BIVOUAC.Settings.DmDock.Bottom",
     },
     default: "beside",
     onChange: () => dmScreen.applyDock(),

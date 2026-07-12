@@ -6,9 +6,15 @@ import { readDMLayout, writeDMLayout } from "./layout";
 import { openWidgetConfig, pickWidgetType } from "./widget-config";
 import { MODULE_ID, SETTINGS, type Widget, type WidgetType } from "./constants";
 
-/** Drag-resize bounds for the drawer, in px (upper bound also capped at 90vw). */
+/** Drag-resize bounds for the drawer, in px (upper bounds also capped at 90vw /
+ *  90vh). Width applies to left/right docks; height to top/bottom docks. */
 const DRAWER_MIN = 280;
 const DRAWER_MAX = 900;
+const DRAWER_MIN_H = 160;
+const DRAWER_MAX_H = 800;
+
+const DOCK_MODES = ["beside", "over", "left", "top", "bottom"] as const;
+type DockMode = (typeof DOCK_MODES)[number];
 
 class DMScreen {
   #el: HTMLElement | null = null;
@@ -16,7 +22,7 @@ class DMScreen {
   #editBtn: HTMLButtonElement | null = null;
   #open = false;
   #editMode = false;
-  #dock: "beside" | "over" = "beside";
+  #dock: DockMode = "beside";
   #dragId: string | null = null;
   #sidebarRO: ResizeObserver | null = null;
   #sidebarMO: MutationObserver | null = null;
@@ -47,52 +53,87 @@ class DMScreen {
     this.#tab = tab;
 
     this.#trackSidebar();
-    this.applyDrawerWidth();
+    this.applyDrawerSize();
     this.applyDock();
-    window.addEventListener("resize", () => this.applyDrawerWidth());
+    window.addEventListener("resize", () => this.applyDrawerSize());
   }
 
-  /** Read the dock-mode setting (beside the sidebar vs over it) and re-publish
-   *  the drawer's right offset. Called on ready and on the setting's change. */
+  /** Which physical edge the drawer docks to. beside/over are both right-edge. */
+  #dockSide(): "right" | "left" | "top" | "bottom" {
+    return this.#dock === "left" || this.#dock === "top" || this.#dock === "bottom" ? this.#dock : "right";
+  }
+
+  /** Read the dock-mode setting and re-anchor the drawer (which edge it emerges
+   *  from). Called on ready and whenever the setting changes (from the Foundry
+   *  settings menu or the header gear). */
   applyDock(): void {
-    this.#dock = game.settings.get(MODULE_ID, SETTINGS.dmDock) === "over" ? "over" : "beside";
+    const m = game.settings.get(MODULE_ID, SETTINGS.dmDock);
+    this.#dock = (DOCK_MODES as readonly string[]).includes(m) ? (m as DockMode) : "beside";
+    this.#applyDockClass();
     this.#syncTab();
+  }
+
+  #applyDockClass(): void {
+    if (!this.#el) return;
+    this.#el.classList.remove("bivouac-dock-right", "bivouac-dock-left", "bivouac-dock-top", "bivouac-dock-bottom");
+    this.#el.classList.add(`bivouac-dock-${this.#dockSide()}`);
   }
 
   /* ------------------------------------------------ drawer width -------- */
 
-  /** Push the persisted drawer width into `--bivouac-drawer-w`, clamped to the
-   *  resize bounds and never wider than 90vw. */
-  applyDrawerWidth(): void {
-    const saved = Number(game.settings.get(MODULE_ID, SETTINGS.dmDrawerWidth) ?? 380);
-    const maxW = Math.min(DRAWER_MAX, window.innerWidth * 0.9);
-    const w = Math.min(maxW, Math.max(DRAWER_MIN, Number.isFinite(saved) ? saved : 380));
-    document.documentElement.style.setProperty("--bivouac-drawer-w", `${Math.round(w)}px`);
+  /** Push the persisted drawer width + height into their CSS vars, clamped to
+   *  the resize bounds (and never past 90vw / 90vh). Width drives left/right
+   *  docks; height drives top/bottom. */
+  applyDrawerSize(): void {
+    const savedW = Number(game.settings.get(MODULE_ID, SETTINGS.dmDrawerWidth) ?? 380);
+    const savedH = Number(game.settings.get(MODULE_ID, SETTINGS.dmDrawerHeight) ?? 320);
+    const w = Math.min(Math.min(DRAWER_MAX, window.innerWidth * 0.9), Math.max(DRAWER_MIN, Number.isFinite(savedW) ? savedW : 380));
+    const h = Math.min(Math.min(DRAWER_MAX_H, window.innerHeight * 0.9), Math.max(DRAWER_MIN_H, Number.isFinite(savedH) ? savedH : 320));
+    const root = document.documentElement.style;
+    root.setProperty("--bivouac-drawer-w", `${Math.round(w)}px`);
+    root.setProperty("--bivouac-drawer-h", `${Math.round(h)}px`);
   }
 
   /** Drag the drawer's inner (left) edge to resize; persist on release.
    *  Pointer capture keeps the drag alive over iframe content. */
   #startResize(e: PointerEvent, handle: HTMLElement): void {
     if (e.button !== 0) return;
+    const el = this.#el;
+    if (!el) return;
     e.preventDefault();
+    const side = this.#dockSide();
+    const vertical = side === "top" || side === "bottom";
+    // The drawer's ANCHORED edge is fixed during the resize; the size is the gap
+    // from that edge to the pointer.
+    const rect = el.getBoundingClientRect();
     const maxW = Math.min(DRAWER_MAX, window.innerWidth * 0.9);
-    // The drawer's right edge is fixed during a resize (it's docked to the
-    // sidebar's left edge, not necessarily the viewport edge), so width = that
-    // right edge minus the pointer.
-    const rightEdge = this.#el?.getBoundingClientRect().right ?? window.innerWidth;
-    let width = this.#el?.getBoundingClientRect().width ?? 380;
+    const maxH = Math.min(DRAWER_MAX_H, window.innerHeight * 0.9);
+    let width = rect.width;
+    let height = rect.height;
     handle.setPointerCapture(e.pointerId);
     document.body.classList.add("bivouac-resizing-drawer");
+    document.body.style.cursor = vertical ? "ns-resize" : "ew-resize";
     const onMove = (ev: PointerEvent): void => {
-      width = Math.min(maxW, Math.max(DRAWER_MIN, rightEdge - ev.clientX));
-      document.documentElement.style.setProperty("--bivouac-drawer-w", `${Math.round(width)}px`);
+      if (side === "right") width = Math.min(maxW, Math.max(DRAWER_MIN, rect.right - ev.clientX));
+      else if (side === "left") width = Math.min(maxW, Math.max(DRAWER_MIN, ev.clientX - rect.left));
+      else if (side === "top") height = Math.min(maxH, Math.max(DRAWER_MIN_H, ev.clientY - rect.top));
+      else height = Math.min(maxH, Math.max(DRAWER_MIN_H, rect.bottom - ev.clientY));
+      document.documentElement.style.setProperty(
+        vertical ? "--bivouac-drawer-h" : "--bivouac-drawer-w",
+        `${Math.round(vertical ? height : width)}px`,
+      );
     };
     const onUp = (ev: PointerEvent): void => {
       handle.releasePointerCapture(ev.pointerId);
       handle.removeEventListener("pointermove", onMove);
       handle.removeEventListener("pointerup", onUp);
       document.body.classList.remove("bivouac-resizing-drawer");
-      void game.settings.set(MODULE_ID, SETTINGS.dmDrawerWidth, Math.round(width));
+      document.body.style.cursor = "";
+      void game.settings.set(
+        MODULE_ID,
+        vertical ? SETTINGS.dmDrawerHeight : SETTINGS.dmDrawerWidth,
+        Math.round(vertical ? height : width),
+      );
     };
     handle.addEventListener("pointermove", onMove);
     handle.addEventListener("pointerup", onUp);
@@ -134,10 +175,10 @@ class DMScreen {
       const inset = Math.max(0, window.innerWidth - rect.left + this.#tabPad());
       document.documentElement.style.setProperty("--bivouac-dmtab-inset", `${Math.round(inset)}px`);
     }
-    // Drawer: "beside" anchors its right edge to the sidebar's live left edge
-    // (sits beside the sidebar, never covering chat/dice); "over" pins it to the
-    // viewport edge (right: 0), covering the sidebar as it did originally.
-    const drawerRight = this.#dock === "over" ? 0 : Math.max(0, window.innerWidth - rect.left);
+    // Right-dock offset: only "beside" tracks the sidebar's left edge (sits
+    // beside it, never covering chat/dice). "over" and the non-right docks pin
+    // to the viewport edge (0) — those dock classes ignore this var anyway.
+    const drawerRight = this.#dock === "beside" ? Math.max(0, window.innerWidth - rect.left) : 0;
     document.documentElement.style.setProperty("--bivouac-drawer-right", `${Math.round(drawerRight)}px`);
   };
 
@@ -235,6 +276,7 @@ class DMScreen {
 
     iface.appendChild(drawer);
     this.#el = drawer;
+    this.#applyDockClass(); // position it at the configured edge before it opens
   }
 
   #toggleEdit(): void {
@@ -249,16 +291,21 @@ class DMScreen {
    *  Foundry settings menu exposes, so both stay in sync. */
   async #openSettings(): Promise<void> {
     const loc = (k: string): string => game.i18n.localize(k);
-    const cur = game.settings.get(MODULE_ID, SETTINGS.dmDock) === "over" ? "over" : "beside";
-    const opt = (v: string, k: string): string =>
-      `<option value="${v}"${cur === v ? " selected" : ""}>${loc(k)}</option>`;
+    const cur = this.#dock;
+    const labels: Record<DockMode, string> = {
+      beside: "BIVOUAC.Settings.DmDock.Beside",
+      over: "BIVOUAC.Settings.DmDock.Over",
+      left: "BIVOUAC.Settings.DmDock.Left",
+      top: "BIVOUAC.Settings.DmDock.Top",
+      bottom: "BIVOUAC.Settings.DmDock.Bottom",
+    };
+    const opts = DOCK_MODES.map(
+      (v) => `<option value="${v}"${cur === v ? " selected" : ""}>${loc(labels[v])}</option>`,
+    ).join("");
     const content =
       `<div class="bivouac-config standard-form">` +
       `<div class="form-group"><label>${loc("BIVOUAC.Settings.DmDock.Name")}</label>` +
-      `<div class="form-fields"><select name="dock">` +
-      opt("beside", "BIVOUAC.Settings.DmDock.Beside") +
-      opt("over", "BIVOUAC.Settings.DmDock.Over") +
-      `</select></div></div>` +
+      `<div class="form-fields"><select name="dock">${opts}</select></div></div>` +
       `<p class="bivouac-config__hint">${loc("BIVOUAC.Settings.DmDock.Hint")}</p></div>`;
     const result = await foundry.applications.api.DialogV2.prompt({
       window: { title: loc("BIVOUAC.DMScreen.Settings"), icon: "fa-solid fa-gear" },
@@ -271,7 +318,7 @@ class DMScreen {
       },
       rejectClose: false,
     });
-    if (result === "beside" || result === "over") await game.settings.set(MODULE_ID, SETTINGS.dmDock, result);
+    if ((DOCK_MODES as readonly string[]).includes(result)) await game.settings.set(MODULE_ID, SETTINGS.dmDock, result);
   }
 
   render(): void {

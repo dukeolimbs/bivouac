@@ -48,7 +48,7 @@ class DMScreen {
     const tab = document.createElement("button");
     tab.type = "button";
     tab.id = "bivouac-dmscreen-tab";
-    tab.className = "bivouac-dmscreen-tab";
+    tab.className = "bivouac-dmscreen-tab bivouac-tab-right"; // corrected to the configured edge by applyDock()
     tab.title = game.i18n.localize("BIVOUAC.Controls.DMScreen");
     tab.setAttribute("aria-pressed", String(this.#open));
     tab.innerHTML = `<i class="fa-solid fa-chalkboard-user"></i>`;
@@ -78,9 +78,13 @@ class DMScreen {
   }
 
   #applyDockClass(): void {
-    if (!this.#el) return;
-    this.#el.classList.remove("bivouac-dock-right", "bivouac-dock-left", "bivouac-dock-top", "bivouac-dock-bottom");
-    this.#el.classList.add(`bivouac-dock-${this.#dockSide()}`);
+    const side = this.#dockSide();
+    const setSide = (elm: HTMLElement, prefix: string): void => {
+      elm.classList.remove(`${prefix}-right`, `${prefix}-left`, `${prefix}-top`, `${prefix}-bottom`);
+      elm.classList.add(`${prefix}-${side}`);
+    };
+    if (this.#el) setSide(this.#el, "bivouac-dock"); // drawer edge
+    if (this.#tab) setSide(this.#tab, "bivouac-tab"); // toggle tab follows the same edge
   }
 
   /* ------------------------------------------------ drawer width -------- */

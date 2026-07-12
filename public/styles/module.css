@@ -552,20 +552,15 @@ body.bivouac-dnd-active .bivouac-card__body iframe {
   pointer-events: none;
 }
 
-/* GM-only DM-screen toggle: a detached, glassy pill that sits just left of the
-   right-hand UI column, above other elements. It fades out while the drawer is
-   open (closed via the drawer ✕ or Esc), so it never floats over the panel. */
+/* GM-only DM-screen toggle: a detached, glassy pill on the same edge the drawer
+   docks to (a .bivouac-tab-* class, set by JS to mirror the dock). It fades out
+   while the drawer is open (closed via the drawer ✕ or Esc). */
 .bivouac-dmscreen-tab {
   position: absolute;
-  top: var(--bivouac-dmtab-top);
-  right: var(--bivouac-dmtab-inset);
-  transform: translateY(-50%);
   z-index: calc(var(--bivouac-drawer-z) + 1);   /* above Foundry's UI */
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 60px;
   padding: 0;
   color: var(--bivouac-text);
   font-size: 15px;
@@ -581,13 +576,66 @@ body.bivouac-dnd-active .bivouac-card__body iframe {
 .bivouac-dmscreen-tab:hover {
   color: var(--bivouac-accent);
   background: color-mix(in srgb, var(--bivouac-accent) 18%, var(--bivouac-panel-bg));
+}
+/* Vertical pill on the left/right edge; --bivouac-dmtab-top positions it along
+   the edge. Right tracks the sidebar via --bivouac-dmtab-inset; left sits flush. */
+.bivouac-tab-right,
+.bivouac-tab-left {
+  width: 34px;
+  height: 60px;
+  top: var(--bivouac-dmtab-top);
+  transform: translateY(-50%);
+}
+.bivouac-tab-right {
+  right: var(--bivouac-dmtab-inset);
+}
+.bivouac-tab-left {
+  left: 0;
+}
+/* Horizontal pill on the top/bottom edge; --bivouac-dmtab-top positions it along
+   the edge (as a left %). */
+.bivouac-tab-top,
+.bivouac-tab-bottom {
+  width: 60px;
+  height: 34px;
+  left: var(--bivouac-dmtab-top);
+  transform: translateX(-50%);
+}
+.bivouac-tab-top {
+  top: 0;
+}
+.bivouac-tab-bottom {
+  bottom: 0;
+}
+/* Hover nudge toward the drawer edge (keeps the centring transform). */
+.bivouac-tab-right:hover {
   transform: translateY(-50%) translateX(-2px);
 }
-/* Drawer open → get out of the way. */
+.bivouac-tab-left:hover {
+  transform: translateY(-50%) translateX(2px);
+}
+.bivouac-tab-top:hover {
+  transform: translateX(-50%) translateY(2px);
+}
+.bivouac-tab-bottom:hover {
+  transform: translateX(-50%) translateY(-2px);
+}
+/* Drawer open → fade + tuck off the docked edge. */
 .bivouac-dmscreen-tab--open {
   opacity: 0;
   pointer-events: none;
+}
+.bivouac-tab-right.bivouac-dmscreen-tab--open {
   transform: translateY(-50%) translateX(12px);
+}
+.bivouac-tab-left.bivouac-dmscreen-tab--open {
+  transform: translateY(-50%) translateX(-12px);
+}
+.bivouac-tab-top.bivouac-dmscreen-tab--open {
+  transform: translateX(-50%) translateY(-12px);
+}
+.bivouac-tab-bottom.bivouac-dmscreen-tab--open {
+  transform: translateX(-50%) translateY(12px);
 }
 .bivouac-drawer__header {
   display: flex;

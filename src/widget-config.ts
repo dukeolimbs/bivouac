@@ -39,13 +39,10 @@ function buildForm(widget: Widget): string {
       .map((c) => `<option value="${c}"${widget.chrome === c ? " selected" : ""}>${esc(t(`BIVOUAC.Config.Chrome_${c}`))}</option>`)
       .join("")}</select>`));
 
-  // Per-tile frame colour + opacity (overrides the theme panel for the
-  // Subtle/Framed styles when "custom" is ticked; otherwise theme default).
-  const frameCustom = !!widget.config.frameCustom;
-  const frameColor = typeof widget.config.frameColor === "string" ? widget.config.frameColor : "#101219";
+  // Per-tile frame colour + opacity (overrides the theme panel bg for the
+  // Subtle/Framed styles). Defaults to the accent orange.
+  const frameColor = typeof widget.config.frameColor === "string" ? widget.config.frameColor : "#d98b3a";
   const frameOpacity = Number.isFinite(Number(widget.config.frameOpacity)) ? Number(widget.config.frameOpacity) : 0.4;
-  rows.push(group(t("BIVOUAC.Config.FrameCustom"),
-    `<input type="checkbox" name="frameCustom"${frameCustom ? " checked" : ""}>`));
   rows.push(group(t("BIVOUAC.Config.FrameColor"),
     `<input type="color" name="frameColor" value="${esc(frameColor)}">`));
   rows.push(group(t("BIVOUAC.Config.FrameOpacity"),
@@ -105,8 +102,7 @@ function applyForm(widget: Widget, data: Record<string, string>): Widget {
   updated.scope = (data.scope === "dm" ? "dm" : "shared") as WidgetScope;
   updated.chrome = (["none", "subtle", "framed"].includes(data.chrome) ? data.chrome : "subtle") as WidgetChrome;
 
-  updated.config.frameCustom = !!data.frameCustom;
-  updated.config.frameColor = /^#[0-9a-fA-F]{6}$/.test(data.frameColor ?? "") ? data.frameColor : "#101219";
+  updated.config.frameColor = /^#[0-9a-fA-F]{6}$/.test(data.frameColor ?? "") ? data.frameColor : "#d98b3a";
   const frameOp = Number(data.frameOpacity);
   updated.config.frameOpacity = Number.isFinite(frameOp) ? Math.min(1, Math.max(0, frameOp)) : 0.4;
 

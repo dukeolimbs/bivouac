@@ -210,6 +210,8 @@
   height: calc(100% / var(--bivouac-scale, 1));
   transform: scale(var(--bivouac-scale, 1));
   transform-origin: 0 0;
+  /* Query container so note text can size to the tile via cq units. */
+  container-type: size;
 }
 
 .bivouac-widget__btn,
@@ -332,6 +334,12 @@
   overflow: auto;
   padding: 10px 12px;
   line-height: 1.5;
+  overflow-wrap: anywhere; /* wrap long words / URLs instead of overflowing */
+}
+/* Landing tiles: note text scales with the tile size (container = scaler) and
+   the per-tile Text-size multiplier. DM-screen notes keep the inherited size. */
+.bivouac-scaler .bivouac-note {
+  font-size: clamp(9px, calc(6.5cqmin * var(--bivouac-note-scale, 1)), 64px);
 }
 
 .bivouac-placeholder {

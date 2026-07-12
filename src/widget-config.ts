@@ -68,6 +68,8 @@ function buildForm(widget: Widget): string {
     case "note":
       rows.push(group(t("BIVOUAC.Config.Html"),
         `<textarea name="html" rows="6" placeholder="${esc(t("BIVOUAC.Config.HtmlPlaceholder"))}">${esc(widget.config.html ?? "")}</textarea>`));
+      rows.push(group(t("BIVOUAC.Config.NoteTextSize"),
+        `<input type="number" name="textScale" value="${esc(Number(widget.config.textScale) || 1)}" min="0.5" max="3" step="0.1" title="${esc(t("BIVOUAC.Config.NoteTextSizeHint"))}">`));
       break;
   }
 
@@ -106,9 +108,12 @@ function applyForm(widget: Widget, data: Record<string, string>): Widget {
           ? [{ trigger: "click", action: data.iAction as never, uuid: data.iUuid.trim() }]
           : [];
       break;
-    case "note":
+    case "note": {
       updated.config.html = data.html ?? "";
+      const s = Number(data.textScale);
+      updated.config.textScale = Number.isFinite(s) ? Math.min(3, Math.max(0.5, s)) : 1;
       break;
+    }
   }
   return updated;
 }

@@ -69,7 +69,9 @@
       "TargetUuid": "Target UUID",
       "TargetUuidPlaceholder": "Actor.xx…  /  JournalEntry.xx…  /  Macro.xx…",
       "Html": "Content",
-      "HtmlPlaceholder": "Notes, rules, HTML…"
+      "HtmlPlaceholder": "Notes, rules, HTML…",
+      "NoteTextSize": "Text size",
+      "NoteTextSizeHint": "Text size for this note, relative to the tile (1 = default; the note also scales with the tile's size)."
     },
     "DMScreen": {
       "Title": "DM Screen",

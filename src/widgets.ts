@@ -209,8 +209,10 @@ registerWidgetType({
     const box = el("div", "bivouac-note");
     // GM-authored content; rendered as-is for MVP (enrichment comes later).
     // Fills its container (the .bivouac-scaler for landing widgets, or the card
-    // for DM screen); zoom scaling is handled by that ancestor.
+    // for DM screen); zoom scaling is handled by that ancestor. On the landing
+    // board the font scales with the tile size (cqmin) × this per-tile multiplier.
     box.innerHTML = html;
+    box.style.setProperty("--bivouac-note-scale", String(Number(ctx.widget.config.textScale) || 1));
     return box;
   },
 });

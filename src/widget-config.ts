@@ -119,7 +119,17 @@ function buildForm(widget: Widget): string {
         `<select name="cardsArt">
            <option value="portrait"${curArt === "portrait" ? " selected" : ""}>${esc(t("BIVOUAC.Config.CardsArt_portrait"))}</option>
            <option value="token"${curArt === "token" ? " selected" : ""}>${esc(t("BIVOUAC.Config.CardsArt_token"))}</option>
-         </select>` +
+         </select>`));
+      const showNames = widget.config.showNames !== false;
+      content.push(group(t("BIVOUAC.Config.CardsShowNames"),
+        `<input type="checkbox" name="cardsShowNames"${showNames ? " checked" : ""}>`));
+      const curCardFont = String(widget.config.nameFont ?? "");
+      const cardFontOpts = [`<option value=""${curCardFont === "" ? " selected" : ""}>${esc(t("BIVOUAC.Config.NoteFontDefault"))}</option>`]
+        .concat(availableFonts().map((f) => `<option value="${esc(f)}"${curCardFont === f ? " selected" : ""}>${esc(f)}</option>`))
+        .join("");
+      content.push(group(t("BIVOUAC.Config.CardsNameFont"), `<select name="cardsNameFont">${cardFontOpts}</select>`));
+      content.push(group(t("BIVOUAC.Config.CardsNameSize"),
+        `<input type="number" name="cardsNameSize" value="${esc(Number(widget.config.nameSize) || 12)}" min="6" max="48" step="1">` +
           `<p class="bivouac-config__hint">${esc(t("BIVOUAC.Config.CardsHint"))}</p>`));
       break;
     }
@@ -234,10 +244,15 @@ function applyForm(widget: Widget, data: Record<string, string>): Widget {
       updated.config.uuid = data.uuid?.trim() ?? "";
       updated.config.journalMode = data.journalMode === "link" ? "link" : "inline";
       break;
-    case "cards":
+    case "cards": {
       updated.config.layout = ["fan", "row", "grid"].includes(data.cardsLayout) ? data.cardsLayout : "fan";
       updated.config.art = data.cardsArt === "token" ? "token" : "portrait";
+      updated.config.showNames = data.cardsShowNames === "on";
+      updated.config.nameFont = typeof data.cardsNameFont === "string" ? data.cardsNameFont : "";
+      const ns = Number(data.cardsNameSize);
+      updated.config.nameSize = Number.isFinite(ns) ? Math.min(48, Math.max(6, ns)) : 12;
       break;
+    }
   }
   return updated;
 }

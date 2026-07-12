@@ -3,6 +3,7 @@
 
 import {
   applyBackground,
+  applyCardOp,
   applyFrameStyle,
   attachInteractions,
   backgroundOf,
@@ -311,25 +312,18 @@ class DMScreen {
     this.#applyDockClass(); // position it at the configured edge before it opens
   }
 
-  async #cardOp(e: CustomEvent<{ id?: string; op?: string; uuid?: string }>): Promise<void> {
+  async #cardOp(
+    e: CustomEvent<{ id?: string; op?: string; uuid?: string; cid?: string; targetCid?: string; after?: boolean }>,
+  ): Promise<void> {
     if (!game.user?.isGM) return;
-    const { id, op, uuid } = e.detail ?? {};
-    if (!id || !uuid) return;
+    const d = e.detail ?? {};
+    if (!d.id) return;
     const layout = readDMLayout();
-    const w = layout.widgets.find((x) => x.id === id);
+    const w = layout.widgets.find((x) => x.id === d.id);
     if (!w) return;
-    const cur = Array.isArray(w.config.uuids) ? (w.config.uuids as string[]).slice() : [];
-    if (op === "add") {
-      if (cur.includes(uuid)) return;
-      cur.push(uuid);
-    } else if (op === "remove") {
-      const idx = cur.indexOf(uuid);
-      if (idx < 0) return;
-      cur.splice(idx, 1);
-    } else {
-      return;
-    }
-    w.config = { ...w.config, uuids: cur };
+    const next = applyCardOp(w.config, d);
+    if (!next) return;
+    w.config = next;
     await writeDMLayout(layout);
     this.render();
   }

@@ -30,7 +30,23 @@ export const SETTINGS = {
   lodMinWebviews: "lodMinWebviews",
   /** Client setting: DM-screen dock mode — "beside" the sidebar or "over" it. */
   dmDock: "dmDock",
+  /** World setting: minimum user role that can control tiles/cards (role number). */
+  controlRole: "controlRole",
 } as const;
+
+/** May the current user control Bivouac tiles/cards (add / remove / reorder /
+ *  drop-to-tile)? Gated by the `controlRole` world setting (default GM). NB: this
+ *  is a UI gate — persisting board changes still requires Foundry permission
+ *  (scene ownership for non-GMs). */
+export function canControl(): boolean {
+  try {
+    const min = Number(game.settings.get(MODULE_ID, SETTINGS.controlRole));
+    const role = Number(game.user?.role ?? 0);
+    return role >= (Number.isFinite(min) ? min : 4);
+  } catch {
+    return !!game.user?.isGM;
+  }
+}
 
 /** Widget geometry, measured in whole scene grid squares. */
 export interface WidgetCell {

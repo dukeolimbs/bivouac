@@ -1,10 +1,11 @@
 /** Bivouac — the world layer: a DOM surface over the canvas whose transform
  *  tracks the scene's pan/zoom, hosting widgets placed on scene grid squares. */
 
-import { GRID, LOD, MODULE_ID, SETTINGS, type Widget, type WidgetCell, type WidgetType } from "./constants";
+import { GRID, LOD, MODULE_ID, SETTINGS, canControl, type Widget, type WidgetCell, type WidgetType } from "./constants";
 import { activeLandingScene, readLayout, writeLayout } from "./layout";
 import {
   applyBackground,
+  applyCardOp,
   applyFrameStyle,
   attachInteractions,
   backgroundOf,
@@ -124,27 +125,20 @@ class WorldLayer {
     this.#world = world;
   }
 
-  async #cardOp(e: CustomEvent<{ id?: string; op?: string; uuid?: string }>): Promise<void> {
-    if (!game.user?.isGM) return;
-    const { id, op, uuid } = e.detail ?? {};
-    if (!id || !uuid) return;
+  async #cardOp(
+    e: CustomEvent<{ id?: string; op?: string; uuid?: string; cid?: string; targetCid?: string; after?: boolean }>,
+  ): Promise<void> {
+    if (!canControl()) return;
+    const d = e.detail ?? {};
+    if (!d.id) return;
     const scene = activeLandingScene();
     if (!scene) return;
     const layout = readLayout(scene);
-    const w = layout.widgets.find((x) => x.id === id);
+    const w = layout.widgets.find((x) => x.id === d.id);
     if (!w) return;
-    const cur = Array.isArray(w.config.uuids) ? (w.config.uuids as string[]).slice() : [];
-    if (op === "add") {
-      if (cur.includes(uuid)) return;
-      cur.push(uuid);
-    } else if (op === "remove") {
-      const idx = cur.indexOf(uuid);
-      if (idx < 0) return;
-      cur.splice(idx, 1);
-    } else {
-      return;
-    }
-    w.config = { ...w.config, uuids: cur };
+    const next = applyCardOp(w.config, d);
+    if (!next) return;
+    w.config = next;
     await writeLayout(scene, layout);
   }
 
@@ -153,7 +147,7 @@ class WorldLayer {
    *  token/note drops still work in view mode. Returns false to prevent
    *  Foundry's default (e.g. creating a token) when we take the drop. */
   handleCanvasDrop(data: { x?: number; y?: number } & Record<string, unknown>): boolean | void {
-    if (!game.user?.isGM || !this.#editMode || !activeLandingScene()) return;
+    if (!canControl() || !this.#editMode || !activeLandingScene()) return;
     const doc = normalizeDropData(data);
     if (!doc) return;
     const gs = this.#gridSize();

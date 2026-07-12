@@ -3,6 +3,7 @@
 import {
   GRID,
   MODULE_ID,
+  canControl,
   type Widget,
   type WidgetBackground,
   type WidgetFrame,
@@ -352,7 +353,44 @@ registerWidgetType({
 export function refsUuid(widget: Widget, uuid: string): boolean {
   if (widget.config?.uuid === uuid) return true;
   const many = widget.config?.uuids;
-  return Array.isArray(many) && many.includes(uuid);
+  if (Array.isArray(many) && many.includes(uuid)) return true;
+  const cards = widget.config?.cards;
+  return Array.isArray(cards) && cards.some((c) => (c as { uuid?: string })?.uuid === uuid);
+}
+
+/** Apply a card-collection op (add / remove / move) to a widget config, returning
+ *  the new config (or null if it's a no-op). Cards are `{ cid, uuid }` so the same
+ *  document can appear multiple times and each instance is addressed by `cid`.
+ *  Shared by the world layer and DM screen. */
+export function applyCardOp(
+  config: Record<string, unknown>,
+  detail: { op?: string; uuid?: string; cid?: string; targetCid?: string; after?: boolean },
+): Record<string, unknown> | null {
+  const list: { cid: string; uuid: string }[] = Array.isArray(config.cards)
+    ? (config.cards as { cid: string; uuid: string }[]).map((c) => ({ cid: c.cid, uuid: c.uuid }))
+    : Array.isArray(config.uuids)
+      ? (config.uuids as string[]).map((u) => ({ cid: u, uuid: u })) // legacy migration
+      : [];
+  const { op, uuid, cid, targetCid, after } = detail;
+  if (op === "add" && uuid) {
+    list.push({ cid: foundry.utils.randomID(), uuid });
+  } else if (op === "remove" && cid) {
+    const i = list.findIndex((c) => c.cid === cid);
+    if (i < 0) return null;
+    list.splice(i, 1);
+  } else if (op === "move" && cid) {
+    const from = list.findIndex((c) => c.cid === cid);
+    if (from < 0) return null;
+    const [moved] = list.splice(from, 1);
+    const ti = targetCid ? list.findIndex((c) => c.cid === targetCid) : -1;
+    if (ti < 0) list.push(moved);
+    else list.splice(ti + (after ? 1 : 0), 0, moved);
+  } else {
+    return null;
+  }
+  const next = { ...config, cards: list };
+  delete (next as { uuids?: unknown }).uuids;
+  return next;
 }
 
 /** Can the current user at least see this document? Doc tiles render a quiet
@@ -513,23 +551,41 @@ registerWidgetType({
 
 /* -------------------------------------------- card collection ----------- */
 
-/** Lay cards out as a curved hand that spans the tile's full width. Distributes
- *  the cards edge-to-edge (measuring the card width so the end cards stay inside),
- *  fans the rotation by count, and arcs them (centre highest). Layout px
- *  (client/offset) are transform-independent, so it's correct under the scaler. */
+/** Lay cards out as a curved hand that spans the tile's full width WITHOUT
+ *  clipping. Cards rotate around their bottom-centre, so the end cards' corners
+ *  swing out — we size the card and side/vertical margins from the *rotated*
+ *  bounding box (at the end-card angle) so those corners always stay on-tile.
+ *  Uses layout px (client), which are transform-independent → correct under the
+ *  world scaler. */
 function applyFan(hand: HTMLElement, cards: HTMLElement[]): void {
   const n = cards.length;
   if (!n) return;
   const W = hand.clientWidth || 1;
-  const cardWpct = Math.min(60, ((cards[0].offsetWidth || W * 0.28) / W) * 100);
-  const margin = Math.min(cardWpct / 2 + 2, 45); // keep the end cards on-tile
+  const H = hand.clientHeight || 1;
+  const ASPECT = 5 / 7; // card width : height
   const fanDeg = Math.min(54, n * 8); // total spread; ends at ±fanDeg/2
-  const arc = Math.min(14, n * 2); // vertical curve depth (%)
+  const th = ((fanDeg / 2) * Math.PI) / 180;
+  const sin = Math.sin(th);
+  const cos = Math.cos(th);
+  const arc = Math.min(0.1, n * 0.012); // vertical curve depth (fraction of H)
+  // Largest card height that keeps the rotated end card inside horizontally and
+  // vertically (and the raised centre card inside the top).
+  const hMax = (0.47 * W) / ((ASPECT / 2) * cos + sin); // horizontal half-extent ≤ 47% W
+  const vMaxEnd = (0.94 * H) / (ASPECT * sin + cos); // full rotated vertical span ≤ 94% H
+  const vMaxCentre = (0.94 - arc) * H; // upright centre card + arc lift
+  let cardH = Math.min(0.82 * H, hMax, vMaxEnd, vMaxCentre);
+  cardH = Math.max(cardH, 0.18 * H);
+  const cardW = cardH * ASPECT;
+  const dip = (cardW / 2) * sin; // how far a rotated bottom corner drops below the pivot (px)
+  const baseBottom = Math.max(0.03, dip / H + 0.02); // fraction: keep that corner on-tile
+  const ex = (cardW / 2) * cos + cardH * sin; // rotated horizontal half-extent (px)
+  const margin = Math.min(48, (ex / W) * 100); // end-card pivot inset (%)
   cards.forEach((c, i) => {
     const u = n > 1 ? i / (n - 1) : 0.5; // 0 … 1 across the width
     const t = u - 0.5; // -0.5 … 0.5
+    c.style.height = `${((cardH / H) * 100).toFixed(2)}%`;
     c.style.left = `${(n > 1 ? margin + (100 - 2 * margin) * u : 50).toFixed(2)}%`;
-    c.style.bottom = `${(6 + arc * (1 - 4 * t * t)).toFixed(2)}%`; // centre higher, ends lower
+    c.style.bottom = `${(baseBottom * 100 + arc * 100 * (1 - 4 * t * t)).toFixed(2)}%`; // centre higher
     c.style.setProperty("--card-angle", `${(t * fanDeg).toFixed(2)}deg`);
     c.style.zIndex = String(i + 1);
   });
@@ -539,24 +595,31 @@ function applyFan(hand: HTMLElement, cards: HTMLElement[]): void {
  *  Actors or Items onto it to add them; a card opens its sheet (if permitted).
  *  Card add/remove is dispatched as a bubbling `bivouac-card-op` event the host
  *  surface (world layer / DM screen) persists. */
+const REORDER_TYPE = "application/x-bivouac-card"; // drag marker for in-hand reorder
+
 registerWidgetType({
   type: "cards",
   label: "BIVOUAC.Widgets.Cards.Label",
   icon: "fa-solid fa-id-badge",
-  defaultConfig: () => ({ uuids: [], layout: "fan", art: "portrait" }),
+  defaultConfig: () => ({ cards: [], layout: "fan", art: "portrait", showNames: true, nameSize: 12, nameFont: "" }),
   renderBody(ctx) {
-    const layout = ["fan", "row", "grid"].includes(String(ctx.widget.config.layout))
-      ? String(ctx.widget.config.layout)
-      : "fan";
-    const art = ctx.widget.config.art === "token" ? "token" : "portrait";
+    const cfg = ctx.widget.config;
+    const layout = ["fan", "row", "grid"].includes(String(cfg.layout)) ? String(cfg.layout) : "fan";
+    const art = cfg.art === "token" ? "token" : "portrait";
+    const showNames = cfg.showNames !== false;
+    const nameSize = Number(cfg.nameSize) || 12;
+    const nameFont = String(cfg.nameFont ?? "");
+    const control = canControl();
     const wrap = el("div", `bivouac-cards bivouac-cards--${layout}`);
-    const emit = (op: string, uuid: string): void => {
-      wrap.dispatchEvent(new CustomEvent("bivouac-card-op", { bubbles: true, detail: { id: ctx.widget.id, op, uuid } }));
+    const emit = (op: string, detail: Record<string, unknown>): void => {
+      wrap.dispatchEvent(new CustomEvent("bivouac-card-op", { bubbles: true, detail: { id: ctx.widget.id, op, ...detail } }));
     };
 
-    // Drop Actors / Items onto the collection to add them (GM).
+    // Drop Actors / Items onto the collection to add them (controllers only).
+    // In-hand reorder drags carry REORDER_TYPE and are handled by the cards.
     wrap.addEventListener("dragover", (e) => {
-      if (!game.user?.isGM || !isDocDrag(e)) return;
+      if (e.dataTransfer?.types.includes(REORDER_TYPE)) return;
+      if (!control || !isDocDrag(e)) return;
       e.preventDefault();
       e.stopPropagation();
       if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
@@ -565,16 +628,21 @@ registerWidgetType({
     wrap.addEventListener("dragleave", () => wrap.classList.remove("bivouac-cards--dropok"));
     wrap.addEventListener("drop", (e) => {
       wrap.classList.remove("bivouac-cards--dropok");
-      if (!game.user?.isGM) return;
+      if (e.dataTransfer?.types.includes(REORDER_TYPE) || !control) return;
       const data = parseDrop(e);
       if (!data || (data.type !== "Actor" && data.type !== "Item")) return;
       e.preventDefault();
-      e.stopPropagation(); // handled here — don't create/relocate a tile
-      emit("add", data.uuid);
+      e.stopPropagation();
+      emit("add", { uuid: data.uuid }); // duplicates allowed — each add is a distinct card
     });
 
-    const uuids = Array.isArray(ctx.widget.config.uuids) ? (ctx.widget.config.uuids as string[]) : [];
-    if (!uuids.length) {
+    // Normalise the collection ({ cid, uuid }); migrate any legacy config.uuids.
+    const list: { cid: string; uuid: string }[] = Array.isArray(cfg.cards)
+      ? (cfg.cards as { cid: string; uuid: string }[])
+      : Array.isArray(cfg.uuids)
+        ? (cfg.uuids as string[]).map((u) => ({ cid: u, uuid: u }))
+        : [];
+    if (!list.length) {
       wrap.appendChild(placeholder("fa-solid fa-id-badge", game.i18n.localize("BIVOUAC.Widgets.Cards.Empty")));
       return wrap;
     }
@@ -582,25 +650,67 @@ registerWidgetType({
     wrap.appendChild(hand);
     void (async () => {
       const built: HTMLElement[] = [];
-      for (const uuid of uuids) {
-        const doc = (await fromUuid(uuid).catch(() => null)) as Record<string, unknown> | null;
+      for (const entry of list) {
+        const doc = (await fromUuid(entry.uuid).catch(() => null)) as Record<string, unknown> | null;
         if (!doc || !canView(doc)) continue;
         const card = el("div", "bivouac-cards__card");
+        card.dataset.cid = entry.cid;
         const img = document.createElement("img");
         img.className = "bivouac-cards__art";
+        img.draggable = false; // the card div owns the drag, not the image
         const token = (doc.prototypeToken as { texture?: { src?: string } } | undefined)?.texture?.src;
         img.src = (art === "token" ? token || (doc.img as string) : (doc.img as string)) || "icons/svg/mystery-man.svg";
         img.alt = String(doc.name ?? "");
         card.appendChild(img);
-        card.appendChild(el("span", "bivouac-cards__name", String(doc.name ?? "")));
-        if (ctx.editMode) {
+        if (showNames) {
+          const nm = el("span", "bivouac-cards__name", String(doc.name ?? ""));
+          nm.style.fontSize = `${nameSize}px`;
+          if (nameFont) nm.style.fontFamily = `"${nameFont}", var(--font-primary, "Signika", sans-serif)`;
+          card.appendChild(nm);
+        }
+        // Draggable in every mode: dragging a card onto the scene carries standard
+        // Foundry document data, so it makes a token in normal play and (via our
+        // dropCanvasData hook) a tile in edit mode. In edit mode it also reorders
+        // within the hand (REORDER_TYPE marker).
+        const docType = String(doc.documentName ?? (entry.uuid.includes("Item") ? "Item" : "Actor"));
+        card.draggable = true;
+        card.addEventListener("dragstart", (e) => {
+          e.stopPropagation();
+          e.dataTransfer?.setData("text/plain", JSON.stringify({ type: docType, uuid: entry.uuid }));
+          if (control) e.dataTransfer?.setData(REORDER_TYPE, entry.cid);
+          if (e.dataTransfer) e.dataTransfer.effectAllowed = "copyMove";
+          card.classList.add("bivouac-cards__card--dragging");
+        });
+        card.addEventListener("dragend", () => card.classList.remove("bivouac-cards__card--dragging"));
+        if (ctx.editMode && control) {
+          card.addEventListener("dragover", (e) => {
+            if (!e.dataTransfer?.types.includes(REORDER_TYPE)) return;
+            e.preventDefault();
+            e.stopPropagation();
+            const r = card.getBoundingClientRect();
+            const after = e.clientX - r.left > r.width / 2;
+            card.classList.toggle("bivouac-cards__card--after", after);
+            card.classList.toggle("bivouac-cards__card--before", !after);
+          });
+          card.addEventListener("dragleave", () =>
+            card.classList.remove("bivouac-cards__card--after", "bivouac-cards__card--before"),
+          );
+          card.addEventListener("drop", (e) => {
+            const cid = e.dataTransfer?.getData(REORDER_TYPE);
+            const after = card.classList.contains("bivouac-cards__card--after");
+            card.classList.remove("bivouac-cards__card--after", "bivouac-cards__card--before");
+            if (!cid) return;
+            e.preventDefault();
+            e.stopPropagation();
+            emit("move", { cid, targetCid: entry.cid, after });
+          });
           const rm = el("button", "bivouac-cards__remove");
           rm.type = "button";
           rm.title = game.i18n.localize("BIVOUAC.Widgets.Cards.Remove");
           rm.textContent = "×";
           rm.addEventListener("click", (e) => {
             e.stopPropagation();
-            emit("remove", uuid);
+            emit("remove", { cid: entry.cid });
           });
           card.appendChild(rm);
         } else {

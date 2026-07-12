@@ -45,6 +45,24 @@ Hooks.once("init", () => {
     default: [],
   });
 
+  // Minimum user role that can control tiles/cards (add / remove / reorder /
+  // drop-to-tile). Default GM. Non-GMs also need Foundry permission to persist
+  // (scene ownership for the landing board).
+  game.settings.register(MODULE_ID, SETTINGS.controlRole, {
+    name: "BIVOUAC.Settings.ControlRole.Name",
+    hint: "BIVOUAC.Settings.ControlRole.Hint",
+    scope: "world",
+    config: true,
+    type: Number,
+    choices: {
+      1: "BIVOUAC.Settings.ControlRole.Player",
+      2: "BIVOUAC.Settings.ControlRole.Trusted",
+      3: "BIVOUAC.Settings.ControlRole.Assistant",
+      4: "BIVOUAC.Settings.ControlRole.GM",
+    },
+    default: CONST.USER_ROLES.GAMEMASTER,
+  });
+
   // Esc closes the DM screen. Registered as a PRIORITY keybinding that consumes
   // the key (returns true) only while the drawer is open, so it pre-empts
   // Foundry's core "dismiss" action (which would otherwise open the Esc menu).

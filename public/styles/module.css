@@ -534,23 +534,43 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* Remove (×) — always visible in edit mode (only rendered then), styled as a
+   clear red badge so it reads over any card art. */
 .bivouac-cards__remove {
   position: absolute;
-  top: 2px;
-  right: 2px;
-  width: 18px;
-  height: 18px;
+  top: 4px;
+  right: 4px;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 17px;
+  font-weight: 700;
   line-height: 1;
-  border: none;
+  border: 1.5px solid rgba(255, 255, 255, 0.9);
   border-radius: 50%;
-  background: rgba(0, 0, 0, 0.6);
+  background: #c0392b;
   color: #fff;
   cursor: pointer;
-  opacity: 0;
-  transition: opacity 120ms ease;
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.55);
+  z-index: 5;
+  transition: background 120ms ease, transform 120ms ease;
 }
-.bivouac-cards__card:hover .bivouac-cards__remove {
-  opacity: 1;
+.bivouac-cards__remove:hover {
+  background: #e04b39;
+  transform: scale(1.12);
+}
+/* Reorder drag feedback. */
+.bivouac-cards__card--dragging {
+  opacity: 0.4;
+}
+.bivouac-cards__card--before {
+  box-shadow: inset 3px 0 0 0 var(--bivouac-accent), 0 4px 14px rgba(0, 0, 0, 0.45);
+}
+.bivouac-cards__card--after {
+  box-shadow: inset -3px 0 0 0 var(--bivouac-accent), 0 4px 14px rgba(0, 0, 0, 0.45);
 }
 /* Row: overlapping horizontal spread. Grid: wrapped. */
 .bivouac-cards--row .bivouac-cards__hand,

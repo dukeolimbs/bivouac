@@ -117,7 +117,10 @@
       "CardsArt": "Card art",
       "CardsArt_portrait": "Portrait",
       "CardsArt_token": "Token",
-      "CardsHint": "Drop actors or items onto this tile to add cards; a card opens its sheet (if you can). Remove via the × in edit mode.",
+      "CardsShowNames": "Show card names",
+      "CardsNameFont": "Name font",
+      "CardsNameSize": "Name size (px)",
+      "CardsHint": "Drop actors/items on the tile to add cards (duplicates allowed). Drag a card onto the scene to place its token (or a tile, in edit mode). In edit mode: drag to reorder, × to remove.",
       "Html": "Content",
       "HtmlPlaceholder": "HTML, @UUID[…] links, [[/r 1d20]] rolls…",
       "HtmlHint": "Select text and press Ctrl/⌘+B, I or U to format it. Paste a link over selected text to turn it into a hyperlink.",
@@ -159,6 +162,14 @@
       "LodMinWebviews": {
         "Name": "Live web views before LOD",
         "Hint": "How many web-view tiles may stay live before level-of-detail kicks in. Once the board has at least this many web views AND is zoomed far out, distant web views are shown as a quiet placeholder to save performance. Set high to keep every web view live."
+      },
+      "ControlRole": {
+        "Name": "Who can control tiles & cards",
+        "Hint": "Minimum user role that can add/remove/reorder cards and drop documents to create tiles. Note: non-GMs also need Foundry permission to save changes (e.g. ownership of the landing scene).",
+        "Player": "Player",
+        "Trusted": "Trusted Player",
+        "Assistant": "Assistant GM",
+        "GM": "Game Master"
       },
       "DmDock": {
         "Name": "DM screen position",

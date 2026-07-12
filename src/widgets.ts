@@ -180,22 +180,25 @@ registerWidgetType({
     // Per-widget content zoom (config.zoom, default 1): higher renders the page
     // at fewer logical px so it appears larger; lower shows more of the page.
     const zoom = Number(ctx.widget.config.zoom) || 1;
+    // Content zoom must NOT shrink the iframe's logical VIEWPORT below the base
+    // (gw·L): some embedded apps (LegendKeeper) crash at small viewports
+    // (`useMapContext … MapScope`). Clamp the viewport with min(zoom, 1) —
+    // zoom < 1 grows it (shows more of the page), zoom > 1 keeps it at the base
+    // and magnifies via the (constant) transform, cropping the overflow. zoom = 1
+    // is byte-identical to the working baseline. The transform stays constant
+    // (map zoom lives on the .bivouac-scaler ancestor), which is what lets the
+    // iframe embed cleanly.
+    const vpZoom = Math.min(zoom, 1);
     if (!ctx.fillContainer) {
-      // Logical-resolution iframe: rendered at a fixed logical size and scaled
-      // to fit at map scale 1. The map ZOOM is applied by the per-widget
-      // .bivouac-scaler ancestor, so this transform is otherwise constant —
-      // matching how the old scaled-world layer treated the iframe, which
-      // embeds cleanly (a per-frame-changing iframe transform breaks some apps).
       const L = WEBVIEW.logicalPerSquare;
-      frame.style.width = `${(ctx.widget.cell.gw * L) / zoom}px`;
-      frame.style.height = `${(ctx.widget.cell.gh * L) / zoom}px`;
+      frame.style.width = `${(ctx.widget.cell.gw * L) / vpZoom}px`;
+      frame.style.height = `${(ctx.widget.cell.gh * L) / vpZoom}px`;
       frame.style.transformOrigin = "0 0";
       frame.style.transform = `scale(${(ctx.gridSize * zoom) / L})`;
     } else if (zoom !== 1) {
-      // DM-screen fill mode: honor zoom by rendering at a larger logical area
-      // and scaling it back to fill the card.
-      frame.style.width = `${100 / zoom}%`;
-      frame.style.height = `${100 / zoom}%`;
+      // DM-screen fill mode, same clamp: viewport never below 100% of the card.
+      frame.style.width = `${100 / vpZoom}%`;
+      frame.style.height = `${100 / vpZoom}%`;
       frame.style.transformOrigin = "0 0";
       frame.style.transform = `scale(${zoom})`;
     }

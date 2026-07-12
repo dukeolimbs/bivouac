@@ -111,6 +111,22 @@ Hooks.once("init", () => {
     onChange: () => worldLayer.render("lod"),
   });
 
+  // DM-screen dock mode — beside the sidebar (default; keeps chat/dice visible)
+  // or over it (the original behaviour). Also toggleable from the DM header gear.
+  game.settings.register(MODULE_ID, SETTINGS.dmDock, {
+    name: "BIVOUAC.Settings.DmDock.Name",
+    hint: "BIVOUAC.Settings.DmDock.Hint",
+    scope: "client",
+    config: true,
+    type: String,
+    choices: {
+      beside: "BIVOUAC.Settings.DmDock.Beside",
+      over: "BIVOUAC.Settings.DmDock.Over",
+    },
+    default: "beside",
+    onChange: () => dmScreen.applyDock(),
+  });
+
   // Ctrl+Z / Ctrl+Y undo & redo of the landing layout. Foundry's own undo only
   // covers canvas placeables, not our scene-flag layout, so we run our own
   // history. Both consume the key (and pre-empt core undo) ONLY while editing

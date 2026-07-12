@@ -16,6 +16,7 @@ class DMScreen {
   #editBtn: HTMLButtonElement | null = null;
   #open = false;
   #editMode = false;
+  #dock: "beside" | "over" = "beside";
   #dragId: string | null = null;
   #sidebarRO: ResizeObserver | null = null;
   #sidebarMO: MutationObserver | null = null;
@@ -47,7 +48,15 @@ class DMScreen {
 
     this.#trackSidebar();
     this.applyDrawerWidth();
+    this.applyDock();
     window.addEventListener("resize", () => this.applyDrawerWidth());
+  }
+
+  /** Read the dock-mode setting (beside the sidebar vs over it) and re-publish
+   *  the drawer's right offset. Called on ready and on the setting's change. */
+  applyDock(): void {
+    this.#dock = game.settings.get(MODULE_ID, SETTINGS.dmDock) === "over" ? "over" : "beside";
+    this.#syncTab();
   }
 
   /* ------------------------------------------------ drawer width -------- */
@@ -125,9 +134,10 @@ class DMScreen {
       const inset = Math.max(0, window.innerWidth - rect.left + this.#tabPad());
       document.documentElement.style.setProperty("--bivouac-dmtab-inset", `${Math.round(inset)}px`);
     }
-    // Drawer: anchor its right edge flush to the sidebar's left edge so the open
-    // drawer sits BESIDE the sidebar and never covers chat / dice.
-    const drawerRight = Math.max(0, window.innerWidth - rect.left);
+    // Drawer: "beside" anchors its right edge to the sidebar's live left edge
+    // (sits beside the sidebar, never covering chat/dice); "over" pins it to the
+    // viewport edge (right: 0), covering the sidebar as it did originally.
+    const drawerRight = this.#dock === "over" ? 0 : Math.max(0, window.innerWidth - rect.left);
     document.documentElement.style.setProperty("--bivouac-drawer-right", `${Math.round(drawerRight)}px`);
   };
 
@@ -215,6 +225,7 @@ class DMScreen {
       const type = await pickWidgetType();
       if (type) await this.#add(type);
     }));
+    header.appendChild(this.#toolButton("fa-solid fa-gear", "BIVOUAC.DMScreen.Settings", () => void this.#openSettings()));
     header.appendChild(this.#toolButton("fa-solid fa-xmark", "BIVOUAC.DMScreen.Close", () => this.toggle(false)));
     drawer.appendChild(header);
 
@@ -231,6 +242,36 @@ class DMScreen {
     this.#editBtn?.classList.toggle("bivouac-drawer__btn--active", this.#editMode);
     this.#editBtn?.setAttribute("aria-pressed", String(this.#editMode));
     this.render();
+  }
+
+  /** Quick DM-screen settings from the header gear. Currently the dock mode
+   *  (beside the sidebar vs over it); writes the same client setting that the
+   *  Foundry settings menu exposes, so both stay in sync. */
+  async #openSettings(): Promise<void> {
+    const loc = (k: string): string => game.i18n.localize(k);
+    const cur = game.settings.get(MODULE_ID, SETTINGS.dmDock) === "over" ? "over" : "beside";
+    const opt = (v: string, k: string): string =>
+      `<option value="${v}"${cur === v ? " selected" : ""}>${loc(k)}</option>`;
+    const content =
+      `<div class="bivouac-config standard-form">` +
+      `<div class="form-group"><label>${loc("BIVOUAC.Settings.DmDock.Name")}</label>` +
+      `<div class="form-fields"><select name="dock">` +
+      opt("beside", "BIVOUAC.Settings.DmDock.Beside") +
+      opt("over", "BIVOUAC.Settings.DmDock.Over") +
+      `</select></div></div>` +
+      `<p class="bivouac-config__hint">${loc("BIVOUAC.Settings.DmDock.Hint")}</p></div>`;
+    const result = await foundry.applications.api.DialogV2.prompt({
+      window: { title: loc("BIVOUAC.DMScreen.Settings"), icon: "fa-solid fa-gear" },
+      position: { width: 420 },
+      content,
+      ok: {
+        label: loc("BIVOUAC.Edit.Save"),
+        icon: "fa-solid fa-check",
+        callback: (_event: Event, button: { form: HTMLFormElement }) => String(new FormData(button.form).get("dock") ?? ""),
+      },
+      rejectClose: false,
+    });
+    if (result === "beside" || result === "over") await game.settings.set(MODULE_ID, SETTINGS.dmDock, result);
   }
 
   render(): void {

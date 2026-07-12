@@ -100,6 +100,7 @@
     "DMScreen": {
       "Title": "DM Screen",
       "Close": "Close",
+      "Settings": "DM screen settings",
       "Edit": "Toggle edit mode",
       "Resize": "Drag to resize the drawer",
       "Reorder": "Drag to move — beside a tile to share its row, above/below for a new row",
@@ -126,6 +127,12 @@
       "LodMinWebviews": {
         "Name": "Live web views before LOD",
         "Hint": "How many web-view tiles may stay live before level-of-detail kicks in. Once the board has at least this many web views AND is zoomed far out, distant web views are shown as a quiet placeholder to save performance. Set high to keep every web view live."
+      },
+      "DmDock": {
+        "Name": "DM screen position",
+        "Hint": "Where the DM screen drawer opens. 'Beside the sidebar' keeps Foundry's chat and dice visible; 'Over the sidebar' opens at the screen edge, covering them (the original behaviour). Also switchable from the gear in the DM screen header.",
+        "Beside": "Beside the sidebar (keeps chat/dice visible)",
+        "Over": "Over the sidebar (screen edge)"
       }
     }
   }

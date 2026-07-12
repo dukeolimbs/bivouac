@@ -23,6 +23,8 @@ export const SETTINGS = {
   dmDrawerWidth: "dmDrawerWidth",
   /** Client setting: how many web views may be live before LOD can kick in. */
   lodMinWebviews: "lodMinWebviews",
+  /** Client setting: DM-screen dock mode — "beside" the sidebar or "over" it. */
+  dmDock: "dmDock",
 } as const;
 
 /** Widget geometry, measured in whole scene grid squares. */

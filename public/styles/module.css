@@ -300,7 +300,9 @@
   background: rgba(0, 0, 0, 0.55);
   color: #fff;
   cursor: pointer;
-  opacity: 0;
+  /* Faintly visible at all times so there's always an obvious escape hatch when
+     a site refuses to embed (GitHub/Google/etc.) and the frame stays blank. */
+  opacity: 0.4;
   transition: opacity 120ms ease;
   z-index: 2;
 }

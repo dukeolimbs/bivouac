@@ -73,6 +73,7 @@
       "BgOpacityHint": "0 = transparent, 1 = solid. Applies to Solid / Frosted / Gradient backgrounds.",
       "Url": "URL",
       "UrlPlaceholder": "https://…",
+      "UrlHint": "Some sites (GitHub, Google, X, most login pages) refuse to be embedded and will stay blank — that's their policy, not a bug. Use the ⇗ button on the tile to open them in a window. Wikis, docs, dashboards and LegendKeeper embed fine.",
       "WebviewZoom": "Content zoom",
       "WebviewZoomHint": "1 = default. Higher zooms the page in; lower shows more of it.",
       "Src": "Image path",

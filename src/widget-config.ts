@@ -45,7 +45,8 @@ function buildForm(widget: Widget): string {
   switch (widget.type) {
     case "webview":
       content.push(group(t("BIVOUAC.Config.Url"),
-        `<input type="text" name="url" value="${esc(widget.config.url ?? "")}" placeholder="${esc(t("BIVOUAC.Config.UrlPlaceholder"))}">`));
+        `<input type="text" name="url" value="${esc(widget.config.url ?? "")}" placeholder="${esc(t("BIVOUAC.Config.UrlPlaceholder"))}">` +
+          `<p class="bivouac-config__hint">${esc(t("BIVOUAC.Config.UrlHint"))}</p>`));
       content.push(group(t("BIVOUAC.Config.WebviewZoom"),
         `<input type="number" name="zoom" value="${esc(Number(widget.config.zoom) || 1)}" min="0.25" max="4" step="0.05" title="${esc(t("BIVOUAC.Config.WebviewZoomHint"))}">`));
       break;

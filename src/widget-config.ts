@@ -103,10 +103,11 @@ function buildForm(widget: Widget): string {
   ];
 
   // ---- Background (fill) axis ---------------------------------------------
-  const backgrounds: WidgetBackground[] = ["none", "solid", "frosted", "gradient"];
+  const backgrounds: WidgetBackground[] = ["none", "solid", "frosted", "gradient", "image"];
   const curBg = backgroundOf(widget);
   const bgColor = typeof widget.config.bgColor === "string" ? widget.config.bgColor : "#101219";
   const bgColor2 = typeof widget.config.bgColor2 === "string" ? widget.config.bgColor2 : bgColor;
+  const bgImage = typeof widget.config.bgImage === "string" ? widget.config.bgImage : "";
   const bgOpacity = Number.isFinite(Number(widget.config.bgOpacity)) ? Number(widget.config.bgOpacity) : 0.4;
   const background = [
     group(t("BIVOUAC.Config.Background"),
@@ -115,6 +116,8 @@ function buildForm(widget: Widget): string {
         .join("")}</select>`),
     group(t("BIVOUAC.Config.BgColor"), `<input type="color" name="bgColor" value="${esc(bgColor)}">`),
     group(t("BIVOUAC.Config.BgColor2"), `<input type="color" name="bgColor2" value="${esc(bgColor2)}">`),
+    group(t("BIVOUAC.Config.BgImage"),
+      `<input type="text" name="bgImage" value="${esc(bgImage)}" placeholder="${esc(t("BIVOUAC.Config.BgImagePlaceholder"))}">`),
     group(t("BIVOUAC.Config.BgOpacity"),
       `<input type="range" name="bgOpacity" value="${esc(bgOpacity)}" min="0" max="1" step="0.05" title="${esc(t("BIVOUAC.Config.BgOpacityHint"))}"><output class="bivouac-range-out">${esc(bgOpacity)}</output>`),
   ];
@@ -150,13 +153,14 @@ function applyForm(widget: Widget, data: Record<string, string>): Widget {
   updated.config.frameOpacity = Number.isFinite(frameOp) ? Math.min(1, Math.max(0, frameOp)) : 0.4;
 
   // Background (fill) axis.
-  updated.config.background = (["none", "solid", "frosted", "gradient"].includes(data.background)
+  updated.config.background = (["none", "solid", "frosted", "gradient", "image"].includes(data.background)
     ? data.background
     : "frosted") as WidgetBackground;
   updated.config.bgColor = /^#[0-9a-fA-F]{6}$/.test(data.bgColor ?? "") ? data.bgColor : "#101219";
   updated.config.bgColor2 = /^#[0-9a-fA-F]{6}$/.test(data.bgColor2 ?? "")
     ? data.bgColor2
     : (updated.config.bgColor as string);
+  updated.config.bgImage = data.bgImage?.trim() ?? "";
   const bgOp = Number(data.bgOpacity);
   updated.config.bgOpacity = Number.isFinite(bgOp) ? Math.min(1, Math.max(0, bgOp)) : 0.4;
 

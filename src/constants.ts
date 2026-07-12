@@ -47,8 +47,8 @@ export type WidgetScope = "shared" | "dm";
 export type WidgetChrome = "none" | "subtle" | "framed";
 /** Border/edge style (config.frame). */
 export type WidgetFrame = "none" | "subtle" | "framed";
-/** Fill style (config.background). `image` is a planned future value. */
-export type WidgetBackground = "none" | "solid" | "frosted" | "gradient";
+/** Fill style (config.background). */
+export type WidgetBackground = "none" | "solid" | "frosted" | "gradient" | "image";
 
 export interface WidgetInteraction {
   trigger: "click" | "dblclick";

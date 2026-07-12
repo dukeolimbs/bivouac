@@ -172,6 +172,21 @@
     var(--bivouac-bg-fill2, var(--bivouac-panel-bg-strong))
   );
 }
+/* Image fill: the picture rides a ::after layer behind the content (so its
+   --bivouac-bg-opacity can fade it to reveal the scene), with the tile itself
+   transparent. Content sits above via .bivouac-widget__body's z-index. */
+.bivouac-bg-image {
+  background: transparent;
+}
+.bivouac-bg-image::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--bivouac-bg-image, none) center / cover no-repeat;
+  opacity: var(--bivouac-bg-opacity, 1);
+  border-radius: inherit;
+  pointer-events: none;
+}
 
 /* Header — hidden for players; shown only in edit mode. */
 .bivouac-widget__header {
@@ -204,6 +219,7 @@
   min-height: 0;
   overflow: hidden;
   position: relative;
+  z-index: 1; /* above the .bivouac-bg-image ::after layer */
   /* Round the content boundary to match the frame and force a clean composited
      clip, so a white webview iframe doesn't leave a light anti-aliasing fringe
      at the rounded corners (the panel bg sits behind the border's AA instead). */

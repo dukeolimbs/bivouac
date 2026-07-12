@@ -110,7 +110,7 @@ export function frameOf(widget: Widget): WidgetFrame {
  *  to the legacy `chrome` (none → none; subtle/framed → frosted). */
 export function backgroundOf(widget: Widget): WidgetBackground {
   const b = widget.config.background;
-  if (b === "none" || b === "solid" || b === "frosted" || b === "gradient") return b;
+  if (b === "none" || b === "solid" || b === "frosted" || b === "gradient" || b === "image") return b;
   return widget.chrome === "none" ? "none" : "frosted";
 }
 
@@ -128,8 +128,9 @@ export function applyFrameStyle(el: HTMLElement, widget: Widget): void {
 }
 
 /** Apply a tile's background colour/opacity to the fill CSS vars inline. Used by
- *  the Solid / Frosted / Gradient background styles (`--bivouac-bg-fill` and,
- *  for gradients, `--bivouac-bg-fill2`). Defaults to the dark panel at 0.4. */
+ *  the Solid / Frosted / Gradient styles (`--bivouac-bg-fill` / `-fill2`) and the
+ *  Image style (`--bivouac-bg-image` + `--bivouac-bg-opacity`). Defaults to the
+ *  dark panel at 0.4. */
 export function applyBackground(el: HTMLElement, widget: Widget): void {
   const raw = Number(widget.config.bgOpacity);
   const opacity = Number.isFinite(raw) ? Math.min(1, Math.max(0, raw)) : 0.4;
@@ -137,6 +138,10 @@ export function applyBackground(el: HTMLElement, widget: Widget): void {
   const c2 = typeof widget.config.bgColor2 === "string" ? widget.config.bgColor2 : c1;
   el.style.setProperty("--bivouac-bg-fill", hexToRgba(c1, opacity));
   el.style.setProperty("--bivouac-bg-fill2", hexToRgba(c2, opacity));
+  // Image fill: raw opacity (applied to the image layer) + the image URL.
+  el.style.setProperty("--bivouac-bg-opacity", String(opacity));
+  const img = typeof widget.config.bgImage === "string" ? widget.config.bgImage.trim() : "";
+  el.style.setProperty("--bivouac-bg-image", img ? `url("${img.replace(/"/g, "%22")}")` : "none");
 }
 
 function placeholder(icon: string, label: string): HTMLElement {

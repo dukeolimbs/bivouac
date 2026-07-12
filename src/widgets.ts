@@ -513,13 +513,24 @@ registerWidgetType({
 
 /* -------------------------------------------- card collection ----------- */
 
-/** Fanned-hand transform per card (fan layout only), spread by count. */
-function applyFan(cards: HTMLElement[]): void {
+/** Lay cards out as a curved hand that spans the tile's full width. Distributes
+ *  the cards edge-to-edge (measuring the card width so the end cards stay inside),
+ *  fans the rotation by count, and arcs them (centre highest). Layout px
+ *  (client/offset) are transform-independent, so it's correct under the scaler. */
+function applyFan(hand: HTMLElement, cards: HTMLElement[]): void {
   const n = cards.length;
+  if (!n) return;
+  const W = hand.clientWidth || 1;
+  const cardWpct = Math.min(60, ((cards[0].offsetWidth || W * 0.28) / W) * 100);
+  const margin = Math.min(cardWpct / 2 + 2, 45); // keep the end cards on-tile
+  const fanDeg = Math.min(54, n * 8); // total spread; ends at ±fanDeg/2
+  const arc = Math.min(14, n * 2); // vertical curve depth (%)
   cards.forEach((c, i) => {
-    const t = n > 1 ? i / (n - 1) - 0.5 : 0; // -0.5 … 0.5
-    c.style.setProperty("--card-angle", `${(t * Math.min(48, n * 10)).toFixed(2)}deg`);
-    c.style.setProperty("--card-x", `${(t * Math.min(80, n * 18)).toFixed(1)}%`);
+    const u = n > 1 ? i / (n - 1) : 0.5; // 0 … 1 across the width
+    const t = u - 0.5; // -0.5 … 0.5
+    c.style.left = `${(n > 1 ? margin + (100 - 2 * margin) * u : 50).toFixed(2)}%`;
+    c.style.bottom = `${(6 + arc * (1 - 4 * t * t)).toFixed(2)}%`; // centre higher, ends lower
+    c.style.setProperty("--card-angle", `${(t * fanDeg).toFixed(2)}deg`);
     c.style.zIndex = String(i + 1);
   });
 }
@@ -599,7 +610,7 @@ registerWidgetType({
         built.push(card);
       }
       hand.replaceChildren(...built);
-      if (layout === "fan") applyFan(built);
+      if (layout === "fan") applyFan(hand, built);
     })();
     return wrap;
   },

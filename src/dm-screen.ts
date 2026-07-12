@@ -295,7 +295,7 @@ class DMScreen {
       // card edge; top/bottom makes a new row — a full-width line across the row
       // (drawn on the row element, so it spans the whole horizontal axis).
       el.addEventListener("dragover", (e) => {
-        if (!this.#dragId || this.#dragId === widget.id) return;
+        if (!this.#dragId) return;
         e.preventDefault();
         const zone = this.#zoneFor(e, el, widget.id);
         this.#clearDropMarks();
@@ -362,6 +362,10 @@ class DMScreen {
   /** Can the dragged tile join the target's row horizontally? True if it's
    *  already in that row (a reorder) or the row has room (< 3). */
   #rowJoinable(targetId: string): boolean {
+    // Never offer a left/right (join) drop onto the dragged tile's OWN card —
+    // inserting a tile beside where it already sits is a no-op and could corrupt
+    // the row. Self-drops are top/bottom only (extract into a new row).
+    if (targetId === this.#dragId) return false;
     const row = this.#currentRows().find((r) => r.some((w) => w.id === targetId));
     if (!row) return false;
     return row.some((w) => w.id === this.#dragId) || row.length < 3;
@@ -432,7 +436,31 @@ class DMScreen {
    *  row (max 3 wide), top/bottom into a new row above/below. */
   async #drop(dragId: string, targetId: string, zone: string): Promise<void> {
     this.#dragId = null;
-    if (dragId === targetId) return;
+
+    // Self-drop: dropping a tile onto its own card. Only top/bottom is meaningful
+    // — extract it into a new full-width row directly above/below its current
+    // row. Left/right of yourself is a no-op (guarded here too). If the tile is
+    // already alone in its row, top/bottom is a no-op as well.
+    if (dragId === targetId) {
+      if (zone !== "top" && zone !== "bottom") return;
+      const rows = this.#currentRows();
+      let si = -1;
+      let sj = -1;
+      rows.forEach((row, i) =>
+        row.forEach((w, j) => {
+          if (w.id === dragId) {
+            si = i;
+            sj = j;
+          }
+        }),
+      );
+      if (si < 0) return;
+      const [self] = rows[si].splice(sj, 1);
+      if (!self || rows[si].length === 0) return; // was alone → already its own row
+      rows.splice(zone === "top" ? si : si + 1, 0, [self]);
+      await this.#applyRows(rows);
+      return;
+    }
 
     // Pull the dragged tile out of its current row (dropping any row it empties).
     let dragged: Widget | undefined;

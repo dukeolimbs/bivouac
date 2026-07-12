@@ -1,7 +1,7 @@
 /** Bivouac — per-widget configuration dialog (DialogV2). */
 
 import type { Widget, WidgetBackground, WidgetFrame, WidgetScope, WidgetType } from "./constants";
-import { backgroundOf, frameOf, widgetTypes } from "./widgets";
+import { availableFonts, backgroundOf, frameOf, widgetTypes } from "./widgets";
 
 type SaveFn = (updated: Widget) => void;
 type LiveFn = (updated: Widget) => void;
@@ -69,13 +69,22 @@ function buildForm(widget: Widget): string {
         `<input type="text" name="iUuid" value="${esc(inter?.uuid ?? "")}" placeholder="${esc(t("BIVOUAC.Config.TargetUuidPlaceholder"))}">`));
       break;
     }
-    case "note":
+    case "note": {
       content.push(group(t("BIVOUAC.Config.Html"),
         `<textarea name="html" rows="6" placeholder="${esc(t("BIVOUAC.Config.HtmlPlaceholder"))}">${esc(widget.config.html ?? "")}</textarea>` +
           `<p class="bivouac-config__hint">${esc(t("BIVOUAC.Config.HtmlHint"))}</p>`));
       content.push(group(t("BIVOUAC.Config.NoteTextSize"),
         `<input type="number" name="textScale" value="${esc(Number(widget.config.textScale) || 1)}" min="0.5" max="3" step="0.1" title="${esc(t("BIVOUAC.Config.NoteTextSizeHint"))}">`));
+      const curFont = String(widget.config.font ?? "");
+      const fontOpts = [`<option value=""${curFont === "" ? " selected" : ""}>${esc(t("BIVOUAC.Config.NoteFontDefault"))}</option>`]
+        .concat(availableFonts().map((f) => `<option value="${esc(f)}"${curFont === f ? " selected" : ""}>${esc(f)}</option>`))
+        .join("");
+      content.push(group(t("BIVOUAC.Config.NoteFont"), `<select name="noteFont">${fontOpts}</select>`));
+      content.push(group(t("BIVOUAC.Config.NoteFontCustom"),
+        `<input type="text" name="noteFontCustom" value="${esc(widget.config.fontCustom ?? "")}" placeholder="${esc(t("BIVOUAC.Config.NoteFontCustomPlaceholder"))}">` +
+          `<p class="bivouac-config__hint">${esc(t("BIVOUAC.Config.NoteFontHint"))}</p>`));
       break;
+    }
   }
 
   // ---- Frame (border) axis -------------------------------------------------
@@ -170,6 +179,8 @@ function applyForm(widget: Widget, data: Record<string, string>): Widget {
       updated.config.html = data.html ?? "";
       const s = Number(data.textScale);
       updated.config.textScale = Number.isFinite(s) ? Math.min(3, Math.max(0.5, s)) : 1;
+      updated.config.font = typeof data.noteFont === "string" ? data.noteFont : "";
+      updated.config.fontCustom = (data.noteFontCustom ?? "").trim();
       break;
     }
   }

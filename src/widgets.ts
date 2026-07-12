@@ -262,6 +262,53 @@ registerWidgetType({
   },
 });
 
+/* -------------------------------------------- fonts --------------------- */
+
+/** Font families Foundry already knows about (core + any the GM added via
+ *  "Manage Fonts", which is where Google Fonts get registered natively). Used to
+ *  populate the note font dropdown. Defensive across Foundry versions. */
+export function availableFonts(): string[] {
+  const g = globalThis as { foundry?: unknown; FontConfig?: unknown; CONFIG?: { fontDefinitions?: object } };
+  const out = new Set<string>();
+  try {
+    const fc =
+      (g.foundry as { applications?: { settings?: { menus?: { FontConfig?: { getAvailableFonts?: () => string[] } } } } })
+        ?.applications?.settings?.menus?.FontConfig ??
+      (g.FontConfig as { getAvailableFonts?: () => string[] } | undefined);
+    const list = fc?.getAvailableFonts?.();
+    if (Array.isArray(list)) list.forEach((f) => out.add(String(f)));
+  } catch {
+    /* older/newer API — fall back below */
+  }
+  try {
+    const defs = g.CONFIG?.fontDefinitions;
+    if (defs) Object.keys(defs).forEach((f) => out.add(f));
+  } catch {
+    /* ignore */
+  }
+  if (out.size === 0) ["Signika", "Arial", "Times New Roman", "Courier New"].forEach((f) => out.add(f));
+  return [...out].sort((a, b) => a.localeCompare(b));
+}
+
+/** Lazily inject a Google Fonts stylesheet for a custom family name (once per
+ *  family). Only used for the note's "custom font" field — dropdown fonts are
+ *  already loaded by Foundry. */
+const loadedGoogleFonts = new Set<string>();
+function ensureGoogleFont(family: string): void {
+  const name = family.trim();
+  if (!name) return;
+  const key = name.toLowerCase();
+  if (loadedGoogleFonts.has(key)) return;
+  loadedGoogleFonts.add(key);
+  const id = `bivouac-font-${key.replace(/[^a-z0-9]+/g, "-")}`;
+  if (document.getElementById(id)) return;
+  const link = document.createElement("link");
+  link.id = id;
+  link.rel = "stylesheet";
+  link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(name).replace(/%20/g, "+")}:wght@400;600;700&display=swap`;
+  document.head.appendChild(link);
+}
+
 /* -------------------------------------------- note ---------------------- */
 
 registerWidgetType({
@@ -277,6 +324,14 @@ registerWidgetType({
     // for DM screen); zoom scaling is handled by that ancestor. On the landing
     // board the font scales with the tile size (cqmin) × this per-tile multiplier.
     box.style.setProperty("--bivouac-note-scale", String(Number(ctx.widget.config.textScale) || 1));
+    // Per-note font: a custom Google Font name (loaded from the CDN) overrides
+    // the dropdown pick (a font Foundry already has). Empty → tile default.
+    const fontCustom = String(ctx.widget.config.fontCustom ?? "").trim();
+    const family = fontCustom || String(ctx.widget.config.font ?? "").trim();
+    if (family) {
+      if (fontCustom) ensureGoogleFont(fontCustom);
+      box.style.fontFamily = `"${family}", var(--font-primary, "Signika", sans-serif)`;
+    }
     // Show the raw HTML immediately, then enrich (document links, inline rolls,
     // etc.) asynchronously and swap it in.
     box.innerHTML = html;

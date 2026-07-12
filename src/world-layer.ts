@@ -1,14 +1,25 @@
 /** Bivouac — the world layer: a DOM surface over the canvas whose transform
  *  tracks the scene's pan/zoom, hosting widgets placed on scene grid squares. */
 
-import { GRID, LOD, MODULE_ID, SETTINGS, type Widget, type WidgetCell, type WidgetType } from "./constants";
+import { GRID, LOD, MODULE_ID, SETTINGS, WEBVIEW, type Widget, type WidgetCell, type WidgetType } from "./constants";
 import { activeLandingScene, readLayout, writeLayout } from "./layout";
 import { attachInteractions, createWidget, getWidgetType, type RenderContext } from "./widgets";
 import { openWidgetConfig } from "./widget-config";
 
+/** The PIXI stage transform, sampled per frame to map world coords → screen. */
+interface Stage {
+  px: number;
+  py: number;
+  scale: number;
+  ox: number;
+  oy: number;
+}
+
 interface RenderedWidget {
   el: HTMLElement;
   sig: string;
+  /** Last-known cell, so syncTransform can reposition without re-reading flags. */
+  cell: WidgetCell;
 }
 
 class WorldLayer {
@@ -40,6 +51,27 @@ class WorldLayer {
   #maxCells(): number {
     const v = Number(game.settings.get(MODULE_ID, SETTINGS.maxWidgetSize));
     return Number.isFinite(v) && v >= GRID.min ? v : GRID.max;
+  }
+
+  /** Sample the PIXI stage transform for world→screen mapping. */
+  #stageParams(): Stage | null {
+    const s = canvas?.stage;
+    if (!s) return null;
+    return { px: s.position.x, py: s.position.y, scale: s.scale.x, ox: s.pivot.x, oy: s.pivot.y };
+  }
+
+  /** Publish scale / grid metrics as CSS vars so widget CHROME stays at scale 1
+   *  (crisp) while CONTENT and the grid guides still track zoom.
+   *  `--bivouac-scale` scales notes; `--bivouac-webview-scale` scales the
+   *  logical-resolution iframes; the grid vars draw the guides in screen space. */
+  #applyStageVars(t: Stage, gs: number): void {
+    const w = this.#world;
+    if (!w) return;
+    w.style.setProperty("--bivouac-scale", `${t.scale}`);
+    w.style.setProperty("--bivouac-webview-scale", `${(gs * t.scale) / WEBVIEW.logicalPerSquare}`);
+    w.style.setProperty("--bivouac-grid-screen", `${gs * t.scale}px`);
+    w.style.setProperty("--bivouac-grid-x", `${t.px - t.scale * t.ox}px`);
+    w.style.setProperty("--bivouac-grid-y", `${t.py - t.scale * t.oy}px`);
   }
 
   #readWidget(id: string): Widget | null {
@@ -85,14 +117,17 @@ class WorldLayer {
     this.#rendered.clear();
   }
 
-  /** Mirror the PIXI stage transform so world-coordinate children track the map. */
+  /** Track the map. Widgets are positioned in SCREEN space (world→screen each
+   *  frame) instead of living inside a CSS-scaled layer, so their chrome
+   *  (borders/shadows/radii) renders at scale 1 and stays crisp at any zoom. */
   syncTransform(): void {
-    if (!this.#world || !canvas?.stage) return;
-    const s = canvas.stage;
-    const scale = s.scale.x;
-    this.#world.style.transform =
-      `translate(${s.position.x}px, ${s.position.y}px) scale(${scale}) ` +
-      `translate(${-s.pivot.x}px, ${-s.pivot.y}px)`;
+    const t = this.#stageParams();
+    if (!this.#world || !t) return;
+    const gs = this.#gridSize();
+    this.#applyStageVars(t, gs);
+    if (!this.#dragging) {
+      for (const rec of this.#rendered.values()) this.#position(rec.el, rec.cell, gs, t);
+    }
     this.scheduleLOD();
   }
 
@@ -113,18 +148,18 @@ class WorldLayer {
   render(_reason: string): void {
     if (!this.#world || this.#dragging) return;
     const scene = activeLandingScene();
-    if (!scene) return;
+    const t = this.#stageParams();
+    if (!scene || !t) return;
 
     const gs = this.#gridSize();
-    const scale = canvas?.stage?.scale?.x ?? 1;
     const isGM = !!game.user?.isGM;
-    this.#world.style.setProperty("--bivouac-grid", `${gs}px`);
+    this.#applyStageVars(t, gs);
 
     let widgets = readLayout(scene).widgets;
     if (!isGM) widgets = widgets.filter((w) => w.scope !== "dm"); // filter, don't just hide
 
     const webviewCount = widgets.filter((w) => w.type === "webview").length;
-    const lodActive = webviewCount >= LOD.minWebviews && scale <= LOD.farScale;
+    const lodActive = webviewCount >= LOD.minWebviews && t.scale <= LOD.farScale;
 
     const seen = new Set<string>();
     for (const widget of widgets) {
@@ -144,14 +179,15 @@ class WorldLayer {
 
       const existing = this.#rendered.get(widget.id);
       if (existing && existing.sig === sig) {
-        this.#position(existing.el, widget.cell, gs); // move only — no rebuild
+        existing.cell = { ...widget.cell };
+        this.#position(existing.el, widget.cell, gs, t); // move only — no rebuild
         continue;
       }
       const el = this.#buildWidget(widget, { gs, isGM, lod });
-      this.#position(el, widget.cell, gs);
+      this.#position(el, widget.cell, gs, t);
       if (existing) existing.el.replaceWith(el);
       else this.#world.appendChild(el);
-      this.#rendered.set(widget.id, { el, sig });
+      this.#rendered.set(widget.id, { el, sig, cell: { ...widget.cell } });
     }
 
     for (const [id, rec] of this.#rendered) {
@@ -166,11 +202,13 @@ class WorldLayer {
     this.#applySelectionClasses();
   }
 
-  #position(el: HTMLElement, cell: WidgetCell, gs: number): void {
-    el.style.left = `${cell.gx * gs}px`;
-    el.style.top = `${cell.gy * gs}px`;
-    el.style.width = `${cell.gw * gs}px`;
-    el.style.height = `${cell.gh * gs}px`;
+  /** Place a widget in SCREEN pixels: world cell → screen rect via the stage
+   *  transform. Size scales with zoom; the element's chrome does not. */
+  #position(el: HTMLElement, cell: WidgetCell, gs: number, t: Stage): void {
+    el.style.left = `${t.px + t.scale * (cell.gx * gs - t.ox)}px`;
+    el.style.top = `${t.py + t.scale * (cell.gy * gs - t.oy)}px`;
+    el.style.width = `${cell.gw * gs * t.scale}px`;
+    el.style.height = `${cell.gh * gs * t.scale}px`;
   }
 
   #buildWidget(widget: Widget, extra: { gs: number; isGM: boolean; lod: boolean }): HTMLElement {
@@ -272,7 +310,8 @@ class WorldLayer {
     // Read the CURRENT widget so a prior resize/move isn't lost (no stale copy).
     const widget = this.#readWidget(widgetId);
     const rec = this.#rendered.get(widgetId);
-    if (!widget || !rec) return;
+    const t = this.#stageParams();
+    if (!widget || !rec || !t) return;
 
     // Grabbing a widget selects it — but keep an existing multi-selection intact
     // when grabbing one of its members, so the whole group can be moved together.
@@ -281,20 +320,39 @@ class WorldLayer {
     event.preventDefault();
     event.stopPropagation();
     const gs = this.#gridSize();
-    const scale = canvas?.stage?.scale?.x ?? 1;
+    const scale = t.scale;
     const maxCells = this.#maxCells();
     const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
 
     // A move on any member of a multi-selection drags the whole group; a resize
-    // only ever affects the grabbed widget.
+    // only ever affects the grabbed widget. Capture each element's start rect in
+    // SCREEN pixels, so drag deltas are plain screen offsets (the layer is no
+    // longer scaled).
     const group = mode === "move" && this.#selected.has(widgetId) && this.#selected.size > 1;
     const ids = group ? [...this.#selected] : [widgetId];
-    const dragees: { id: string; el: HTMLElement; cell: WidgetCell }[] = [];
+    const dragees: {
+      id: string;
+      el: HTMLElement;
+      cell: WidgetCell;
+      sL: number;
+      sT: number;
+      sW: number;
+      sH: number;
+    }[] = [];
     for (const id of ids) {
       const w = this.#readWidget(id);
       const r = this.#rendered.get(id);
       if (!w || !r) continue;
-      dragees.push({ id, el: r.el, cell: { ...w.cell } });
+      const cell = { ...w.cell };
+      dragees.push({
+        id,
+        el: r.el,
+        cell,
+        sL: t.px + scale * (cell.gx * gs - t.ox),
+        sT: t.py + scale * (cell.gy * gs - t.oy),
+        sW: cell.gw * gs * scale,
+        sH: cell.gh * gs * scale,
+      });
       r.el.classList.add("bivouac-dragging");
     }
 
@@ -303,20 +361,23 @@ class WorldLayer {
     this.#dragging = true;
     primary.setPointerCapture(event.pointerId);
 
+    const minPx = GRID.min * gs * scale;
+    const maxPx = maxCells * gs * scale;
+
     const onMove = (ev: PointerEvent) => {
-      const dx = (ev.clientX - start.x) / scale;
-      const dy = (ev.clientY - start.y) / scale;
+      const dx = ev.clientX - start.x;
+      const dy = ev.clientY - start.y;
       if (mode === "move") {
         for (const d of dragees) {
-          d.el.style.left = `${d.cell.gx * gs + dx}px`;
-          d.el.style.top = `${d.cell.gy * gs + dy}px`;
+          d.el.style.left = `${d.sL + dx}px`;
+          d.el.style.top = `${d.sT + dy}px`;
         }
       } else {
-        // Clamp live to [min, max] so the widget can't grow past the cap and
-        // then snap back on release (the old surprise).
+        // Clamp live to [min, max] (screen px) so the widget can't grow past
+        // the cap and then snap back on release (the old surprise).
         const d = dragees[0];
-        d.el.style.width = `${clamp(d.cell.gw * gs + dx, GRID.min * gs, maxCells * gs)}px`;
-        d.el.style.height = `${clamp(d.cell.gh * gs + dy, GRID.min * gs, maxCells * gs)}px`;
+        d.el.style.width = `${clamp(d.sW + dx, minPx, maxPx)}px`;
+        d.el.style.height = `${clamp(d.sH + dy, minPx, maxPx)}px`;
       }
     };
 
@@ -330,23 +391,29 @@ class WorldLayer {
       const updates = new Map<string, WidgetCell>();
       if (mode === "move") {
         for (const d of dragees) {
-          const gx = Math.max(0, Math.round(parseFloat(d.el.style.left) / gs));
-          const gy = Math.max(0, Math.round(parseFloat(d.el.style.top) / gs));
+          // Screen → world → cell.
+          const worldLeft = (parseFloat(d.el.style.left) - t.px) / scale + t.ox;
+          const worldTop = (parseFloat(d.el.style.top) - t.py) / scale + t.oy;
+          const gx = Math.max(0, Math.round(worldLeft / gs));
+          const gy = Math.max(0, Math.round(worldTop / gs));
           updates.set(d.id, { ...d.cell, gx, gy });
         }
       } else {
         const d = dragees[0];
-        const gw = clamp(Math.round(parseFloat(d.el.style.width) / gs), GRID.min, maxCells);
-        const gh = clamp(Math.round(parseFloat(d.el.style.height) / gs), GRID.min, maxCells);
+        const gw = clamp(Math.round(parseFloat(d.el.style.width) / scale / gs), GRID.min, maxCells);
+        const gh = clamp(Math.round(parseFloat(d.el.style.height) / scale / gs), GRID.min, maxCells);
         updates.set(d.id, { ...d.cell, gw, gh });
       }
 
-      // Snap the elements to the grid immediately. A drag whose snapped cell
-      // equals the current cell writes identical data → no updateScene → no
-      // render, which would otherwise leave the element at its raw drag offset.
+      // Snap elements to the grid immediately (screen space) and keep each
+      // rendered record's cell in sync — so a no-op write (snapped == current)
+      // still leaves them aligned, and syncTransform repositions correctly.
       for (const d of dragees) {
         const cell = updates.get(d.id);
-        if (cell) this.#position(d.el, cell, gs);
+        if (!cell) continue;
+        this.#position(d.el, cell, gs, t);
+        const rr = this.#rendered.get(d.id);
+        if (rr) rr.cell = cell;
       }
       void this.#applyCellUpdates(updates);
     };

@@ -137,11 +137,13 @@ registerWidgetType({
     // on the widget's square count, then scale it to fit. Same square-aspect →
     // same content magnification, independent of absolute pixel size.
     if (!ctx.fillContainer) {
+      // Logical-resolution iframe: fixed logical size, scaled to fit the widget.
+      // The scale factor (grid × zoom ÷ logical) is applied via a CSS var so it
+      // tracks zoom in the screen-space layout — see .bivouac-webview__frame--scaled.
       const L = WEBVIEW.logicalPerSquare;
+      frame.classList.add("bivouac-webview__frame--scaled");
       frame.style.width = `${ctx.widget.cell.gw * L}px`;
       frame.style.height = `${ctx.widget.cell.gh * L}px`;
-      frame.style.transformOrigin = "0 0";
-      frame.style.transform = `scale(${ctx.gridSize / L})`;
     }
     wrap.appendChild(frame);
 
@@ -194,6 +196,14 @@ registerWidgetType({
     const box = el("div", "bivouac-note");
     // GM-authored content; rendered as-is for MVP (enrichment comes later).
     box.innerHTML = html;
+    if (!ctx.fillContainer) {
+      // World-sized and scaled by zoom (via --bivouac-scale) so the note's text
+      // tracks the map, while the crisp widget frame around it does not — see
+      // .bivouac-note--scaled.
+      box.classList.add("bivouac-note--scaled");
+      box.style.width = `${ctx.widget.cell.gw * ctx.gridSize}px`;
+      box.style.height = `${ctx.widget.cell.gh * ctx.gridSize}px`;
+    }
     return box;
   },
 });

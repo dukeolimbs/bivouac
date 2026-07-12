@@ -45,22 +45,22 @@
   pointer-events: none;
 }
 
+/* Unscaled, viewport-filling surface. Widgets are positioned inside it in
+   screen pixels (world→screen each frame), so their chrome stays crisp. */
 #bivouac-world {
   position: absolute;
-  top: 0;
-  left: 0;
-  transform-origin: 0 0;
+  inset: 0;
   pointer-events: none;
 }
 
-/* Faint grid guides while editing (square size supplied by JS). */
+/* Faint grid guides while editing, drawn in screen space: cell size = grid ×
+   zoom, offset to the world origin's on-screen position (both supplied by JS). */
 #bivouac-overlay.bivouac-edit #bivouac-world {
   background-image:
     linear-gradient(to right, rgba(255, 255, 255, 0.06) 1px, transparent 1px),
     linear-gradient(to bottom, rgba(255, 255, 255, 0.06) 1px, transparent 1px);
-  background-size: var(--bivouac-grid, 100px) var(--bivouac-grid, 100px);
-  width: 20000px;
-  height: 20000px;
+  background-size: var(--bivouac-grid-screen, 100px) var(--bivouac-grid-screen, 100px);
+  background-position: var(--bivouac-grid-x, 0px) var(--bivouac-grid-y, 0px);
 }
 
 /* ---------------------------------------------------------------- widget */
@@ -221,6 +221,13 @@
   background: #fff;
   display: block;
 }
+/* Landing webviews: rendered at a fixed logical size (set inline) and scaled to
+   fit, tracking zoom via the JS-driven var. DM-screen frames omit this class
+   and fill their card 1:1. */
+.bivouac-webview__frame--scaled {
+  transform-origin: 0 0;
+  transform: scale(var(--bivouac-webview-scale, 0.625));
+}
 .bivouac-webview__popout {
   position: absolute;
   top: 6px;
@@ -293,6 +300,12 @@
   overflow: auto;
   padding: 10px 12px;
   line-height: 1.5;
+}
+/* Landing notes: world-sized (set inline) and scaled by zoom so the text tracks
+   the map. DM-screen notes omit this class and fill their card 1:1. */
+.bivouac-note--scaled {
+  transform-origin: 0 0;
+  transform: scale(var(--bivouac-scale, 1));
 }
 
 .bivouac-placeholder {

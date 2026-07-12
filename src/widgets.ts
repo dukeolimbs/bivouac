@@ -97,16 +97,17 @@ function hexToRgba(hex: string, alpha: number): string {
   return `rgba(${parseInt(m[1], 16)}, ${parseInt(m[2], 16)}, ${parseInt(m[3], 16)}, ${alpha})`;
 }
 
-/** Apply a tile's frame colour/opacity by overriding the panel-bg CSS vars
- *  inline (the Subtle/Framed chromes read these). Defaults to the accent orange
- *  at 0.4 when the tile hasn't set its own. */
+/** Apply a tile's frame colour/opacity to its EDGE (border) only — not the
+ *  panel fill. Overrides the border CSS vars inline (`--bivouac-panel-border`
+ *  for Subtle, `--bivouac-frame-border` for Framed); the background stays the
+ *  theme default. Defaults to the accent orange at 0.4 when unset. */
 export function applyFrameStyle(el: HTMLElement, widget: Widget): void {
   const color = typeof widget.config.frameColor === "string" ? widget.config.frameColor : "#d98b3a";
   const raw = Number(widget.config.frameOpacity);
   const opacity = Number.isFinite(raw) ? Math.min(1, Math.max(0, raw)) : 0.4;
-  const bg = hexToRgba(color, opacity);
-  el.style.setProperty("--bivouac-panel-bg", bg);
-  el.style.setProperty("--bivouac-panel-bg-strong", bg);
+  const edge = hexToRgba(color, opacity);
+  el.style.setProperty("--bivouac-panel-border", edge);
+  el.style.setProperty("--bivouac-frame-border", edge);
 }
 
 function placeholder(icon: string, label: string): HTMLElement {

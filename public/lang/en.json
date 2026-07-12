@@ -56,7 +56,7 @@
       "Chrome_framed": "Framed",
       "FrameColor": "Frame colour",
       "FrameOpacity": "Frame opacity",
-      "FrameOpacityHint": "0 = transparent, 1 = solid. Applies to the Subtle / Framed frame styles.",
+      "FrameOpacityHint": "Opacity of the tile's frame edge. 0 = invisible, 1 = solid. Applies to the Subtle / Framed styles.",
       "Url": "URL",
       "UrlPlaceholder": "https://…",
       "WebviewZoom": "Content zoom",

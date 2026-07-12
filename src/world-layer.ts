@@ -201,13 +201,27 @@ class WorldLayer {
     this.#applySelectionClasses();
   }
 
-  /** Place a widget in SCREEN pixels: world cell → screen rect via the stage
-   *  transform. Size scales with zoom; the element's chrome does not. */
+  /** Screen rect (px) for a cell, inset by GRID.gap on every side so adjacent
+   *  widgets keep a gap. The gap is world px (gs × GRID.gap), so it scales with
+   *  zoom. Shared by #position and the drag path, keeping both consistent. */
+  #screenRect(cell: WidgetCell, gs: number, t: Stage): { left: number; top: number; width: number; height: number } {
+    const g = gs * GRID.gap;
+    return {
+      left: t.px + t.scale * (cell.gx * gs + g - t.ox),
+      top: t.py + t.scale * (cell.gy * gs + g - t.oy),
+      width: Math.max(0, cell.gw * gs - 2 * g) * t.scale,
+      height: Math.max(0, cell.gh * gs - 2 * g) * t.scale,
+    };
+  }
+
+  /** Place a widget in SCREEN pixels via #screenRect. Size scales with zoom;
+   *  the element's chrome does not. */
   #position(el: HTMLElement, cell: WidgetCell, gs: number, t: Stage): void {
-    el.style.left = `${t.px + t.scale * (cell.gx * gs - t.ox)}px`;
-    el.style.top = `${t.py + t.scale * (cell.gy * gs - t.oy)}px`;
-    el.style.width = `${cell.gw * gs * t.scale}px`;
-    el.style.height = `${cell.gh * gs * t.scale}px`;
+    const r = this.#screenRect(cell, gs, t);
+    el.style.left = `${r.left}px`;
+    el.style.top = `${r.top}px`;
+    el.style.width = `${r.width}px`;
+    el.style.height = `${r.height}px`;
   }
 
   #buildWidget(widget: Widget, extra: { gs: number; isGM: boolean; lod: boolean }): HTMLElement {
@@ -350,15 +364,8 @@ class WorldLayer {
       const r = this.#rendered.get(id);
       if (!w || !r) continue;
       const cell = { ...w.cell };
-      dragees.push({
-        id,
-        el: r.el,
-        cell,
-        sL: t.px + scale * (cell.gx * gs - t.ox),
-        sT: t.py + scale * (cell.gy * gs - t.oy),
-        sW: cell.gw * gs * scale,
-        sH: cell.gh * gs * scale,
-      });
+      const sr = this.#screenRect(cell, gs, t);
+      dragees.push({ id, el: r.el, cell, sL: sr.left, sT: sr.top, sW: sr.width, sH: sr.height });
       r.el.classList.add("bivouac-dragging");
     }
 
@@ -367,8 +374,10 @@ class WorldLayer {
     this.#dragging = true;
     primary.setPointerCapture(event.pointerId);
 
-    const minPx = GRID.min * gs * scale;
-    const maxPx = maxCells * gs * scale;
+    // Widget rects are inset by the gap, so the min/max screen sizes are too.
+    const g = gs * GRID.gap;
+    const minPx = Math.max(0, GRID.min * gs - 2 * g) * scale;
+    const maxPx = Math.max(0, maxCells * gs - 2 * g) * scale;
 
     const onMove = (ev: PointerEvent) => {
       const dx = ev.clientX - start.x;
@@ -397,17 +406,19 @@ class WorldLayer {
       const updates = new Map<string, WidgetCell>();
       if (mode === "move") {
         for (const d of dragees) {
-          // Screen → world → cell.
-          const worldLeft = (parseFloat(d.el.style.left) - t.px) / scale + t.ox;
-          const worldTop = (parseFloat(d.el.style.top) - t.py) / scale + t.oy;
+          // Screen → world → cell. The element's edge is inset by the gap `g`,
+          // so subtract it before snapping to a cell.
+          const worldLeft = (parseFloat(d.el.style.left) - t.px) / scale + t.ox - g;
+          const worldTop = (parseFloat(d.el.style.top) - t.py) / scale + t.oy - g;
           const gx = Math.max(0, Math.round(worldLeft / gs));
           const gy = Math.max(0, Math.round(worldTop / gs));
           updates.set(d.id, { ...d.cell, gx, gy });
         }
       } else {
+        // Element size is (cells × gs − 2g) × scale, so add back 2g to recover cells.
         const d = dragees[0];
-        const gw = clamp(Math.round(parseFloat(d.el.style.width) / scale / gs), GRID.min, maxCells);
-        const gh = clamp(Math.round(parseFloat(d.el.style.height) / scale / gs), GRID.min, maxCells);
+        const gw = clamp(Math.round((parseFloat(d.el.style.width) / scale + 2 * g) / gs), GRID.min, maxCells);
+        const gh = clamp(Math.round((parseFloat(d.el.style.height) / scale + 2 * g) / gs), GRID.min, maxCells);
         updates.set(d.id, { ...d.cell, gw, gh });
       }
 

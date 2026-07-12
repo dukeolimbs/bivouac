@@ -63,6 +63,10 @@ export const GRID = {
    *  can override it via the `maxWidgetSize` setting. */
   min: 1,
   max: 40,
+  /** Visual gap between a widget and its cell edge, as a fraction of one grid
+   *  square, applied on every side. Scales with zoom and grid size, so adjacent
+   *  widgets keep breathing room. Layout/snapping still use whole cells. */
+  gap: 0.05,
 } as const;
 
 /** Level-of-detail: only degrade web views to placeholders when the board is

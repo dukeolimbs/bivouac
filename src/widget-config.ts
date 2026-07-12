@@ -85,6 +85,24 @@ function buildForm(widget: Widget): string {
           `<p class="bivouac-config__hint">${esc(t("BIVOUAC.Config.NoteFontHint"))}</p>`));
       break;
     }
+    case "actor":
+    case "table":
+    case "macro":
+      content.push(group(t("BIVOUAC.Config.LinkedDoc"),
+        `<input type="text" name="uuid" value="${esc(widget.config.uuid ?? "")}" placeholder="${esc(t("BIVOUAC.Config.LinkedDocPlaceholder"))}">` +
+          `<p class="bivouac-config__hint">${esc(t("BIVOUAC.Config.LinkedDocHint"))}</p>`));
+      break;
+    case "journal": {
+      content.push(group(t("BIVOUAC.Config.LinkedDoc"),
+        `<input type="text" name="uuid" value="${esc(widget.config.uuid ?? "")}" placeholder="${esc(t("BIVOUAC.Config.LinkedDocPlaceholder"))}">`));
+      const jmode = widget.config.journalMode === "link" ? "link" : "inline";
+      content.push(group(t("BIVOUAC.Config.JournalMode"),
+        `<select name="journalMode">
+           <option value="inline"${jmode === "inline" ? " selected" : ""}>${esc(t("BIVOUAC.Config.JournalInline"))}</option>
+           <option value="link"${jmode === "link" ? " selected" : ""}>${esc(t("BIVOUAC.Config.JournalLink"))}</option>
+         </select>`));
+      break;
+    }
   }
 
   // ---- Frame (border) axis -------------------------------------------------
@@ -187,6 +205,15 @@ function applyForm(widget: Widget, data: Record<string, string>): Widget {
       updated.config.fontCustom = (data.noteFontCustom ?? "").trim();
       break;
     }
+    case "actor":
+    case "table":
+    case "macro":
+      updated.config.uuid = data.uuid?.trim() ?? "";
+      break;
+    case "journal":
+      updated.config.uuid = data.uuid?.trim() ?? "";
+      updated.config.journalMode = data.journalMode === "link" ? "link" : "inline";
+      break;
   }
   return updated;
 }

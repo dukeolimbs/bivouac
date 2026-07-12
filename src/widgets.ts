@@ -345,6 +345,171 @@ registerWidgetType({
   },
 });
 
+/* -------------------------------------------- document tiles ------------ */
+
+/** Does this widget reference the given document UUID (for targeted refresh)? */
+export function refsUuid(widget: Widget, uuid: string): boolean {
+  if (widget.config?.uuid === uuid) return true;
+  const many = widget.config?.uuids;
+  return Array.isArray(many) && many.includes(uuid);
+}
+
+/** Can the current user at least see this document? Doc tiles render a quiet
+ *  "restricted" placeholder for users below LIMITED permission, so a shared tile
+ *  never leaks GM-only content. */
+export function canView(doc: unknown): boolean {
+  const d = doc as { testUserPermission?: (u: unknown, p: string) => boolean } | null;
+  try {
+    return d?.testUserPermission ? d.testUserPermission(game.user, "LIMITED") : true;
+  } catch {
+    return true;
+  }
+}
+
+/** Shared scaffold for a document-backed tile: resolve `config.uuid`, gate on
+ *  permission, then hand the live document to `fill`. Renders synchronously with
+ *  a placeholder and swaps in the resolved view. */
+function docBody(ctx: RenderContext, fill: (doc: Record<string, unknown>, host: HTMLElement) => void): HTMLElement {
+  const wrap = el("div", "bivouac-doc");
+  const uuid = String(ctx.widget.config.uuid ?? "");
+  if (!uuid) {
+    wrap.appendChild(placeholder("fa-solid fa-link-slash", game.i18n.localize("BIVOUAC.Doc.None")));
+    return wrap;
+  }
+  void (async () => {
+    const doc = (await fromUuid(uuid).catch(() => null)) as Record<string, unknown> | null;
+    if (!doc) {
+      wrap.replaceChildren(placeholder("fa-solid fa-triangle-exclamation", game.i18n.localize("BIVOUAC.Doc.Missing")));
+      return;
+    }
+    if (!canView(doc)) {
+      wrap.replaceChildren(placeholder("fa-solid fa-lock", game.i18n.localize("BIVOUAC.Doc.Restricted")));
+      return;
+    }
+    fill(doc, wrap);
+  })();
+  return wrap;
+}
+
+/** Best-effort image for a document (portrait, falling back to the token). */
+function docImg(doc: Record<string, unknown>): string {
+  const token = (doc.prototypeToken as { texture?: { src?: string } } | undefined)?.texture?.src;
+  return (doc.img as string) || token || "icons/svg/mystery-man.svg";
+}
+
+/** Extract renderable HTML from a JournalEntry (first text page) or a page. */
+function journalHtml(doc: Record<string, unknown>): string {
+  const asPage = (doc.text as { content?: string } | undefined)?.content;
+  if (typeof asPage === "string") return asPage;
+  const pages = (doc.pages as { contents?: { type?: string; text?: { content?: string } }[] } | undefined)?.contents;
+  const text = pages?.find((p) => p.type === "text")?.text?.content;
+  return typeof text === "string" ? text : "";
+}
+
+/** Actor / Item card: portrait art + name; click opens the sheet (view mode). */
+registerWidgetType({
+  type: "actor",
+  label: "BIVOUAC.Widgets.Actor.Label",
+  icon: "fa-solid fa-user",
+  defaultConfig: () => ({ uuid: "" }),
+  renderBody(ctx) {
+    return docBody(ctx, (doc, host) => {
+      const box = el("div", "bivouac-actorcard");
+      const img = document.createElement("img");
+      img.className = "bivouac-actorcard__img";
+      img.src = docImg(doc);
+      img.alt = String(doc.name ?? "");
+      box.appendChild(img);
+      box.appendChild(el("span", "bivouac-actorcard__name", String(doc.name ?? "")));
+      if (!ctx.editMode) {
+        box.classList.add("bivouac-interactive");
+        box.addEventListener("click", () => (doc.sheet as { render?: (b: boolean) => void })?.render?.(true));
+      }
+      host.replaceChildren(box);
+    });
+  },
+});
+
+/** Journal tile: inline-render the page content (default) or a link that opens
+ *  it (config.journalMode === "link"). */
+registerWidgetType({
+  type: "journal",
+  label: "BIVOUAC.Widgets.Journal.Label",
+  icon: "fa-solid fa-book-open",
+  defaultConfig: () => ({ uuid: "", journalMode: "inline" }),
+  renderBody(ctx) {
+    const link = ctx.widget.config.journalMode === "link";
+    return docBody(ctx, (doc, host) => {
+      if (link) {
+        const box = el("div", "bivouac-doclink");
+        box.appendChild(el("i", "bivouac-doclink__icon fa-solid fa-book-open"));
+        box.appendChild(el("span", "bivouac-doclink__name", String(doc.name ?? "")));
+        if (!ctx.editMode) {
+          box.classList.add("bivouac-interactive");
+          box.addEventListener("click", () => (doc.sheet as { render?: (b: boolean) => void })?.render?.(true));
+        }
+        host.replaceChildren(box);
+        return;
+      }
+      const note = el("div", "bivouac-note");
+      const html = journalHtml(doc);
+      note.innerHTML = html || `<p class="bivouac-doc__empty">${game.i18n.localize("BIVOUAC.Doc.EmptyJournal")}</p>`;
+      if (html) void enrichNote(note, html);
+      host.replaceChildren(note);
+    });
+  },
+});
+
+/** Rollable table tile: name + a Roll button that draws to chat. */
+registerWidgetType({
+  type: "table",
+  label: "BIVOUAC.Widgets.Table.Label",
+  icon: "fa-solid fa-dice-d20",
+  defaultConfig: () => ({ uuid: "" }),
+  renderBody(ctx) {
+    return docBody(ctx, (doc, host) => {
+      const box = el("div", "bivouac-doctile bivouac-tabletile");
+      box.appendChild(el("span", "bivouac-doctile__name", String(doc.name ?? "")));
+      const roll = el("button", "bivouac-doctile__action");
+      roll.type = "button";
+      roll.innerHTML = `<i class="fa-solid fa-dice-d20"></i> ${game.i18n.localize("BIVOUAC.Widgets.Table.Roll")}`;
+      roll.addEventListener("click", (e) => {
+        e.stopPropagation();
+        void (doc.draw as (() => Promise<unknown>) | undefined)?.();
+      });
+      box.appendChild(roll);
+      host.replaceChildren(box);
+    });
+  },
+});
+
+/** Macro tile: icon/name button that executes the macro. */
+registerWidgetType({
+  type: "macro",
+  label: "BIVOUAC.Widgets.Macro.Label",
+  icon: "fa-solid fa-scroll",
+  defaultConfig: () => ({ uuid: "" }),
+  renderBody(ctx) {
+    return docBody(ctx, (doc, host) => {
+      const box = el("div", "bivouac-doctile bivouac-macrotile");
+      if (doc.img) {
+        const im = document.createElement("img");
+        im.className = "bivouac-macrotile__img";
+        im.src = String(doc.img);
+        box.appendChild(im);
+      } else {
+        box.appendChild(el("i", "bivouac-doctile__icon fa-solid fa-scroll"));
+      }
+      box.appendChild(el("span", "bivouac-doctile__name", String(doc.name ?? "")));
+      if (!ctx.editMode) {
+        box.classList.add("bivouac-interactive");
+        box.addEventListener("click", () => (doc.execute as (() => void) | undefined)?.());
+      }
+      host.replaceChildren(box);
+    });
+  },
+});
+
 /* -------------------------------------------- factory ------------------- */
 
 /** Create a new widget of the given type with default geometry/config. */

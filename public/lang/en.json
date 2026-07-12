@@ -43,7 +43,17 @@
         "Label": "Note",
         "Empty": "Empty note — configure this note."
       },
+      "Actor": { "Label": "Actor" },
+      "Journal": { "Label": "Journal" },
+      "Table": { "Label": "Rollable table", "Roll": "Roll" },
+      "Macro": { "Label": "Macro" },
       "Unknown": "Unknown tile: {type}"
+    },
+    "Doc": {
+      "None": "No document linked.",
+      "Missing": "Linked document not found.",
+      "Restricted": "You don't have permission to view this.",
+      "EmptyJournal": "This journal page is empty."
     },
     "Config": {
       "Section_General": "General",
@@ -89,6 +99,12 @@
       "Action_runMacro": "Run macro",
       "TargetUuid": "Target UUID",
       "TargetUuidPlaceholder": "Actor.xx…  /  JournalEntry.xx…  /  Macro.xx…",
+      "LinkedDoc": "Linked document",
+      "LinkedDocPlaceholder": "Actor.xx…  /  JournalEntry.xx…  /  drop one onto the board",
+      "LinkedDocHint": "The document this tile shows. Usually set by dragging it in; paste a UUID to re-point it.",
+      "JournalMode": "Display",
+      "JournalInline": "Inline (show the page)",
+      "JournalLink": "Link (open on click)",
       "Html": "Content",
       "HtmlPlaceholder": "HTML, @UUID[…] links, [[/r 1d20]] rolls…",
       "HtmlHint": "Select text and press Ctrl/⌘+B, I or U to format it. Paste a link over selected text to turn it into a hyperlink.",

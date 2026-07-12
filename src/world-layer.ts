@@ -11,9 +11,11 @@ import {
   createWidget,
   frameOf,
   getWidgetType,
+  refsUuid,
   type RenderContext,
 } from "./widgets";
 import { openWidgetConfig } from "./widget-config";
+import { normalizeDropData, widgetFromDrop } from "./drop";
 
 /** The PIXI stage transform, sampled per frame to map world coords → screen. */
 interface Stage {
@@ -117,6 +119,47 @@ class WorldLayer {
 
     this.#overlay = overlay;
     this.#world = world;
+  }
+
+  /** Handle a document dropped on the scene canvas (via the `dropCanvasData`
+   *  hook). Only intercepts while EDITING a landing scene — so normal
+   *  token/note drops still work in view mode. Returns false to prevent
+   *  Foundry's default (e.g. creating a token) when we take the drop. */
+  handleCanvasDrop(data: { x?: number; y?: number } & Record<string, unknown>): boolean | void {
+    if (!game.user?.isGM || !this.#editMode || !activeLandingScene()) return;
+    const doc = normalizeDropData(data);
+    if (!doc) return;
+    const gs = this.#gridSize();
+    const gx = Math.round((data.x ?? 0) / gs) - Math.floor(GRID.defaultSize / 2);
+    const gy = Math.round((data.y ?? 0) / gs) - Math.floor(GRID.defaultSize / 2);
+    void (async () => {
+      const widget = await widgetFromDrop(doc, gx, gy);
+      if (!widget) return;
+      await this.updateWidget(widget);
+      this.#selectWidget(widget.id, false);
+    })();
+    return false; // we handled it — don't also create a token/note
+  }
+
+  /** Re-render (in place) only the tiles that reference `uuid` — called when the
+   *  underlying document changes, so doc tiles stay live without rebuilding
+   *  (and reloading) every tile. */
+  refreshDocTiles(uuid: string): void {
+    const scene = activeLandingScene();
+    const t = this.#stageParams();
+    if (!scene || !t || !this.#world) return;
+    const gs = this.#gridSize();
+    const isGM = !!game.user?.isGM;
+    for (const w of readLayout(scene).widgets) {
+      if (!refsUuid(w, uuid)) continue;
+      const rec = this.#rendered.get(w.id);
+      if (!rec) continue;
+      const el = this.#buildWidget(w, { gs, isGM, lod: false });
+      this.#position(el, w.cell, gs, t);
+      rec.el.replaceWith(el);
+      this.#rendered.set(w.id, { el, sig: rec.sig, cell: { ...w.cell } });
+    }
+    this.#applySelectionClasses();
   }
 
   #unmount(): void {
@@ -347,7 +390,7 @@ class WorldLayer {
     const rec = this.#rendered.get(widget.id);
     if (!rec) return;
     this.#applyTileStyle(rec.el, widget);
-    if (widget.type !== "note" && widget.type !== "image") return; // never re-render a web view live
+    if (widget.type === "webview") return; // never re-render a web view live (iframe reload)
     const scaler = rec.el.querySelector(".bivouac-scaler");
     const def = getWidgetType(widget.type);
     if (!scaler || !def) return;

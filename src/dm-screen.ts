@@ -9,8 +9,10 @@ import {
   createWidget,
   frameOf,
   getWidgetType,
+  refsUuid,
   type RenderContext,
 } from "./widgets";
+import { isDocDrag, parseDrop, widgetFromDrop } from "./drop";
 import { readDMLayout, writeDMLayout } from "./layout";
 import { openWidgetConfig, pickWidgetType } from "./widget-config";
 import { MODULE_ID, SETTINGS, type Widget, type WidgetType } from "./constants";
@@ -289,11 +291,46 @@ class DMScreen {
 
     const body = document.createElement("div");
     body.className = "bivouac-drawer__body";
+    // Drop Foundry documents onto the drawer to add them as cards (a new row).
+    // Skip while an internal card reorder is in progress (that has its own DnD).
+    body.addEventListener("dragover", (e) => {
+      if (this.#dragId || !game.user?.isGM || !isDocDrag(e)) return;
+      e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+    });
+    body.addEventListener("drop", (e) => {
+      if (!this.#dragId) void this.#onDocDrop(e);
+    });
     drawer.appendChild(body);
 
     iface.appendChild(drawer);
     this.#el = drawer;
     this.#applyDockClass(); // position it at the configured edge before it opens
+  }
+
+  async #onDocDrop(event: DragEvent): Promise<void> {
+    if (!game.user?.isGM) return;
+    const data = parseDrop(event);
+    if (!data) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const widget = await widgetFromDrop(data, 0, 0); // cell reassigned by #applyRows
+    if (!widget) return;
+    const rows = this.#currentRows();
+    rows.push([widget]);
+    await this.#applyRows(rows);
+  }
+
+  /** Re-render (in place) only the DM cards that reference `uuid`, on a document
+   *  change — so doc cards stay live without rebuilding every card. */
+  refreshDocTiles(uuid: string): void {
+    const body = this.#el?.querySelector<HTMLElement>(".bivouac-drawer__body");
+    if (!body) return;
+    for (const w of readDMLayout().widgets) {
+      if (!refsUuid(w, uuid)) continue;
+      const old = body.querySelector(`.bivouac-card[data-id="${w.id}"]`);
+      if (old) old.replaceWith(this.#renderWidget(w));
+    }
   }
 
   #toggleEdit(): void {

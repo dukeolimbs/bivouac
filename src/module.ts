@@ -244,11 +244,36 @@ Hooks.on("canvasReady", () => {
 // Keep the world layer glued to the map as the user pans / zooms.
 Hooks.on("canvasPan", () => worldLayer.syncTransform());
 
+// Drop a document (Actor / Journal / Table / Macro …) onto the board while
+// editing a landing scene → create a tile at the drop point. In view mode this
+// returns nothing, so Foundry's normal drop (e.g. token creation) is untouched.
+Hooks.on("dropCanvasData", (_canvas: unknown, data: { x?: number; y?: number } & Record<string, unknown>) =>
+  worldLayer.handleCanvasDrop(data),
+);
+
 // React to layout changes (from this GM or, for players, broadcast writes).
 Hooks.on("updateScene", (scene: { id: string }, changes: object) => {
   if (!isLandingScene(scene)) return;
   if (foundry.utils.hasProperty(changes, `flags.${MODULE_ID}`)) worldLayer.render("updateScene");
 });
+
+// Keep document-backed tiles (Actor / Journal / Table / Macro …) live: when a
+// referenced document changes or is removed, re-render just the tiles that point
+// at it, on both surfaces (a page also refreshes its parent journal's tiles).
+function refreshDocTiles(doc: { uuid?: string; parent?: { uuid?: string } } | undefined): void {
+  if (doc?.uuid) {
+    worldLayer.refreshDocTiles(doc.uuid);
+    dmScreen.refreshDocTiles(doc.uuid);
+  }
+  if (doc?.parent?.uuid) {
+    worldLayer.refreshDocTiles(doc.parent.uuid);
+    dmScreen.refreshDocTiles(doc.parent.uuid);
+  }
+}
+for (const kind of ["Actor", "Item", "JournalEntry", "JournalEntryPage", "RollableTable", "Macro"]) {
+  Hooks.on(`update${kind}`, (doc: { uuid?: string; parent?: { uuid?: string } }) => refreshDocTiles(doc));
+  Hooks.on(`delete${kind}`, (doc: { uuid?: string; parent?: { uuid?: string } }) => refreshDocTiles(doc));
+}
 
 // React to a change in the set of landing scenes (cross-client).
 function onSettingChange(setting: { key?: string }): void {

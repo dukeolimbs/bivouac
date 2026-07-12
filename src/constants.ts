@@ -40,7 +40,11 @@ export interface WidgetCell {
   gh: number;
 }
 
-export type WidgetType = "webview" | "image" | "note";
+/** Tile type key. Open (any string) so tiles register via the registry without
+ *  editing this file — including dropped-document tiles and future third-party
+ *  types. Known built-ins: webview · image · note · actor · journal · table ·
+ *  macro (+ planned: scene · playlist · meter · cards · party · combat · rules). */
+export type WidgetType = string;
 export type WidgetScope = "shared" | "dm";
 /** Legacy single "chrome" axis — migrated to separate `frame` + `background`
  *  (stored in `config`); kept for reading old layouts. */

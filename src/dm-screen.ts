@@ -1,7 +1,16 @@
 /** Bivouac — the DM screen: a GM-only, right-docked drawer that stacks widgets.
  *  Layout persists per-GM on the User document. Cards can be drag-reordered. */
 
-import { attachInteractions, createWidget, getWidgetType, type RenderContext } from "./widgets";
+import {
+  applyBackground,
+  applyFrameStyle,
+  attachInteractions,
+  backgroundOf,
+  createWidget,
+  frameOf,
+  getWidgetType,
+  type RenderContext,
+} from "./widgets";
 import { readDMLayout, writeDMLayout } from "./layout";
 import { openWidgetConfig, pickWidgetType } from "./widget-config";
 import { MODULE_ID, SETTINGS, type Widget, type WidgetType } from "./constants";
@@ -355,8 +364,12 @@ class DMScreen {
   #renderWidget(widget: Widget): HTMLElement {
     const edit = this.#editMode;
     const el = document.createElement("div");
-    el.className = `bivouac-card bivouac-chrome-${widget.chrome}`;
+    // Same Frame + Background styling axes as landing tiles (borders, frosted/
+    // solid/gradient/image fills, colour + opacity), editable via the card gear.
+    el.className = `bivouac-card bivouac-frame-${frameOf(widget)} bivouac-bg-${backgroundOf(widget)}`;
     el.dataset.id = widget.id;
+    applyFrameStyle(el, widget);
+    applyBackground(el, widget);
 
     // Chrome (grip · title · gear · trash) only in edit mode — a clean board at play.
     if (edit) {

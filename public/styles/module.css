@@ -681,13 +681,14 @@ body.bivouac-dnd-active .bivouac-card__body iframe {
 }
 
 .bivouac-card {
+  position: relative; /* anchors the frame ::before accent + image ::after layer */
   border-radius: 8px;
   overflow: hidden;
   min-height: 0; /* row height governs the card (rows share the drawer's height) */
   display: flex;
   flex-direction: column;
-  background: rgba(0, 0, 0, 0.18);
-  border: 1px solid var(--bivouac-panel-border);
+  /* Fill + border come from the .bivouac-bg-* / .bivouac-frame-* axis classes
+     (same as landing tiles); a card always carries both. */
   transition: box-shadow 100ms ease, opacity 100ms ease;
 }
 .bivouac-card--dragging {
@@ -740,6 +741,8 @@ body.bivouac-dnd-active .bivouac-card__body iframe {
   color: var(--bivouac-accent);
 }
 .bivouac-card__header {
+  position: relative;
+  z-index: 1; /* above the .bivouac-bg-image ::after layer */
   display: flex;
   align-items: center;
   gap: 4px;
@@ -767,6 +770,7 @@ body.bivouac-dnd-active .bivouac-card__body iframe {
   flex: 1;
   min-height: 0;
   position: relative;
+  z-index: 1; /* above the .bivouac-bg-image ::after layer */
 }
 
 /* ---------------------------------------------------------------- config */

@@ -436,6 +436,10 @@ body.bivouac-resizing-drawer {
 body.bivouac-resizing-drawer iframe {
   pointer-events: none;
 }
+/* During a DM-card drag, let dragover fall through iframe content to the cards. */
+body.bivouac-dnd-active .bivouac-card__body iframe {
+  pointer-events: none;
+}
 
 /* GM-only DM-screen toggle: a detached, glassy pill that sits just left of the
    right-hand UI column, above other elements. It fades out while the drawer is
@@ -513,11 +517,32 @@ body.bivouac-resizing-drawer iframe {
 .bivouac-card--dragging {
   opacity: 0.5;
 }
-.bivouac-card.bivouac-drop-before {
+/* Row of up to 3 tiles that share the drawer width. */
+.bivouac-drawer__row {
+  display: flex;
+  gap: var(--bivouac-gap);
+  align-items: stretch;
+}
+.bivouac-drawer__row > .bivouac-card {
+  flex: 1 1 0;
+  min-width: 0;
+}
+/* Drop-zone indicators: an accent bar on the edge the tile will land against. */
+.bivouac-card.bivouac-drop-left {
+  box-shadow: inset 3px 0 0 0 var(--bivouac-accent);
+}
+.bivouac-card.bivouac-drop-right {
+  box-shadow: inset -3px 0 0 0 var(--bivouac-accent);
+}
+.bivouac-card.bivouac-drop-top {
   box-shadow: inset 0 3px 0 0 var(--bivouac-accent);
 }
-.bivouac-card.bivouac-drop-after {
+.bivouac-card.bivouac-drop-bottom {
   box-shadow: inset 0 -3px 0 0 var(--bivouac-accent);
+}
+/* Active edit toggle in the drawer header. */
+.bivouac-drawer__btn--active {
+  color: var(--bivouac-accent);
 }
 .bivouac-card__header {
   display: flex;

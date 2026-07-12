@@ -94,8 +94,9 @@
     "DMScreen": {
       "Title": "DM Screen",
       "Close": "Close",
+      "Edit": "Toggle edit mode",
       "Resize": "Drag to resize the drawer",
-      "Reorder": "Drag to reorder",
+      "Reorder": "Drag to move — beside a tile to share its row, above/below for a new row",
       "Empty": "No tools yet. Use + to add a tile."
     },
     "Keybindings": {

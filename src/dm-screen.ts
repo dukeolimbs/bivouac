@@ -13,7 +13,9 @@ const DRAWER_MAX = 900;
 class DMScreen {
   #el: HTMLElement | null = null;
   #tab: HTMLElement | null = null;
+  #editBtn: HTMLButtonElement | null = null;
   #open = false;
+  #editMode = false;
   #dragId: string | null = null;
   #sidebarRO: ResizeObserver | null = null;
   #sidebarMO: MutationObserver | null = null;
@@ -195,6 +197,11 @@ class DMScreen {
     title.className = "bivouac-drawer__title";
     title.innerHTML = `<i class="fa-solid fa-chalkboard-user"></i> ${game.i18n.localize("BIVOUAC.DMScreen.Title")}`;
     header.appendChild(title);
+    // Edit toggle — shows/hides per-card chrome (grip · gear · trash) and enables
+    // drag-to-arrange. Independent of the landing-board edit mode.
+    this.#editBtn = this.#toolButton("fa-solid fa-pen-to-square", "BIVOUAC.DMScreen.Edit", () => this.#toggleEdit());
+    this.#editBtn.setAttribute("aria-pressed", String(this.#editMode));
+    header.appendChild(this.#editBtn);
     header.appendChild(this.#toolButton("fa-solid fa-plus", "BIVOUAC.Edit.Add", async () => {
       const type = await pickWidgetType();
       if (type) await this.#add(type);
@@ -210,73 +217,101 @@ class DMScreen {
     this.#el = drawer;
   }
 
+  #toggleEdit(): void {
+    this.#editMode = !this.#editMode;
+    this.#editBtn?.classList.toggle("bivouac-drawer__btn--active", this.#editMode);
+    this.#editBtn?.setAttribute("aria-pressed", String(this.#editMode));
+    this.render();
+  }
+
   render(): void {
     if (!this.#el) return;
+    this.#el.classList.toggle("bivouac-drawer--editing", this.#editMode);
     const body = this.#el.querySelector<HTMLElement>(".bivouac-drawer__body");
     if (!body) return;
     body.replaceChildren();
 
-    const widgets = readDMLayout().widgets;
-    if (!widgets.length) {
+    const rows = this.#currentRows();
+    if (!rows.length) {
       const empty = document.createElement("p");
       empty.className = "bivouac-drawer__empty";
       empty.textContent = game.i18n.localize("BIVOUAC.DMScreen.Empty");
       body.appendChild(empty);
       return;
     }
-    for (const widget of widgets) body.appendChild(this.#renderWidget(widget));
+    for (const row of rows) {
+      const rowEl = document.createElement("div");
+      rowEl.className = "bivouac-drawer__row";
+      for (const widget of row) rowEl.appendChild(this.#renderWidget(widget));
+      body.appendChild(rowEl);
+    }
   }
 
   #renderWidget(widget: Widget): HTMLElement {
+    const edit = this.#editMode;
     const el = document.createElement("div");
     el.className = `bivouac-card bivouac-chrome-${widget.chrome}`;
     el.dataset.id = widget.id;
 
-    const header = document.createElement("header");
-    header.className = "bivouac-card__header";
+    // Chrome (grip · title · gear · trash) only in edit mode — a clean board at play.
+    if (edit) {
+      const header = document.createElement("header");
+      header.className = "bivouac-card__header";
 
-    // Drag handle — only the grip starts a reorder, so iframe content stays usable.
-    const grip = document.createElement("span");
-    grip.className = "bivouac-card__grip";
-    grip.draggable = true;
-    grip.title = game.i18n.localize("BIVOUAC.DMScreen.Reorder");
-    grip.innerHTML = `<i class="fa-solid fa-grip-vertical"></i>`;
-    grip.addEventListener("dragstart", (e) => {
-      this.#dragId = widget.id;
-      el.classList.add("bivouac-card--dragging");
-      e.dataTransfer?.setData("text/plain", widget.id);
-      if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
-    });
-    grip.addEventListener("dragend", () => el.classList.remove("bivouac-card--dragging"));
-    header.appendChild(grip);
+      // Only the grip starts a drag, so iframe content stays usable.
+      const grip = document.createElement("span");
+      grip.className = "bivouac-card__grip";
+      grip.draggable = true;
+      grip.title = game.i18n.localize("BIVOUAC.DMScreen.Reorder");
+      grip.innerHTML = `<i class="fa-solid fa-grip-vertical"></i>`;
+      grip.addEventListener("dragstart", (e) => {
+        this.#dragId = widget.id;
+        el.classList.add("bivouac-card--dragging");
+        // Let dragover reach the cards under the pointer instead of being eaten
+        // by iframe content (webview cards).
+        document.body.classList.add("bivouac-dnd-active");
+        e.dataTransfer?.setData("text/plain", widget.id);
+        if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
+      });
+      grip.addEventListener("dragend", () => {
+        el.classList.remove("bivouac-card--dragging");
+        document.body.classList.remove("bivouac-dnd-active");
+      });
+      header.appendChild(grip);
+
+      const def = getWidgetType(widget.type);
+      const title = document.createElement("span");
+      title.className = "bivouac-card__title";
+      title.textContent = widget.title || (def ? game.i18n.localize(def.label) : widget.type);
+      header.appendChild(title);
+      header.appendChild(this.#toolButton("fa-solid fa-gear", "BIVOUAC.Edit.Configure", () =>
+        openWidgetConfig(widget, (u) => void this.#update(u)),
+      ));
+      header.appendChild(this.#toolButton("fa-solid fa-trash", "BIVOUAC.Edit.Delete", () => void this.#delete(widget.id)));
+      el.appendChild(header);
+
+      // Four-zone drop: left/right joins the target's row (max 3), top/bottom
+      // makes a new row above/below.
+      const clearDrop = (): void =>
+        el.classList.remove("bivouac-drop-left", "bivouac-drop-right", "bivouac-drop-top", "bivouac-drop-bottom");
+      el.addEventListener("dragover", (e) => {
+        if (!this.#dragId || this.#dragId === widget.id) return;
+        e.preventDefault();
+        const zone = this.#zoneFor(e, el, widget.id);
+        clearDrop();
+        el.classList.add(`bivouac-drop-${zone}`);
+        el.dataset.dropZone = zone;
+      });
+      el.addEventListener("dragleave", clearDrop);
+      el.addEventListener("drop", (e) => {
+        e.preventDefault();
+        const zone = el.dataset.dropZone ?? "bottom";
+        clearDrop();
+        if (this.#dragId) void this.#drop(this.#dragId, widget.id, zone);
+      });
+    }
 
     const def = getWidgetType(widget.type);
-    const title = document.createElement("span");
-    title.className = "bivouac-card__title";
-    title.textContent = widget.title || (def ? game.i18n.localize(def.label) : widget.type);
-    header.appendChild(title);
-    header.appendChild(this.#toolButton("fa-solid fa-gear", "BIVOUAC.Edit.Configure", () =>
-      openWidgetConfig(widget, (u) => void this.#update(u)),
-    ));
-    header.appendChild(this.#toolButton("fa-solid fa-trash", "BIVOUAC.Edit.Delete", () => void this.#delete(widget.id)));
-    el.appendChild(header);
-
-    // Drop target behavior on the whole card.
-    el.addEventListener("dragover", (e) => {
-      if (!this.#dragId || this.#dragId === widget.id) return;
-      e.preventDefault();
-      const after = e.clientY - el.getBoundingClientRect().top > el.offsetHeight / 2;
-      el.classList.toggle("bivouac-drop-after", after);
-      el.classList.toggle("bivouac-drop-before", !after);
-    });
-    el.addEventListener("dragleave", () => el.classList.remove("bivouac-drop-after", "bivouac-drop-before"));
-    el.addEventListener("drop", (e) => {
-      e.preventDefault();
-      const after = el.classList.contains("bivouac-drop-after");
-      el.classList.remove("bivouac-drop-after", "bivouac-drop-before");
-      if (this.#dragId) void this.#reorder(this.#dragId, widget.id, after);
-    });
-
     const bodyBox = document.createElement("div");
     bodyBox.className = "bivouac-card__body";
     const ctx: RenderContext = {
@@ -293,6 +328,55 @@ class DMScreen {
     return el;
   }
 
+  /* ------------------------------------------------ row grid ----------- */
+
+  /** Group DM widgets into ordered rows (up to 3 wide) using `cell.gy` (row)
+   *  and `cell.gx` (position within the row). */
+  #currentRows(): Widget[][] {
+    const byRow = new Map<number, Widget[]>();
+    for (const w of readDMLayout().widgets) {
+      const r = Number(w.cell?.gy ?? 0);
+      const bucket = byRow.get(r);
+      if (bucket) bucket.push(w);
+      else byRow.set(r, [w]);
+    }
+    return [...byRow.entries()]
+      .sort((a, b) => a[0] - b[0])
+      .map(([, ws]) => ws.sort((a, b) => Number(a.cell?.gx ?? 0) - Number(b.cell?.gx ?? 0)));
+  }
+
+  /** Renumber `cell.gx`/`cell.gy` from row/column position, persist, re-render. */
+  async #applyRows(rows: Widget[][]): Promise<void> {
+    const widgets: Widget[] = [];
+    rows.forEach((row, y) =>
+      row.forEach((w, x) => {
+        w.cell = { ...w.cell, gx: x, gy: y };
+        widgets.push(w);
+      }),
+    );
+    await writeDMLayout({ widgets });
+    this.render();
+  }
+
+  /** Can the dragged tile join the target's row horizontally? True if it's
+   *  already in that row (a reorder) or the row has room (< 3). */
+  #rowJoinable(targetId: string): boolean {
+    const row = this.#currentRows().find((r) => r.some((w) => w.id === targetId));
+    if (!row) return false;
+    return row.some((w) => w.id === this.#dragId) || row.length < 3;
+  }
+
+  #zoneFor(e: DragEvent, el: HTMLElement, targetId: string): "left" | "right" | "top" | "bottom" {
+    const rect = el.getBoundingClientRect();
+    const fx = (e.clientX - rect.left) / rect.width;
+    const fy = (e.clientY - rect.top) / rect.height;
+    if (this.#rowJoinable(targetId)) {
+      if (fx < 0.28) return "left";
+      if (fx > 0.72) return "right";
+    }
+    return fy < 0.5 ? "top" : "bottom";
+  }
+
   #toolButton(icon: string, titleKey: string, onClick: () => void): HTMLButtonElement {
     const btn = document.createElement("button");
     btn.type = "button";
@@ -306,11 +390,12 @@ class DMScreen {
   }
 
   async #add(type: WidgetType): Promise<void> {
-    const widget = createWidget(type, 0, 0);
-    const layout = readDMLayout();
-    layout.widgets.push(widget);
-    await writeDMLayout(layout);
-    this.render();
+    // A new tile lands as its own full-width row at the bottom; drag it beside
+    // another tile to share a row.
+    const rows = this.#currentRows();
+    const widget = createWidget(type, 0, rows.length);
+    rows.push([widget]);
+    await this.#applyRows(rows);
     openWidgetConfig(widget, (u) => void this.#update(u));
   }
 
@@ -324,25 +409,56 @@ class DMScreen {
   }
 
   async #delete(id: string): Promise<void> {
-    // Single-card delete — no confirm (matches the landing board's per-widget delete).
-    const layout = readDMLayout();
-    layout.widgets = layout.widgets.filter((w) => w.id !== id);
-    await writeDMLayout(layout);
-    this.render();
+    // Single-card delete — no confirm (matches the landing board's per-widget
+    // delete). Drop the tile, then recompact rows so gaps close up.
+    const rows = this.#currentRows()
+      .map((row) => row.filter((w) => w.id !== id))
+      .filter((row) => row.length);
+    await this.#applyRows(rows);
   }
 
-  async #reorder(dragId: string, targetId: string, after: boolean): Promise<void> {
-    if (dragId === targetId) return;
-    const layout = readDMLayout();
-    const from = layout.widgets.findIndex((w) => w.id === dragId);
-    if (from < 0) return;
-    const [moved] = layout.widgets.splice(from, 1);
-    const to = layout.widgets.findIndex((w) => w.id === targetId);
-    if (to < 0) layout.widgets.push(moved);
-    else layout.widgets.splice(after ? to + 1 : to, 0, moved);
+  /** Move a dragged tile relative to a target: left/right into the target's
+   *  row (max 3 wide), top/bottom into a new row above/below. */
+  async #drop(dragId: string, targetId: string, zone: string): Promise<void> {
     this.#dragId = null;
-    await writeDMLayout(layout);
-    this.render();
+    if (dragId === targetId) return;
+
+    // Pull the dragged tile out of its current row (dropping any row it empties).
+    let dragged: Widget | undefined;
+    const rows = this.#currentRows()
+      .map((row) =>
+        row.filter((w) => {
+          if (w.id === dragId) {
+            dragged = w;
+            return false;
+          }
+          return true;
+        }),
+      )
+      .filter((row) => row.length);
+    if (!dragged) return;
+
+    // Locate the target after removal.
+    let ti = -1;
+    let tj = -1;
+    rows.forEach((row, i) =>
+      row.forEach((w, j) => {
+        if (w.id === targetId) {
+          ti = i;
+          tj = j;
+        }
+      }),
+    );
+    if (ti < 0) {
+      rows.push([dragged]); // target vanished — append as a new row
+    } else if ((zone === "left" || zone === "right") && rows[ti].length < 3) {
+      rows[ti].splice(zone === "left" ? tj : tj + 1, 0, dragged);
+    } else if (zone === "top") {
+      rows.splice(ti, 0, [dragged]);
+    } else {
+      rows.splice(ti + 1, 0, [dragged]); // bottom, or a full row → new row below
+    }
+    await this.#applyRows(rows);
   }
 }
 

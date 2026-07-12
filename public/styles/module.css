@@ -191,6 +191,11 @@
   min-height: 0;
   overflow: hidden;
   position: relative;
+  /* Round the content boundary to match the frame and force a clean composited
+     clip, so a white webview iframe doesn't leave a light anti-aliasing fringe
+     at the rounded corners (the panel bg sits behind the border's AA instead). */
+  border-radius: inherit;
+  transform: translateZ(0);
 }
 
 /* Per-widget content scaler: gives content a "world pixel" coordinate space

@@ -16,6 +16,10 @@ const DRAWER_MAX_H = 800;
 const DOCK_MODES = ["beside", "over", "left", "top", "bottom"] as const;
 type DockMode = (typeof DOCK_MODES)[number];
 
+/** Max tiles that may share one DM-screen row (the drawer can be full-width on a
+ *  top/bottom dock, so a row holds a few). */
+const MAX_ROW = 5;
+
 class DMScreen {
   #el: HTMLElement | null = null;
   #tab: HTMLElement | null = null;
@@ -388,7 +392,7 @@ class DMScreen {
       header.appendChild(this.#toolButton("fa-solid fa-trash", "BIVOUAC.Edit.Delete", () => void this.#delete(widget.id)));
       el.appendChild(header);
 
-      // Four-zone drop: left/right joins the target's row (max 3) — a bar on the
+      // Four-zone drop: left/right joins the target's row (max MAX_ROW) — a bar on the
       // card edge; top/bottom makes a new row — a full-width line across the row
       // (drawn on the row element, so it spans the whole horizontal axis).
       el.addEventListener("dragover", (e) => {
@@ -428,7 +432,7 @@ class DMScreen {
 
   /* ------------------------------------------------ row grid ----------- */
 
-  /** Group DM widgets into ordered rows (up to 3 wide) using `cell.gy` (row)
+  /** Group DM widgets into ordered rows (up to MAX_ROW wide) using `cell.gy` (row)
    *  and `cell.gx` (position within the row). */
   #currentRows(): Widget[][] {
     const byRow = new Map<number, Widget[]>();
@@ -457,7 +461,7 @@ class DMScreen {
   }
 
   /** Can the dragged tile join the target's row horizontally? True if it's
-   *  already in that row (a reorder) or the row has room (< 3). */
+   *  already in that row (a reorder) or the row has room (< MAX_ROW). */
   #rowJoinable(targetId: string): boolean {
     // Never offer a left/right (join) drop onto the dragged tile's OWN card —
     // inserting a tile beside where it already sits is a no-op and could corrupt
@@ -465,7 +469,7 @@ class DMScreen {
     if (targetId === this.#dragId) return false;
     const row = this.#currentRows().find((r) => r.some((w) => w.id === targetId));
     if (!row) return false;
-    return row.some((w) => w.id === this.#dragId) || row.length < 3;
+    return row.some((w) => w.id === this.#dragId) || row.length < MAX_ROW;
   }
 
   /** Remove every drop indicator across the drawer (cards + rows) — robust to
@@ -530,7 +534,7 @@ class DMScreen {
   }
 
   /** Move a dragged tile relative to a target: left/right into the target's
-   *  row (max 3 wide), top/bottom into a new row above/below. */
+   *  row (max MAX_ROW wide), top/bottom into a new row above/below. */
   async #drop(dragId: string, targetId: string, zone: string): Promise<void> {
     this.#dragId = null;
 
@@ -587,7 +591,7 @@ class DMScreen {
     );
     if (ti < 0) {
       rows.push([dragged]); // target vanished — append as a new row
-    } else if ((zone === "left" || zone === "right") && rows[ti].length < 3) {
+    } else if ((zone === "left" || zone === "right") && rows[ti].length < MAX_ROW) {
       rows[ti].splice(zone === "left" ? tj : tj + 1, 0, dragged);
     } else if (zone === "top") {
       rows.splice(ti, 0, [dragged]);

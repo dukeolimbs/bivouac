@@ -173,6 +173,20 @@
   position: relative;
 }
 
+/* Per-widget content scaler: gives content a "world pixel" coordinate space
+   (body size ÷ zoom) and then scales it back up by zoom, so content tracks the
+   map exactly as the old scaled-world layer did — while the widget frame stays
+   in screen space and crisp. Content renders at scale 1 inside it. */
+.bivouac-scaler {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: calc(100% / var(--bivouac-scale, 1));
+  height: calc(100% / var(--bivouac-scale, 1));
+  transform: scale(var(--bivouac-scale, 1));
+  transform-origin: 0 0;
+}
+
 .bivouac-widget__btn,
 .bivouac-drawer__btn {
   display: inline-flex;
@@ -220,13 +234,6 @@
   border: 0;
   background: #fff;
   display: block;
-}
-/* Landing webviews: rendered at a fixed logical size (set inline) and scaled to
-   fit, tracking zoom via the JS-driven var. DM-screen frames omit this class
-   and fill their card 1:1. */
-.bivouac-webview__frame--scaled {
-  transform-origin: 0 0;
-  transform: scale(var(--bivouac-webview-scale, 0.625));
 }
 .bivouac-webview__popout {
   position: absolute;
@@ -300,12 +307,6 @@
   overflow: auto;
   padding: 10px 12px;
   line-height: 1.5;
-}
-/* Landing notes: world-sized (set inline) and scaled by zoom so the text tracks
-   the map. DM-screen notes omit this class and fill their card 1:1. */
-.bivouac-note--scaled {
-  transform-origin: 0 0;
-  transform: scale(var(--bivouac-scale, 1));
 }
 
 .bivouac-placeholder {

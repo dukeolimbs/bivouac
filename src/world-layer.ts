@@ -1,7 +1,7 @@
 /** Bivouac — the world layer: a DOM surface over the canvas whose transform
  *  tracks the scene's pan/zoom, hosting widgets placed on scene grid squares. */
 
-import { GRID, LOD, MODULE_ID, SETTINGS, WEBVIEW, type Widget, type WidgetCell, type WidgetType } from "./constants";
+import { GRID, LOD, MODULE_ID, SETTINGS, type Widget, type WidgetCell, type WidgetType } from "./constants";
 import { activeLandingScene, readLayout, writeLayout } from "./layout";
 import { attachInteractions, createWidget, getWidgetType, type RenderContext } from "./widgets";
 import { openWidgetConfig } from "./widget-config";
@@ -68,7 +68,6 @@ class WorldLayer {
     const w = this.#world;
     if (!w) return;
     w.style.setProperty("--bivouac-scale", `${t.scale}`);
-    w.style.setProperty("--bivouac-webview-scale", `${(gs * t.scale) / WEBVIEW.logicalPerSquare}`);
     w.style.setProperty("--bivouac-grid-screen", `${gs * t.scale}px`);
     w.style.setProperty("--bivouac-grid-x", `${t.px - t.scale * t.ox}px`);
     w.style.setProperty("--bivouac-grid-y", `${t.py - t.scale * t.oy}px`);
@@ -266,7 +265,14 @@ class WorldLayer {
     };
     const body = document.createElement("div");
     body.className = "bivouac-widget__body";
-    body.appendChild(def ? def.renderBody(ctx) : this.#unknown(widget.type));
+    // Content lives in a per-widget scaler: it renders at world resolution and
+    // the scaler applies the zoom (via --bivouac-scale), reproducing the old
+    // scaled-world behavior for content — while the widget FRAME around it stays
+    // in screen space and crisp. (Content type does its own thing at scale 1.)
+    const scaler = document.createElement("div");
+    scaler.className = "bivouac-scaler";
+    scaler.appendChild(def ? def.renderBody(ctx) : this.#unknown(widget.type));
+    body.appendChild(scaler);
     el.appendChild(body);
 
     // Interactions are live only when NOT editing, so editing can click freely.

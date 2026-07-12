@@ -88,7 +88,7 @@ function buildForm(widget: Widget): string {
         .join("")}</select>`),
     group(t("BIVOUAC.Config.FrameColor"), `<input type="color" name="frameColor" value="${esc(frameColor)}">`),
     group(t("BIVOUAC.Config.FrameOpacity"),
-      `<input type="number" name="frameOpacity" value="${esc(frameOpacity)}" min="0" max="1" step="0.05" title="${esc(t("BIVOUAC.Config.FrameOpacityHint"))}">`),
+      `<input type="range" name="frameOpacity" value="${esc(frameOpacity)}" min="0" max="1" step="0.05" title="${esc(t("BIVOUAC.Config.FrameOpacityHint"))}"><output class="bivouac-range-out">${esc(frameOpacity)}</output>`),
   ];
 
   // ---- Background (fill) axis ---------------------------------------------
@@ -105,7 +105,7 @@ function buildForm(widget: Widget): string {
     group(t("BIVOUAC.Config.BgColor"), `<input type="color" name="bgColor" value="${esc(bgColor)}">`),
     group(t("BIVOUAC.Config.BgColor2"), `<input type="color" name="bgColor2" value="${esc(bgColor2)}">`),
     group(t("BIVOUAC.Config.BgOpacity"),
-      `<input type="number" name="bgOpacity" value="${esc(bgOpacity)}" min="0" max="1" step="0.05" title="${esc(t("BIVOUAC.Config.BgOpacityHint"))}">`),
+      `<input type="range" name="bgOpacity" value="${esc(bgOpacity)}" min="0" max="1" step="0.05" title="${esc(t("BIVOUAC.Config.BgOpacityHint"))}"><output class="bivouac-range-out">${esc(bgOpacity)}</output>`),
   ];
 
   return `<div class="bivouac-config standard-form">${
@@ -185,10 +185,19 @@ function ensureLiveHook(): void {
   Hooks.on("renderDialogV2", (_app: unknown, html: unknown) => {
     const root = html instanceof HTMLElement ? html : (html as { [0]?: HTMLElement } | null)?.[0];
     const form = root?.querySelector?.("form") as HTMLFormElement | null;
-    // Only our tile-config dialog (has .bivouac-config) with a live binding.
-    if (!form || !form.querySelector(".bivouac-config") || !activeLive) return;
+    if (!form || !form.querySelector(".bivouac-config")) return; // only our tile-config dialog
     const bind = activeLive;
-    form.addEventListener("input", () => bind.onLive(applyForm(bind.widget, readForm(form))));
+    const onInput = (): void => {
+      // Keep each slider's numeric readout in sync.
+      form.querySelectorAll<HTMLInputElement>('input[type="range"]').forEach((r) => {
+        const out = r.nextElementSibling;
+        if (out instanceof HTMLOutputElement) out.value = r.value;
+      });
+      // Live-preview style edits (edit flow only; the add flow has no binding).
+      if (bind) bind.onLive(applyForm(bind.widget, readForm(form)));
+    };
+    onInput();
+    form.addEventListener("input", onInput);
   });
 }
 

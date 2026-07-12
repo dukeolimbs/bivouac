@@ -547,6 +547,17 @@
   text-transform: uppercase;
   opacity: 0.7;
 }
+/* Opacity sliders + their live numeric readout. */
+.bivouac-config input[type="range"] {
+  flex: 1;
+  min-width: 0;
+}
+.bivouac-range-out {
+  min-width: 2.4em;
+  text-align: right;
+  opacity: 0.8;
+  font-variant-numeric: tabular-nums;
+}
 .bivouac-pick-hint {
   margin: 0 0 8px;
   opacity: 0.8;

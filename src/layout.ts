@@ -4,22 +4,32 @@ import { MODULE_ID, FLAGS, SETTINGS, EMPTY_LAYOUT, type Layout } from "./constan
 
 /* -------------------------------------------- Landing scene ------------- */
 
-/** The Scene id designated as the campaign landing page, or "" if unset. */
+/** Legacy single-id accessors — kept only for the one-time migration into the
+ *  `landingSceneIds` set (see module.ts). */
 export function getLandingSceneId(): string {
   return (game.settings.get(MODULE_ID, SETTINGS.landingSceneId) as string) ?? "";
 }
-
-/** Designate (or clear) the landing scene. GM only. */
 export async function setLandingSceneId(sceneId: string): Promise<void> {
   await game.settings.set(MODULE_ID, SETTINGS.landingSceneId, sceneId);
 }
 
-export function isLandingScene(scene: unknown): boolean {
-  const s = scene as { id?: string } | null | undefined;
-  return !!s?.id && s.id === getLandingSceneId();
+/** All Scene ids currently designated as landing pages. */
+export function getLandingSceneIds(): string[] {
+  const raw = game.settings.get(MODULE_ID, SETTINGS.landingSceneIds);
+  return Array.isArray(raw) ? raw.filter((x): x is string => typeof x === "string" && x.length > 0) : [];
 }
 
-/** The currently-viewed scene if — and only if — it is the landing scene. */
+/** Replace the set of landing scenes (deduped). GM only. */
+export async function setLandingScenes(ids: string[]): Promise<void> {
+  await game.settings.set(MODULE_ID, SETTINGS.landingSceneIds, [...new Set(ids)]);
+}
+
+export function isLandingScene(scene: unknown): boolean {
+  const s = scene as { id?: string } | null | undefined;
+  return !!s?.id && getLandingSceneIds().includes(s.id);
+}
+
+/** The currently-viewed scene if — and only if — it is a landing scene. */
 export function activeLandingScene(): { id: string } | null {
   const scene = canvas?.scene ?? null;
   return scene && isLandingScene(scene) ? scene : null;

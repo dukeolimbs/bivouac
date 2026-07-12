@@ -11,8 +11,11 @@ export const FLAGS = {
 } as const;
 
 export const SETTINGS = {
-  /** World setting: the id of the Scene designated as the landing page. */
+  /** World setting (legacy, single): the id of the Scene designated as the
+   *  landing page. Migrated into `landingSceneIds` on ready. */
   landingSceneId: "landingSceneId",
+  /** World setting: ids of all Scenes designated as landing pages. */
+  landingSceneIds: "landingSceneIds",
   /** Client setting: px the DM-screen tab keeps left of the sidebar edge. */
   dmTabPad: "dmTabPad",
   /** Client setting: vertical position of the DM-screen tab, as a % of height. */

@@ -15,9 +15,11 @@ import {
   activeLandingScene,
   clearLayoutHistory,
   getLandingSceneId,
+  getLandingSceneIds,
   isLandingScene,
   redoLayout,
   setLandingSceneId,
+  setLandingScenes,
   undoLayout,
 } from "./layout";
 import { worldLayer } from "./world-layer";
@@ -32,6 +34,15 @@ Hooks.once("init", () => {
     config: false,
     type: String,
     default: "",
+  });
+
+  // Set of Scenes designated as landing pages (several allowed). Any of them
+  // shows the board when it's the active/viewed scene.
+  game.settings.register(MODULE_ID, SETTINGS.landingSceneIds, {
+    scope: "world",
+    config: false,
+    type: Array,
+    default: [],
   });
 
   // Esc closes the DM screen. Registered as a PRIORITY keybinding that consumes
@@ -223,7 +234,12 @@ Hooks.on("getSceneControlButtons", (controls: Record<string, unknown>) => {
 });
 
 // Mount / refresh the world layer whenever the canvas (re)loads a scene.
-Hooks.on("canvasReady", () => worldLayer.refresh());
+Hooks.on("canvasReady", () => {
+  // Undo history is per active-scene layout; a scene switch means a different
+  // layout context, so drop it (prevents undoing one landing scene onto another).
+  clearLayoutHistory();
+  worldLayer.refresh();
+});
 
 // Keep the world layer glued to the map as the user pans / zooms.
 Hooks.on("canvasPan", () => worldLayer.syncTransform());
@@ -234,10 +250,10 @@ Hooks.on("updateScene", (scene: { id: string }, changes: object) => {
   if (foundry.utils.hasProperty(changes, `flags.${MODULE_ID}`)) worldLayer.render("updateScene");
 });
 
-// React to a change of which scene is the landing scene (cross-client).
+// React to a change in the set of landing scenes (cross-client).
 function onSettingChange(setting: { key?: string }): void {
-  if (setting?.key === `${MODULE_ID}.${SETTINGS.landingSceneId}`) {
-    clearLayoutHistory(); // old history belongs to the previous landing scene
+  if (setting?.key === `${MODULE_ID}.${SETTINGS.landingSceneIds}`) {
+    clearLayoutHistory(); // designation changed — history context may no longer apply
     worldLayer.refresh();
     ui.controls?.render();
   }
@@ -248,10 +264,24 @@ Hooks.on("createSetting", onSettingChange);
 Hooks.once("ready", () => {
   const mod = game.modules.get(MODULE_ID);
   if (mod) mod.api = { worldLayer, dmScreen };
-  if (game.user?.isGM) dmScreen.mountControl();
+  if (game.user?.isGM) {
+    dmScreen.mountControl();
+    void migrateLandingScenes();
+  }
   applyTabSettings();
   log("Ready");
 });
+
+/** One-time migration: fold the legacy single `landingSceneId` into the
+ *  `landingSceneIds` set, then clear the legacy value so removing all landing
+ *  scenes can't be undone by the fallback. GM only (world-scope writes). */
+async function migrateLandingScenes(): Promise<void> {
+  const legacy = getLandingSceneId();
+  if (legacy && getLandingSceneIds().length === 0) {
+    await setLandingScenes([legacy]);
+    await setLandingSceneId("");
+  }
+}
 
 /** Push the DM-tab settings into their CSS vars and reposition the tab. */
 function applyTabSettings(): void {
@@ -289,10 +319,11 @@ Hooks.on("closeSettingsConfig", () => applyTabSettings());
 async function toggleLandingScene(): Promise<void> {
   const scene = canvas?.scene;
   if (!scene) return;
-  const clearing = getLandingSceneId() === scene.id;
+  const ids = getLandingSceneIds();
+  const clearing = ids.includes(scene.id); // toggling THIS scene off (others untouched)
 
-  // Clearing hides the whole board in one click, so guard it behind a confirm.
-  // Setting a landing scene is harmless and stays immediate.
+  // Removing a scene's landing status hides its board, so guard it behind a
+  // confirm. Adding one is harmless and stays immediate.
   if (clearing) {
     const ok = await foundry.applications.api.DialogV2.confirm({
       window: { title: game.i18n.localize("BIVOUAC.Confirm.ClearLandingTitle") },
@@ -302,10 +333,9 @@ async function toggleLandingScene(): Promise<void> {
     if (!ok) return;
   }
 
-  const next = clearing ? "" : scene.id;
-  await setLandingSceneId(next);
+  await setLandingScenes(clearing ? ids.filter((id) => id !== scene.id) : [...ids, scene.id]);
   ui.notifications?.info(
-    game.i18n.localize(next ? "BIVOUAC.Notify.LandingSet" : "BIVOUAC.Notify.LandingCleared"),
+    game.i18n.localize(clearing ? "BIVOUAC.Notify.LandingCleared" : "BIVOUAC.Notify.LandingSet"),
   );
 }
 

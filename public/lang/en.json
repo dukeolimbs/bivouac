@@ -2,21 +2,21 @@
   "BIVOUAC": {
     "Controls": {
       "Title": "Landing Page",
-      "SetLanding": "Set this scene as the Landing Page",
-      "UnsetLanding": "Disable the Landing Page",
+      "SetLanding": "Set this scene as a Landing Page",
+      "UnsetLanding": "Remove this scene's Landing Page",
       "Arrange": "Arrange tiles (edit mode)",
       "AddWidget": "Add a tile",
       "Fit": "Fit all tiles to view",
       "DMScreen": "Toggle the DM screen"
     },
     "Notify": {
-      "LandingSet": "This scene is now the Landing Page.",
-      "LandingCleared": "Landing Page cleared.",
-      "NotLanding": "Switch to the Landing Page scene to add tiles."
+      "LandingSet": "This scene is now a Landing Page.",
+      "LandingCleared": "Landing Page removed from this scene.",
+      "NotLanding": "Switch to a Landing Page scene to add tiles."
     },
     "Confirm": {
-      "ClearLandingTitle": "Disable landing page?",
-      "ClearLandingBody": "This removes the Landing Page designation from this scene. Your tiles are kept, but the board will no longer appear. You can set it again anytime."
+      "ClearLandingTitle": "Remove this landing page?",
+      "ClearLandingBody": "This removes the Landing Page designation from this scene (other landing scenes are unaffected). Your tiles are kept, but this scene's board will no longer appear. You can set it again anytime."
     },
     "Edit": {
       "Add": "Add tile",

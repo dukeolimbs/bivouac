@@ -71,7 +71,9 @@ class DMScreen {
     if (!el || !this.#tab) return;
     const rect = el.getBoundingClientRect();
     if (rect.width === 0) return; // not laid out (e.g. mid-transition) — keep last position
-    const inset = Math.max(8, window.innerWidth - rect.left + this.#tabPad());
+    // Floor at 0 so negative padding can slide the tab right to the screen edge
+    // (flush at most), without ever pushing it off-screen.
+    const inset = Math.max(0, window.innerWidth - rect.left + this.#tabPad());
     document.documentElement.style.setProperty("--bivouac-dmtab-inset", `${Math.round(inset)}px`);
   };
 

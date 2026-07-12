@@ -41,7 +41,8 @@
       "Note": {
         "Label": "Note",
         "Empty": "Empty note — configure this note."
-      }
+      },
+      "Unknown": "Unknown widget: {type}"
     },
     "Config": {
       "Title": "Title",
@@ -54,8 +55,11 @@
       "Chrome_subtle": "Subtle",
       "Chrome_framed": "Framed",
       "Url": "URL",
+      "UrlPlaceholder": "https://…",
       "WebviewZoom": "Content zoom",
+      "WebviewZoomHint": "1 = default. Higher zooms the page in; lower shows more of it.",
       "Src": "Image path",
+      "SrcPlaceholder": "path/to/image.webp",
       "Fit": "Image fit",
       "OnClick": "On click",
       "Action_none": "Nothing",
@@ -63,6 +67,7 @@
       "Action_openJournal": "Open journal",
       "Action_runMacro": "Run macro",
       "TargetUuid": "Target UUID",
+      "TargetUuidPlaceholder": "Actor.xx…  /  JournalEntry.xx…  /  Macro.xx…",
       "Html": "Content",
       "HtmlPlaceholder": "Notes, rules, HTML…"
     },
@@ -80,7 +85,7 @@
     "Settings": {
       "DmTabPad": {
         "Name": "DM screen tab — edge padding",
-        "Hint": "Horizontal gap (px) the DM-screen toggle tab keeps to the left of the sidebar. Increase it to clear other UI docked there, such as a party HUD."
+        "Hint": "Horizontal gap (px) the DM-screen toggle tab keeps to the left of the sidebar. Increase it to clear other UI docked there, such as a party HUD; negative values push it toward — or over — the sidebar edge."
       },
       "DmTabTop": {
         "Name": "DM screen tab — vertical position",

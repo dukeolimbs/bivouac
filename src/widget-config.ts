@@ -42,13 +42,13 @@ function buildForm(widget: Widget): string {
   switch (widget.type) {
     case "webview":
       rows.push(group(t("BIVOUAC.Config.Url"),
-        `<input type="text" name="url" value="${esc(widget.config.url ?? "")}" placeholder="https://…">`));
+        `<input type="text" name="url" value="${esc(widget.config.url ?? "")}" placeholder="${esc(t("BIVOUAC.Config.UrlPlaceholder"))}">`));
       rows.push(group(t("BIVOUAC.Config.WebviewZoom"),
-        `<input type="number" name="zoom" value="${esc(Number(widget.config.zoom) || 1)}" min="0.25" max="4" step="0.05" title="1 = default. Higher zooms the page in; lower shows more of it.">`));
+        `<input type="number" name="zoom" value="${esc(Number(widget.config.zoom) || 1)}" min="0.25" max="4" step="0.05" title="${esc(t("BIVOUAC.Config.WebviewZoomHint"))}">`));
       break;
     case "image": {
       rows.push(group(t("BIVOUAC.Config.Src"),
-        `<input type="text" name="src" value="${esc(widget.config.src ?? "")}" placeholder="path/to/image.webp">`));
+        `<input type="text" name="src" value="${esc(widget.config.src ?? "")}" placeholder="${esc(t("BIVOUAC.Config.SrcPlaceholder"))}">`));
       const fit = String(widget.config.fit ?? "cover");
       rows.push(group(t("BIVOUAC.Config.Fit"),
         `<select name="fit">
@@ -62,7 +62,7 @@ function buildForm(widget: Widget): string {
           .map((a) => `<option value="${a}"${inter?.action === a || (!inter && a === "none") ? " selected" : ""}>${esc(t(`BIVOUAC.Config.Action_${a}`))}</option>`)
           .join("")}</select>`));
       rows.push(group(t("BIVOUAC.Config.TargetUuid"),
-        `<input type="text" name="iUuid" value="${esc(inter?.uuid ?? "")}" placeholder="Actor.xx…  /  JournalEntry.xx…  /  Macro.xx…">`));
+        `<input type="text" name="iUuid" value="${esc(inter?.uuid ?? "")}" placeholder="${esc(t("BIVOUAC.Config.TargetUuidPlaceholder"))}">`));
       break;
     }
     case "note":

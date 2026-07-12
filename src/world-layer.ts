@@ -305,7 +305,7 @@ class WorldLayer {
   #unknown(type: string): HTMLElement {
     const box = document.createElement("div");
     box.className = "bivouac-placeholder";
-    box.textContent = `Unknown widget: ${type}`;
+    box.textContent = game.i18n.format("BIVOUAC.Widgets.Unknown", { type });
     return box;
   }
 

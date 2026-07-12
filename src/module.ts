@@ -59,7 +59,7 @@ Hooks.once("init", () => {
     scope: "client",
     config: true,
     type: Number,
-    range: { min: 0, max: 400, step: 2 },
+    range: { min: -200, max: 400, step: 2 }, // negative pushes the tab toward / over the sidebar edge
     default: 16,
     onChange: () => applyTabSettings(),
   });

@@ -264,7 +264,17 @@
   width: 100%;
   height: 100%;
   position: relative;
+}
+.bivouac-image {
   overflow: hidden;
+}
+/* Web views intentionally do NOT clip here: the content-zoom scale() makes the
+   iframe overflow this box, and it must be clipped by the screen-space body
+   (.bivouac-widget__body / .bivouac-card) AFTER the scaler + iframe transforms —
+   clipping it here would crop the logical iframe before its transform and shrink
+   coverage (the "covers only half the tile" bug). */
+.bivouac-webview {
+  overflow: visible;
 }
 .bivouac-webview__frame {
   width: 100%;

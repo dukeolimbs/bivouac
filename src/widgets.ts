@@ -2,7 +2,6 @@
 
 import {
   GRID,
-  WEBVIEW,
   MODULE_ID,
   type Widget,
   type WidgetBackground,
@@ -201,31 +200,30 @@ registerWidgetType({
     frame.setAttribute("referrerpolicy", "no-referrer");
     frame.setAttribute("loading", "lazy");
 
-    // Content zoom (config.zoom, default 1) as a *browser-style* zoom: the iframe
-    // ALWAYS fills the whole tile, and zoom changes its logical VIEWPORT — higher
-    // zoom → smaller viewport → content appears bigger; lower → larger viewport →
-    // more of the page shown. So content scales gracefully and covers the tile at
-    // every zoom: no cropping (the earlier "magnify on a wrapper" cut content off)
-    // and no gaps. The iframe rendering at a logical resolution (L px/square, then
-    // scaled to fit) keeps magnification consistent regardless of pixel size.
+    // Content zoom (config.zoom, default 1) as a *browser-style* zoom that always
+    // fills the whole tile. The iframe is sized to (100/zoom)% and scaled by
+    // `zoom`, so its painted size is exactly 100% of the container at EVERY zoom
+    // (higher zoom → smaller CSS viewport → content bigger; lower → larger
+    // viewport → more of the page). Percentage-based, so it fills regardless of
+    // the tile's aspect or pixel size — at zoom = 1 it is a plain 100% with no
+    // overflow at all. Identical for the landing board (inside the world-px
+    // .bivouac-scaler) and DM cards (inside the card body).
     //
-    // LegendKeeper invariant: the iframe's own transform is CONSTANT for a given
-    // config (gs, zoom are constant); the per-frame map zoom rides the
-    // .bivouac-scaler ANCESTOR. LK only ever broke on a *per-frame-changing*
-    // iframe transform — a constant one (even magnifying) is fine.
+    // Clipping is DEFERRED to the screen-space body (.bivouac-widget__body /
+    // .bivouac-card): those sit ABOVE the scaler + iframe transforms, so the
+    // oversized iframe is clipped AFTER its transform. The immediate .bivouac-
+    // webview must NOT clip, or it crops the logical iframe *before* the scale()
+    // (that cropped the tile to half width — the bug this fixes).
+    //
+    // LegendKeeper-safe: the iframe's viewport (a % of the constant-size scaler)
+    // and its own transform are CONSTANT per config; the per-frame map zoom rides
+    // the .bivouac-scaler ANCESTOR. LK only ever broke on a *per-frame-changing*
+    // iframe transform.
     const zoom = Number(ctx.widget.config.zoom) || 1;
-    const L = WEBVIEW.logicalPerSquare;
     frame.style.transformOrigin = "0 0";
-    if (!ctx.fillContainer) {
-      frame.style.width = `${(ctx.widget.cell.gw * L) / zoom}px`;
-      frame.style.height = `${(ctx.widget.cell.gh * L) / zoom}px`;
-      frame.style.transform = `scale(${(ctx.gridSize * zoom) / L})`;
-    } else {
-      // DM-screen fill path: same browser-style zoom, expressed in %.
-      frame.style.width = `${100 / zoom}%`;
-      frame.style.height = `${100 / zoom}%`;
-      frame.style.transform = `scale(${zoom})`;
-    }
+    frame.style.width = `${100 / zoom}%`;
+    frame.style.height = `${100 / zoom}%`;
+    frame.style.transform = `scale(${zoom})`;
     wrap.appendChild(frame);
 
     // Pop-out fallback for sites that refuse embedding.

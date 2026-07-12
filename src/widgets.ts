@@ -90,6 +90,30 @@ export function attachInteractions(node: HTMLElement, widget: Widget): void {
   }
 }
 
+/** Convert `#rrggbb` + alpha (0–1) to an `rgba()` string. */
+function hexToRgba(hex: string, alpha: number): string {
+  const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex.trim());
+  if (!m) return `rgba(16, 18, 25, ${alpha})`;
+  return `rgba(${parseInt(m[1], 16)}, ${parseInt(m[2], 16)}, ${parseInt(m[3], 16)}, ${alpha})`;
+}
+
+/** Apply a tile's custom frame colour/opacity by overriding the panel-bg CSS
+ *  vars inline (the Subtle/Framed chromes read these). Cleared when the tile
+ *  uses the theme default, so it stays theme-aware unless explicitly overridden. */
+export function applyFrameStyle(el: HTMLElement, widget: Widget): void {
+  if (!widget.config.frameCustom) {
+    el.style.removeProperty("--bivouac-panel-bg");
+    el.style.removeProperty("--bivouac-panel-bg-strong");
+    return;
+  }
+  const color = typeof widget.config.frameColor === "string" ? widget.config.frameColor : "#101219";
+  const raw = Number(widget.config.frameOpacity);
+  const opacity = Number.isFinite(raw) ? Math.min(1, Math.max(0, raw)) : 0.4;
+  const bg = hexToRgba(color, opacity);
+  el.style.setProperty("--bivouac-panel-bg", bg);
+  el.style.setProperty("--bivouac-panel-bg-strong", bg);
+}
+
 function placeholder(icon: string, label: string): HTMLElement {
   const box = el("div", "bivouac-placeholder");
   box.appendChild(el("i", `bivouac-placeholder__icon ${icon}`));

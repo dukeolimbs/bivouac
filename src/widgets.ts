@@ -194,7 +194,6 @@ registerWidgetType({
     }
 
     const wrap = el("div", "bivouac-webview");
-    const zoomBox = el("div", "bivouac-webview__zoom");
     const frame = document.createElement("iframe");
     frame.className = "bivouac-webview__frame";
     frame.src = url;
@@ -202,45 +201,32 @@ registerWidgetType({
     frame.setAttribute("referrerpolicy", "no-referrer");
     frame.setAttribute("loading", "lazy");
 
-    // Consistent content scale: the iframe renders at a logical resolution based
-    // on the widget's square count, then scales to fit. Same square-aspect → same
-    // content magnification, independent of absolute pixel size.
+    // Content zoom (config.zoom, default 1) as a *browser-style* zoom: the iframe
+    // ALWAYS fills the whole tile, and zoom changes its logical VIEWPORT — higher
+    // zoom → smaller viewport → content appears bigger; lower → larger viewport →
+    // more of the page shown. So content scales gracefully and covers the tile at
+    // every zoom: no cropping (the earlier "magnify on a wrapper" cut content off)
+    // and no gaps. The iframe rendering at a logical resolution (L px/square, then
+    // scaled to fit) keeps magnification consistent regardless of pixel size.
     //
-    // Content zoom (config.zoom, default 1) — and the LegendKeeper invariant:
-    // embedded apps like LK only stay healthy when the *iframe itself* matches
-    // the known-good baseline (viewport gw·L, own transform scale(gs/L)). A
-    // changing transform on an ANCESTOR is fine — that's exactly how map zoom
-    // works, on .bivouac-scaler. So for zoom ≥ 1 we keep the iframe byte-
-    // identical to the baseline and magnify on the .bivouac-webview__zoom
-    // wrapper (crop-to-fill). Only zoom < 1 ("show more of the page") enlarges
-    // the iframe's logical viewport — a *larger* viewport is LK-safe; a smaller
-    // one is what used to crash it (`useMapContext … MapScope`).
+    // LegendKeeper invariant: the iframe's own transform is CONSTANT for a given
+    // config (gs, zoom are constant); the per-frame map zoom rides the
+    // .bivouac-scaler ANCESTOR. LK only ever broke on a *per-frame-changing*
+    // iframe transform — a constant one (even magnifying) is fine.
     const zoom = Number(ctx.widget.config.zoom) || 1;
     const L = WEBVIEW.logicalPerSquare;
+    frame.style.transformOrigin = "0 0";
     if (!ctx.fillContainer) {
-      frame.style.transformOrigin = "0 0";
-      if (zoom < 1) {
-        frame.style.width = `${(ctx.widget.cell.gw * L) / zoom}px`;
-        frame.style.height = `${(ctx.widget.cell.gh * L) / zoom}px`;
-        frame.style.transform = `scale(${(ctx.gridSize * zoom) / L})`;
-      } else {
-        frame.style.width = `${ctx.widget.cell.gw * L}px`;
-        frame.style.height = `${ctx.widget.cell.gh * L}px`;
-        frame.style.transform = `scale(${ctx.gridSize / L})`;
-        if (zoom > 1) zoomBox.style.transform = `scale(${zoom})`;
-      }
-    } else if (zoom < 1) {
-      // DM-screen fill: a bigger viewport shows more of the page.
-      frame.style.transformOrigin = "0 0";
+      frame.style.width = `${(ctx.widget.cell.gw * L) / zoom}px`;
+      frame.style.height = `${(ctx.widget.cell.gh * L) / zoom}px`;
+      frame.style.transform = `scale(${(ctx.gridSize * zoom) / L})`;
+    } else {
+      // DM-screen fill path: same browser-style zoom, expressed in %.
       frame.style.width = `${100 / zoom}%`;
       frame.style.height = `${100 / zoom}%`;
       frame.style.transform = `scale(${zoom})`;
-    } else if (zoom > 1) {
-      // DM-screen fill: iframe fills 100% (baseline); magnify on the wrapper.
-      zoomBox.style.transform = `scale(${zoom})`;
     }
-    zoomBox.appendChild(frame);
-    wrap.appendChild(zoomBox);
+    wrap.appendChild(frame);
 
     // Pop-out fallback for sites that refuse embedding.
     const popout = el("button", "bivouac-webview__popout");

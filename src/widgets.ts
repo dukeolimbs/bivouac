@@ -105,6 +105,24 @@ function hostOf(url: string): string {
   }
 }
 
+/** Enrich note HTML with Foundry's text enrichers (document @UUID links, inline
+ *  [[/roll]]s, content links, etc.) and swap the result into the box. Clickable
+ *  links/rolls work via Foundry's global delegated handlers on the document.
+ *  Async, so the caller shows the raw HTML first; falls back to it on error. */
+async function enrichNote(box: HTMLElement, html: string): Promise<void> {
+  const TE = (foundry.applications?.ux?.TextEditor?.implementation ??
+    foundry.applications?.ux?.TextEditor ??
+    (globalThis as { TextEditor?: unknown }).TextEditor) as
+    | { enrichHTML?: (h: string, o?: object) => Promise<string> }
+    | undefined;
+  if (!TE?.enrichHTML) return;
+  try {
+    box.innerHTML = await TE.enrichHTML(html, { secrets: !!game.user?.isGM });
+  } catch {
+    /* keep the raw-HTML fallback the caller already set */
+  }
+}
+
 /* -------------------------------------------- webview ------------------- */
 
 registerWidgetType({
@@ -207,12 +225,14 @@ registerWidgetType({
     const html = String(ctx.widget.config.html ?? "").trim();
     if (!html) return placeholder("fa-solid fa-scroll", game.i18n.localize("BIVOUAC.Widgets.Note.Empty"));
     const box = el("div", "bivouac-note");
-    // GM-authored content; rendered as-is for MVP (enrichment comes later).
-    // Fills its container (the .bivouac-scaler for landing widgets, or the card
+    // Fills its container (the .bivouac-scaler for landing tiles, or the card
     // for DM screen); zoom scaling is handled by that ancestor. On the landing
     // board the font scales with the tile size (cqmin) × this per-tile multiplier.
-    box.innerHTML = html;
     box.style.setProperty("--bivouac-note-scale", String(Number(ctx.widget.config.textScale) || 1));
+    // Show the raw HTML immediately, then enrich (document links, inline rolls,
+    // etc.) asynchronously and swap it in.
+    box.innerHTML = html;
+    void enrichNote(box, html);
     return box;
   },
 });

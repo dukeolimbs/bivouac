@@ -69,7 +69,7 @@
       "TargetUuid": "Target UUID",
       "TargetUuidPlaceholder": "Actor.xx…  /  JournalEntry.xx…  /  Macro.xx…",
       "Html": "Content",
-      "HtmlPlaceholder": "Notes, rules, HTML…",
+      "HtmlPlaceholder": "HTML, @UUID[…] links, [[/r 1d20]] rolls…",
       "NoteTextSize": "Text size",
       "NoteTextSizeHint": "Text size for this note, relative to the tile (1 = default; the note also scales with the tile's size)."
     },

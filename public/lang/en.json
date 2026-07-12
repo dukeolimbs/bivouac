@@ -46,6 +46,10 @@
       "Unknown": "Unknown tile: {type}"
     },
     "Config": {
+      "Section_General": "General",
+      "Section_Content": "Content",
+      "Section_Frame": "Frame",
+      "Section_Background": "Background",
       "Title": "Title",
       "TitlePlaceholder": "Optional label (shown in edit mode)",
       "Scope": "Visibility",

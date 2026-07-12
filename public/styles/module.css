@@ -517,6 +517,12 @@
 
 /* ---------------------------------------------------------------- config */
 
+/* Config dialog: scrollable within a (resizable) window. */
+.bivouac-config {
+  max-height: 68vh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
 .bivouac-config .form-group {
   margin: 6px 0;
 }
@@ -524,6 +530,22 @@
   width: 100%;
   resize: vertical;
   font-family: var(--font-mono, monospace);
+}
+/* Categorised sections. */
+.bivouac-config__section {
+  border: 1px solid var(--bivouac-panel-border);
+  border-radius: 6px;
+  padding: 4px 10px 8px;
+  margin: 0 0 10px;
+  min-width: 0;
+}
+.bivouac-config__section > legend {
+  padding: 0 6px;
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.7;
 }
 .bivouac-pick-hint {
   margin: 0 0 8px;

@@ -236,11 +236,10 @@ class WorldLayer {
 
   #buildWidget(widget: Widget, extra: { gs: number; isGM: boolean; lod: boolean }): HTMLElement {
     const el = document.createElement("div");
-    el.className = `bivouac-widget bivouac-frame-${frameOf(widget)} bivouac-bg-${backgroundOf(widget)}`;
+    el.className = "bivouac-widget";
     el.dataset.id = widget.id;
     if (widget.scope === "dm") el.classList.add("bivouac-dm-scope");
-    applyFrameStyle(el, widget);
-    applyBackground(el, widget);
+    this.#applyTileStyle(el, widget);
 
     // Click anywhere on a widget (except its buttons) to select it; the
     // header/resize drag path selects too (it stops propagation before this).
@@ -268,7 +267,11 @@ class WorldLayer {
         // Save. Also re-read the live cell at save time in case it moved while
         // the dialog was open.
         const current = this.#readWidget(widget.id) ?? widget;
-        openWidgetConfig(current, (updated) => this.#saveConfigured(widget.id, updated));
+        openWidgetConfig(
+          current,
+          (updated) => this.#saveConfigured(widget.id, updated),
+          (updated) => this.previewStyle(updated),
+        );
       }));
       header.appendChild(this.#iconButton("fa-solid fa-clone", "BIVOUAC.Edit.Duplicate", (e) => {
         e.stopPropagation();
@@ -312,6 +315,32 @@ class WorldLayer {
       el.appendChild(handle);
     }
     return el;
+  }
+
+  /** Apply a tile's STYLE in place: frame/background classes + colour vars +
+   *  (edit-mode) header title text. No rebuild — cheap, and never reloads a web
+   *  view iframe. Used by the builder and by live config preview. */
+  #applyTileStyle(el: HTMLElement, widget: Widget): void {
+    el.classList.remove(
+      "bivouac-frame-none", "bivouac-frame-subtle", "bivouac-frame-framed",
+      "bivouac-bg-none", "bivouac-bg-solid", "bivouac-bg-frosted", "bivouac-bg-gradient",
+    );
+    el.classList.add(`bivouac-frame-${frameOf(widget)}`, `bivouac-bg-${backgroundOf(widget)}`);
+    applyFrameStyle(el, widget);
+    applyBackground(el, widget);
+    const titleEl = el.querySelector(".bivouac-widget__title");
+    if (titleEl) {
+      const def = getWidgetType(widget.type);
+      titleEl.textContent = widget.title || (def ? game.i18n.localize(def.label) : widget.type);
+    }
+  }
+
+  /** Live-preview a tile's style (frame/background/colour/opacity/title) from a
+   *  config dialog, in place and WITHOUT touching the layout. Content changes
+   *  (url / note text / image / zoom) are not previewed — they commit on Save. */
+  previewStyle(widget: Widget): void {
+    const rec = this.#rendered.get(widget.id);
+    if (rec) this.#applyTileStyle(rec.el, widget);
   }
 
   #unknown(type: string): HTMLElement {

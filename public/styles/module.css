@@ -484,6 +484,109 @@
   background: color-mix(in srgb, var(--bivouac-accent) 40%, transparent);
 }
 
+/* ------------------------------------------- card collection ------------ */
+.bivouac-cards {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+.bivouac-cards--dropok {
+  outline: 2px dashed var(--bivouac-accent);
+  outline-offset: -4px;
+}
+.bivouac-cards__hand {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+/* A single card — playing-card aspect, image art + name banner. */
+.bivouac-cards__card {
+  position: relative;
+  aspect-ratio: 5 / 7;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--bivouac-panel-border);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+  background: #0b0d13;
+  transition: transform 140ms ease, box-shadow 140ms ease;
+}
+.bivouac-cards__art {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.bivouac-cards__name {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 3px 6px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.78));
+  color: #fff;
+  font-weight: 600;
+  font-size: 11px;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bivouac-cards__remove {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 18px;
+  height: 18px;
+  line-height: 1;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.bivouac-cards__card:hover .bivouac-cards__remove {
+  opacity: 1;
+}
+/* Row: overlapping horizontal spread. Grid: wrapped. */
+.bivouac-cards--row .bivouac-cards__hand,
+.bivouac-cards--grid .bivouac-cards__hand {
+  gap: 6px;
+  padding: 6px;
+}
+.bivouac-cards--row .bivouac-cards__card {
+  height: 82%;
+  margin-inline: -3%; /* slight overlap */
+}
+.bivouac-cards--grid .bivouac-cards__hand {
+  flex-wrap: wrap;
+  align-content: center;
+}
+.bivouac-cards--grid .bivouac-cards__card {
+  height: 46%;
+}
+.bivouac-cards--row .bivouac-cards__card:hover,
+.bivouac-cards--grid .bivouac-cards__card:hover {
+  transform: translateY(-6%) scale(1.04);
+  z-index: 999;
+}
+/* Fan: cards arc out from the bottom centre (transforms set per-card in JS). */
+.bivouac-cards--fan .bivouac-cards__card {
+  position: absolute;
+  bottom: 6%;
+  left: 50%;
+  height: 80%;
+  transform: translateX(calc(-50% + var(--card-x, 0%))) rotate(var(--card-angle, 0deg));
+  transform-origin: bottom center;
+}
+.bivouac-cards--fan .bivouac-cards__card:hover {
+  transform: translateX(calc(-50% + var(--card-x, 0%))) rotate(var(--card-angle, 0deg)) translateY(-10%);
+  z-index: 999 !important;
+}
+
 .bivouac-placeholder {
   height: 100%;
   display: flex;

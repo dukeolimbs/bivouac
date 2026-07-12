@@ -114,11 +114,38 @@ class WorldLayer {
 
     const world = document.createElement("div");
     world.id = "bivouac-world";
+    // Card-collection tiles emit this when an Actor/Item is dropped on them or a
+    // card is removed; persist it to the layout.
+    world.addEventListener("bivouac-card-op", (e) => void this.#cardOp(e as CustomEvent));
     overlay.appendChild(world);
     iface.appendChild(overlay);
 
     this.#overlay = overlay;
     this.#world = world;
+  }
+
+  async #cardOp(e: CustomEvent<{ id?: string; op?: string; uuid?: string }>): Promise<void> {
+    if (!game.user?.isGM) return;
+    const { id, op, uuid } = e.detail ?? {};
+    if (!id || !uuid) return;
+    const scene = activeLandingScene();
+    if (!scene) return;
+    const layout = readLayout(scene);
+    const w = layout.widgets.find((x) => x.id === id);
+    if (!w) return;
+    const cur = Array.isArray(w.config.uuids) ? (w.config.uuids as string[]).slice() : [];
+    if (op === "add") {
+      if (cur.includes(uuid)) return;
+      cur.push(uuid);
+    } else if (op === "remove") {
+      const idx = cur.indexOf(uuid);
+      if (idx < 0) return;
+      cur.splice(idx, 1);
+    } else {
+      return;
+    }
+    w.config = { ...w.config, uuids: cur };
+    await writeLayout(scene, layout);
   }
 
   /** Handle a document dropped on the scene canvas (via the `dropCanvasData`

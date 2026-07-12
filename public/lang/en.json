@@ -47,6 +47,11 @@
       "Journal": { "Label": "Journal" },
       "Table": { "Label": "Rollable table", "Roll": "Roll" },
       "Macro": { "Label": "Macro" },
+      "Cards": {
+        "Label": "Card collection",
+        "Empty": "Drop actors or items here to add cards.",
+        "Remove": "Remove card"
+      },
       "Unknown": "Unknown tile: {type}"
     },
     "Doc": {
@@ -105,6 +110,14 @@
       "JournalMode": "Display",
       "JournalInline": "Inline (show the page)",
       "JournalLink": "Link (open on click)",
+      "CardsLayout": "Layout",
+      "CardsLayout_fan": "Fan (hand of cards)",
+      "CardsLayout_row": "Row",
+      "CardsLayout_grid": "Grid",
+      "CardsArt": "Card art",
+      "CardsArt_portrait": "Portrait",
+      "CardsArt_token": "Token",
+      "CardsHint": "Drop actors or items onto this tile to add cards; a card opens its sheet (if you can). Remove via the × in edit mode.",
       "Html": "Content",
       "HtmlPlaceholder": "HTML, @UUID[…] links, [[/r 1d20]] rolls…",
       "HtmlHint": "Select text and press Ctrl/⌘+B, I or U to format it. Paste a link over selected text to turn it into a hyperlink.",

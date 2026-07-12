@@ -103,6 +103,26 @@ function buildForm(widget: Widget): string {
          </select>`));
       break;
     }
+    case "cards": {
+      const layouts: [string, string][] = [
+        ["fan", t("BIVOUAC.Config.CardsLayout_fan")],
+        ["row", t("BIVOUAC.Config.CardsLayout_row")],
+        ["grid", t("BIVOUAC.Config.CardsLayout_grid")],
+      ];
+      const curLayout = ["fan", "row", "grid"].includes(String(widget.config.layout)) ? String(widget.config.layout) : "fan";
+      content.push(group(t("BIVOUAC.Config.CardsLayout"),
+        `<select name="cardsLayout">${layouts
+          .map(([v, l]) => `<option value="${v}"${curLayout === v ? " selected" : ""}>${esc(l)}</option>`)
+          .join("")}</select>`));
+      const curArt = widget.config.art === "token" ? "token" : "portrait";
+      content.push(group(t("BIVOUAC.Config.CardsArt"),
+        `<select name="cardsArt">
+           <option value="portrait"${curArt === "portrait" ? " selected" : ""}>${esc(t("BIVOUAC.Config.CardsArt_portrait"))}</option>
+           <option value="token"${curArt === "token" ? " selected" : ""}>${esc(t("BIVOUAC.Config.CardsArt_token"))}</option>
+         </select>` +
+          `<p class="bivouac-config__hint">${esc(t("BIVOUAC.Config.CardsHint"))}</p>`));
+      break;
+    }
   }
 
   // ---- Frame (border) axis -------------------------------------------------
@@ -213,6 +233,10 @@ function applyForm(widget: Widget, data: Record<string, string>): Widget {
     case "journal":
       updated.config.uuid = data.uuid?.trim() ?? "";
       updated.config.journalMode = data.journalMode === "link" ? "link" : "inline";
+      break;
+    case "cards":
+      updated.config.layout = ["fan", "row", "grid"].includes(data.cardsLayout) ? data.cardsLayout : "fan";
+      updated.config.art = data.cardsArt === "token" ? "token" : "portrait";
       break;
   }
   return updated;

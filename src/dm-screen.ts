@@ -303,9 +303,35 @@ class DMScreen {
     });
     drawer.appendChild(body);
 
+    // Card-collection cards emit this on add/remove; persist to the DM layout.
+    drawer.addEventListener("bivouac-card-op", (e) => void this.#cardOp(e as CustomEvent));
+
     iface.appendChild(drawer);
     this.#el = drawer;
     this.#applyDockClass(); // position it at the configured edge before it opens
+  }
+
+  async #cardOp(e: CustomEvent<{ id?: string; op?: string; uuid?: string }>): Promise<void> {
+    if (!game.user?.isGM) return;
+    const { id, op, uuid } = e.detail ?? {};
+    if (!id || !uuid) return;
+    const layout = readDMLayout();
+    const w = layout.widgets.find((x) => x.id === id);
+    if (!w) return;
+    const cur = Array.isArray(w.config.uuids) ? (w.config.uuids as string[]).slice() : [];
+    if (op === "add") {
+      if (cur.includes(uuid)) return;
+      cur.push(uuid);
+    } else if (op === "remove") {
+      const idx = cur.indexOf(uuid);
+      if (idx < 0) return;
+      cur.splice(idx, 1);
+    } else {
+      return;
+    }
+    w.config = { ...w.config, uuids: cur };
+    await writeDMLayout(layout);
+    this.render();
   }
 
   async #onDocDrop(event: DragEvent): Promise<void> {

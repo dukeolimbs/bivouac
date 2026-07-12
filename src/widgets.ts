@@ -9,6 +9,7 @@ import {
   type WidgetInteraction,
   type WidgetType,
 } from "./constants";
+import { isDocDrag, parseDrop } from "./drop";
 
 export interface RenderContext {
   widget: Widget;
@@ -507,6 +508,100 @@ registerWidgetType({
       }
       host.replaceChildren(box);
     });
+  },
+});
+
+/* -------------------------------------------- card collection ----------- */
+
+/** Fanned-hand transform per card (fan layout only), spread by count. */
+function applyFan(cards: HTMLElement[]): void {
+  const n = cards.length;
+  cards.forEach((c, i) => {
+    const t = n > 1 ? i / (n - 1) - 0.5 : 0; // -0.5 … 0.5
+    c.style.setProperty("--card-angle", `${(t * Math.min(48, n * 10)).toFixed(2)}deg`);
+    c.style.setProperty("--card-x", `${(t * Math.min(80, n * 18)).toFixed(1)}%`);
+    c.style.zIndex = String(i + 1);
+  });
+}
+
+/** A collection of documents shown as a hand of cards (fan / row / grid). Drop
+ *  Actors or Items onto it to add them; a card opens its sheet (if permitted).
+ *  Card add/remove is dispatched as a bubbling `bivouac-card-op` event the host
+ *  surface (world layer / DM screen) persists. */
+registerWidgetType({
+  type: "cards",
+  label: "BIVOUAC.Widgets.Cards.Label",
+  icon: "fa-solid fa-id-badge",
+  defaultConfig: () => ({ uuids: [], layout: "fan", art: "portrait" }),
+  renderBody(ctx) {
+    const layout = ["fan", "row", "grid"].includes(String(ctx.widget.config.layout))
+      ? String(ctx.widget.config.layout)
+      : "fan";
+    const art = ctx.widget.config.art === "token" ? "token" : "portrait";
+    const wrap = el("div", `bivouac-cards bivouac-cards--${layout}`);
+    const emit = (op: string, uuid: string): void => {
+      wrap.dispatchEvent(new CustomEvent("bivouac-card-op", { bubbles: true, detail: { id: ctx.widget.id, op, uuid } }));
+    };
+
+    // Drop Actors / Items onto the collection to add them (GM).
+    wrap.addEventListener("dragover", (e) => {
+      if (!game.user?.isGM || !isDocDrag(e)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+      wrap.classList.add("bivouac-cards--dropok");
+    });
+    wrap.addEventListener("dragleave", () => wrap.classList.remove("bivouac-cards--dropok"));
+    wrap.addEventListener("drop", (e) => {
+      wrap.classList.remove("bivouac-cards--dropok");
+      if (!game.user?.isGM) return;
+      const data = parseDrop(e);
+      if (!data || (data.type !== "Actor" && data.type !== "Item")) return;
+      e.preventDefault();
+      e.stopPropagation(); // handled here — don't create/relocate a tile
+      emit("add", data.uuid);
+    });
+
+    const uuids = Array.isArray(ctx.widget.config.uuids) ? (ctx.widget.config.uuids as string[]) : [];
+    if (!uuids.length) {
+      wrap.appendChild(placeholder("fa-solid fa-id-badge", game.i18n.localize("BIVOUAC.Widgets.Cards.Empty")));
+      return wrap;
+    }
+    const hand = el("div", "bivouac-cards__hand");
+    wrap.appendChild(hand);
+    void (async () => {
+      const built: HTMLElement[] = [];
+      for (const uuid of uuids) {
+        const doc = (await fromUuid(uuid).catch(() => null)) as Record<string, unknown> | null;
+        if (!doc || !canView(doc)) continue;
+        const card = el("div", "bivouac-cards__card");
+        const img = document.createElement("img");
+        img.className = "bivouac-cards__art";
+        const token = (doc.prototypeToken as { texture?: { src?: string } } | undefined)?.texture?.src;
+        img.src = (art === "token" ? token || (doc.img as string) : (doc.img as string)) || "icons/svg/mystery-man.svg";
+        img.alt = String(doc.name ?? "");
+        card.appendChild(img);
+        card.appendChild(el("span", "bivouac-cards__name", String(doc.name ?? "")));
+        if (ctx.editMode) {
+          const rm = el("button", "bivouac-cards__remove");
+          rm.type = "button";
+          rm.title = game.i18n.localize("BIVOUAC.Widgets.Cards.Remove");
+          rm.textContent = "×";
+          rm.addEventListener("click", (e) => {
+            e.stopPropagation();
+            emit("remove", uuid);
+          });
+          card.appendChild(rm);
+        } else {
+          card.classList.add("bivouac-interactive");
+          card.addEventListener("click", () => (doc.sheet as { render?: (b: boolean) => void })?.render?.(true));
+        }
+        built.push(card);
+      }
+      hand.replaceChildren(...built);
+      if (layout === "fan") applyFan(built);
+    })();
+    return wrap;
   },
 });
 

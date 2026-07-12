@@ -262,6 +262,12 @@
   background: #fff;
   display: block;
 }
+/* While editing, don't let a live web view swallow the pointer — so you can
+   drag / select / right-drag-pan over it. (In view mode it stays interactive,
+   and a cross-origin iframe then captures its own mouse/wheel events.) */
+#bivouac-overlay.bivouac-edit .bivouac-webview__frame {
+  pointer-events: none;
+}
 .bivouac-webview__popout {
   position: absolute;
   top: 6px;

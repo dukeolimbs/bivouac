@@ -644,49 +644,53 @@ class WorldLayer {
     document.addEventListener("pointerup", onUp, true);
   }
 
-  /** Wheel over a tile that consumes scroll (a web view, or a note tall enough
-   *  to scroll) scrolls that content instead of zooming the map; over any other
-   *  tile we forward the wheel to the canvas so Foundry zooms (toward the
-   *  cursor). Over empty canvas we don't interfere — Foundry zooms natively. */
+  /** Wheel over a tile that consumes scroll (a note tall enough to scroll)
+   *  scrolls that content instead of zooming the map; over any other tile we
+   *  zoom the map ourselves (toward the cursor). **Ctrl/⌘ + wheel always zooms**
+   *  the map, overriding content scroll. Over empty canvas we don't interfere —
+   *  Foundry zooms natively. (Cross-origin web views capture their own wheel
+   *  events, so those never reach here — the iframe scrolls itself.) */
   #onWheel = (event: WheelEvent): void => {
     if (!this.#overlay) return;
     const target = event.target;
     if (!(target instanceof HTMLElement)) return;
     if (!target.closest(".bivouac-widget")) return; // empty canvas / UI → native zoom
 
-    if (target.closest(".bivouac-webview")) {
-      event.stopPropagation(); // let the iframe scroll; block map zoom
-      return;
-    }
-    const note = target.closest(".bivouac-note");
-    if (note instanceof HTMLElement && note.scrollHeight - note.clientHeight > 1) {
-      event.stopPropagation(); // let the note scroll
-      return;
+    if (!(event.ctrlKey || event.metaKey)) {
+      if (target.closest(".bivouac-webview")) {
+        event.stopPropagation(); // let the web view scroll; block map zoom
+        return;
+      }
+      const note = target.closest(".bivouac-note");
+      if (note instanceof HTMLElement && note.scrollHeight - note.clientHeight > 1) {
+        event.stopPropagation(); // let the note scroll
+        return;
+      }
     }
 
-    // Non-scrolling tile → forward the wheel to the canvas for a native zoom.
+    // Zoom the map ourselves, anchored at the cursor.
     event.preventDefault();
     event.stopPropagation();
-    const view = canvas?.app?.view ?? canvas?.app?.canvas ?? document.getElementById("board");
-    if (view instanceof HTMLElement || view instanceof HTMLCanvasElement) {
-      view.dispatchEvent(
-        new WheelEvent("wheel", {
-          deltaX: event.deltaX,
-          deltaY: event.deltaY,
-          deltaZ: event.deltaZ,
-          deltaMode: event.deltaMode,
-          clientX: event.clientX,
-          clientY: event.clientY,
-          ctrlKey: event.ctrlKey,
-          shiftKey: event.shiftKey,
-          altKey: event.altKey,
-          metaKey: event.metaKey,
-          bubbles: true,
-          cancelable: true,
-        }),
-      );
-    }
+    this.#zoomAt(event.deltaY, event.clientX, event.clientY);
   };
+
+  /** Zoom the canvas toward a client point (keeps the world point under the
+   *  cursor fixed), matching Foundry's own wheel-zoom feel. */
+  #zoomAt(deltaY: number, clientX: number, clientY: number): void {
+    const stage = canvas?.stage;
+    const view = canvas?.app?.view ?? canvas?.app?.canvas;
+    if (!stage || !(view instanceof HTMLElement || view instanceof HTMLCanvasElement)) return;
+    const cur = stage.scale.x || 1;
+    const next = Math.max(0.05, Math.min(3, cur * (deltaY < 0 ? 1.1 : 1 / 1.1)));
+    if (Math.abs(next - cur) < 1e-4) return;
+    const p = canvas.canvasCoordinatesFromClient({ x: clientX, y: clientY });
+    const r = view.getBoundingClientRect();
+    canvas.pan({
+      x: p.x - (clientX - (r.left + r.width / 2)) / next,
+      y: p.y - (clientY - (r.top + r.height / 2)) / next,
+      scale: next,
+    });
+  }
 
   /** Pan/zoom the canvas to frame all tiles (toolbar "Fit"). */
   fitToTiles(): void {

@@ -446,26 +446,38 @@ class DMScreen {
       header.appendChild(this.#toolButton("fa-solid fa-trash", "BIVOUAC.Edit.Delete", () => void this.#delete(widget.id)));
       el.appendChild(header);
 
-      // Four-zone drop: left/right joins the target's row (max MAX_ROW) — a bar on the
-      // card edge; top/bottom makes a new row — a full-width line across the row
-      // (drawn on the row element, so it spans the whole horizontal axis).
-      el.addEventListener("dragover", (e) => {
-        if (!this.#dragId) return;
-        e.preventDefault();
-        const zone = this.#zoneFor(e, el, widget.id);
-        this.#clearDropMarks();
-        const mark = zone === "left" || zone === "right" ? el : el.parentElement;
-        mark?.classList.add(`bivouac-drop-${zone}`);
-        el.dataset.dropZone = zone;
-      });
-      el.addEventListener("dragleave", () => this.#clearDropMarks());
-      el.addEventListener("drop", (e) => {
-        e.preventDefault();
-        const zone = el.dataset.dropZone ?? "bottom";
-        this.#clearDropMarks();
-        if (this.#dragId) void this.#drop(this.#dragId, widget.id, zone);
-      });
     }
+
+    // Drop target for BOTH internal card reorder (edit mode) and EXTERNAL
+    // document drops (GM, any mode). Four-zone placement: left/right joins the
+    // target's row (max MAX_ROW) — a bar on the card edge; top/bottom makes a new
+    // row — a full-width line across the row. So dragging an Actor onto a card
+    // lands it beside/above/below that card, not just at the bottom.
+    el.addEventListener("dragover", (e) => {
+      const external = !this.#dragId && !!game.user?.isGM && isDocDrag(e);
+      if (!this.#dragId && !external) return;
+      e.preventDefault();
+      if (external && e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+      const zone = this.#zoneFor(e, el, widget.id);
+      this.#clearDropMarks();
+      const mark = zone === "left" || zone === "right" ? el : el.parentElement;
+      mark?.classList.add(`bivouac-drop-${zone}`);
+      el.dataset.dropZone = zone;
+    });
+    el.addEventListener("dragleave", () => this.#clearDropMarks());
+    el.addEventListener("drop", (e) => {
+      const zone = el.dataset.dropZone ?? "bottom";
+      this.#clearDropMarks();
+      if (this.#dragId) {
+        e.preventDefault();
+        void this.#drop(this.#dragId, widget.id, zone);
+        return;
+      }
+      if (!game.user?.isGM) return;
+      e.preventDefault();
+      e.stopPropagation(); // handled here — don't also let the body append to the bottom
+      void this.#onDocDropAt(e, widget.id, zone);
+    });
 
     const def = getWidgetType(widget.type);
     const bodyBox = document.createElement("div");
@@ -631,8 +643,14 @@ class DMScreen {
       )
       .filter((row) => row.length);
     if (!dragged) return;
+    this.#insertAtZone(rows, dragged, targetId, zone);
+    await this.#applyRows(rows);
+  }
 
-    // Locate the target after removal.
+  /** Insert `widget` relative to the target card per drop zone: left/right into
+   *  the target's row (max MAX_ROW), top/bottom as a new row above/below. Shared
+   *  by internal reorder (#drop) and external document drops (#onDocDropAt). */
+  #insertAtZone(rows: Widget[][], widget: Widget, targetId: string, zone: string): void {
     let ti = -1;
     let tj = -1;
     rows.forEach((row, i) =>
@@ -644,14 +662,26 @@ class DMScreen {
       }),
     );
     if (ti < 0) {
-      rows.push([dragged]); // target vanished — append as a new row
+      rows.push([widget]); // target vanished — append as a new row
     } else if ((zone === "left" || zone === "right") && rows[ti].length < MAX_ROW) {
-      rows[ti].splice(zone === "left" ? tj : tj + 1, 0, dragged);
+      rows[ti].splice(zone === "left" ? tj : tj + 1, 0, widget);
     } else if (zone === "top") {
-      rows.splice(ti, 0, [dragged]);
+      rows.splice(ti, 0, [widget]);
     } else {
-      rows.splice(ti + 1, 0, [dragged]); // bottom, or a full row → new row below
+      rows.splice(ti + 1, 0, [widget]); // bottom, or a full row → new row below
     }
+  }
+
+  /** Build a tile from a document dropped onto a specific card, and place it at
+   *  that card's zone (left/right join its row, top/bottom new row above/below). */
+  async #onDocDropAt(event: DragEvent, targetId: string, zone: string): Promise<void> {
+    if (!game.user?.isGM) return;
+    const data = parseDrop(event);
+    if (!data) return;
+    const widget = await widgetFromDrop(data, 0, 0);
+    if (!widget) return;
+    const rows = this.#currentRows();
+    this.#insertAtZone(rows, widget, targetId, zone);
     await this.#applyRows(rows);
   }
 }

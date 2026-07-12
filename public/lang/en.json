@@ -87,6 +87,7 @@
       "TargetUuidPlaceholder": "Actor.xx…  /  JournalEntry.xx…  /  Macro.xx…",
       "Html": "Content",
       "HtmlPlaceholder": "HTML, @UUID[…] links, [[/r 1d20]] rolls…",
+      "HtmlHint": "Select text and press Ctrl/⌘+B, I or U to format it. Paste a link over selected text to turn it into a hyperlink.",
       "NoteTextSize": "Text size",
       "NoteTextSizeHint": "Text size for this note, relative to the tile (1 = default; the note also scales with the tile's size)."
     },

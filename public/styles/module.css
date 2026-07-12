@@ -558,6 +558,14 @@
   opacity: 0.8;
   font-variant-numeric: tabular-nums;
 }
+/* Helper text under a field (e.g. the note editor's formatting shortcuts). */
+.bivouac-config__hint {
+  flex-basis: 100%;
+  margin: 4px 0 0;
+  font-size: 11px;
+  line-height: 1.35;
+  opacity: 0.65;
+}
 .bivouac-pick-hint {
   margin: 0 0 8px;
   opacity: 0.8;

@@ -70,7 +70,8 @@ function buildForm(widget: Widget): string {
     }
     case "note":
       content.push(group(t("BIVOUAC.Config.Html"),
-        `<textarea name="html" rows="6" placeholder="${esc(t("BIVOUAC.Config.HtmlPlaceholder"))}">${esc(widget.config.html ?? "")}</textarea>`));
+        `<textarea name="html" rows="6" placeholder="${esc(t("BIVOUAC.Config.HtmlPlaceholder"))}">${esc(widget.config.html ?? "")}</textarea>` +
+          `<p class="bivouac-config__hint">${esc(t("BIVOUAC.Config.HtmlHint"))}</p>`));
       content.push(group(t("BIVOUAC.Config.NoteTextSize"),
         `<input type="number" name="textScale" value="${esc(Number(widget.config.textScale) || 1)}" min="0.5" max="3" step="0.1" title="${esc(t("BIVOUAC.Config.NoteTextSizeHint"))}">`));
       break;
@@ -174,6 +175,58 @@ function applyForm(widget: Widget, data: Record<string, string>): Widget {
   return updated;
 }
 
+/** Insert `text` at the textarea's selection, preferring execCommand so the
+ *  textarea keeps its native undo stack; falls back to setRangeText. */
+function insertText(ta: HTMLTextAreaElement, text: string): void {
+  ta.focus();
+  try {
+    if (document.execCommand("insertText", false, text)) return;
+  } catch {
+    /* execCommand unavailable — fall through */
+  }
+  const start = ta.selectionStart ?? ta.value.length;
+  const end = ta.selectionEnd ?? start;
+  ta.setRangeText(text, start, end, "end");
+  ta.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
+/** Wrap the current selection in `before`…`after`. With no selection, insert
+ *  the empty pair and park the caret between the tags. */
+function wrapSelection(ta: HTMLTextAreaElement, before: string, after: string): void {
+  const start = ta.selectionStart ?? 0;
+  const selected = ta.value.slice(start, ta.selectionEnd ?? start);
+  insertText(ta, before + selected + after);
+  const caret = selected ? start + before.length + selected.length + after.length : start + before.length;
+  ta.setSelectionRange(caret, caret);
+}
+
+/** A single-token http(s) URL with no whitespace. */
+function isBareUrl(s: string): boolean {
+  return /^https?:\/\/\S+$/i.test(s) && !/\s/.test(s);
+}
+
+/** Ctrl/⌘+B/I/U formatting + paste-a-URL-over-selection → hyperlink, on the
+ *  note editor's raw-HTML textarea. */
+function wireNoteEditor(form: HTMLFormElement): void {
+  const ta = form.querySelector('textarea[name="html"]') as HTMLTextAreaElement | null;
+  if (!ta) return;
+  const tags: Record<string, string> = { b: "strong", i: "em", u: "u" };
+  ta.addEventListener("keydown", (e: KeyboardEvent) => {
+    if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+    const tag = tags[e.key.toLowerCase()];
+    if (!tag) return;
+    e.preventDefault();
+    wrapSelection(ta, `<${tag}>`, `</${tag}>`);
+  });
+  ta.addEventListener("paste", (e: ClipboardEvent) => {
+    if ((ta.selectionStart ?? 0) === (ta.selectionEnd ?? 0)) return; // no selection → normal paste
+    const url = (e.clipboardData?.getData("text/plain") ?? "").trim();
+    if (!isBareUrl(url)) return; // not a bare URL → normal paste
+    e.preventDefault();
+    wrapSelection(ta, `<a href="${esc(url)}">`, "</a>");
+  });
+}
+
 /** While a config dialog is open, this holds its live-preview binding so the
  *  (once-registered) renderDialogV2 hook can wire input → preview. Only one
  *  config dialog is open at a time. */
@@ -186,6 +239,7 @@ function ensureLiveHook(): void {
     const root = html instanceof HTMLElement ? html : (html as { [0]?: HTMLElement } | null)?.[0];
     const form = root?.querySelector?.("form") as HTMLFormElement | null;
     if (!form || !form.querySelector(".bivouac-config")) return; // only our tile-config dialog
+    wireNoteEditor(form);
     const bind = activeLive;
     const onInput = (): void => {
       // Keep each slider's numeric readout in sync.

@@ -277,8 +277,22 @@
   overflow: visible;
 }
 .bivouac-webview__frame {
+  /* Absolutely positioned so a content-zoom width > 100% actually expands: an
+     in-flow (static) replaced element clamps its % width to the container (its
+     % height does not), which left "show more" (zoom < 1) filling full height
+     but only ~zoom× the width. Absolute positioning removes that flow
+     constraint so both axes scale the same. */
+  position: absolute;
+  top: 0;
+  left: 0;
   width: 100%;
   height: 100%;
+  /* Foundry's base CSS caps iframes at max-width:100%, which silently clamped a
+     content-zoom width > 100% back to the container (height had no such cap, so
+     it filled height but only ~zoom× the width). Lift both caps so the scaled
+     iframe can size past 100% and fill the tile. */
+  max-width: none;
+  max-height: none;
   border: 0;
   background: #fff;
   display: block;

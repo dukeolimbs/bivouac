@@ -87,11 +87,25 @@ function buildForm(widget: Widget): string {
     }
     case "actor":
     case "table":
-    case "macro":
       content.push(group(t("BIVOUAC.Config.LinkedDoc"),
         `<input type="text" name="uuid" value="${esc(widget.config.uuid ?? "")}" placeholder="${esc(t("BIVOUAC.Config.LinkedDocPlaceholder"))}">` +
           `<p class="bivouac-config__hint">${esc(t("BIVOUAC.Config.LinkedDocHint"))}</p>`));
       break;
+    case "macro": {
+      content.push(group(t("BIVOUAC.Config.LinkedDoc"),
+        `<input type="text" name="uuid" value="${esc(widget.config.uuid ?? "")}" placeholder="${esc(t("BIVOUAC.Config.LinkedDocPlaceholder"))}">`));
+      const showIcon = widget.config.showIcon !== false;
+      const showTitle = widget.config.showTitle !== false;
+      content.push(group(t("BIVOUAC.Config.MacroShowIcon"),
+        `<input type="checkbox" name="macroShowIcon"${showIcon ? " checked" : ""}>`));
+      content.push(group(t("BIVOUAC.Config.MacroIconSize"),
+        `<input type="number" name="macroIconSize" value="${esc(Number(widget.config.iconSize) || 48)}" min="16" max="256" step="1">`));
+      content.push(group(t("BIVOUAC.Config.MacroShowTitle"),
+        `<input type="checkbox" name="macroShowTitle"${showTitle ? " checked" : ""}>`));
+      content.push(group(t("BIVOUAC.Config.MacroTitleSize"),
+        `<input type="number" name="macroTitleSize" value="${esc(Number(widget.config.titleSize) || 14)}" min="8" max="48" step="1">`));
+      break;
+    }
     case "journal": {
       content.push(group(t("BIVOUAC.Config.LinkedDoc"),
         `<input type="text" name="uuid" value="${esc(widget.config.uuid ?? "")}" placeholder="${esc(t("BIVOUAC.Config.LinkedDocPlaceholder"))}">`));
@@ -237,9 +251,18 @@ function applyForm(widget: Widget, data: Record<string, string>): Widget {
     }
     case "actor":
     case "table":
-    case "macro":
       updated.config.uuid = data.uuid?.trim() ?? "";
       break;
+    case "macro": {
+      updated.config.uuid = data.uuid?.trim() ?? "";
+      updated.config.showIcon = data.macroShowIcon === "on";
+      updated.config.showTitle = data.macroShowTitle === "on";
+      const is = Number(data.macroIconSize);
+      updated.config.iconSize = Number.isFinite(is) ? Math.min(256, Math.max(16, is)) : 48;
+      const ts = Number(data.macroTitleSize);
+      updated.config.titleSize = Number.isFinite(ts) ? Math.min(48, Math.max(8, ts)) : 14;
+      break;
+    }
     case "journal":
       updated.config.uuid = data.uuid?.trim() ?? "";
       updated.config.journalMode = data.journalMode === "link" ? "link" : "inline";

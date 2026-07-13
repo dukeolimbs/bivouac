@@ -467,10 +467,7 @@
   overflow-wrap: anywhere;
 }
 .bivouac-macrotile__img {
-  width: 40%;
-  max-width: 96px;
-  aspect-ratio: 1;
-  object-fit: contain;
+  object-fit: contain; /* size (width/height) is set inline from config */
 }
 .bivouac-doctile__action {
   border: 1px solid var(--bivouac-panel-border);

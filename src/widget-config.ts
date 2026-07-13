@@ -150,6 +150,9 @@ function buildForm(widget: Widget): string {
       const showNames = widget.config.showNames !== false;
       content.push(group(t("BIVOUAC.Config.CardsShowNames"),
         `<input type="checkbox" name="cardsShowNames"${showNames ? " checked" : ""}>`));
+      const showAll = widget.config.showToAll === true;
+      content.push(group(t("BIVOUAC.Config.CardsShowAll"),
+        `<label class="bivouac-config__inline"><input type="checkbox" name="cardsShowAll"${showAll ? " checked" : ""}> ${esc(t("BIVOUAC.Config.CardsShowAllLabel"))}</label>`));
       const curCardFont = String(widget.config.nameFont ?? "");
       const cardFontOpts = [`<option value=""${curCardFont === "" ? " selected" : ""}>${esc(t("BIVOUAC.Config.NoteFontDefault"))}</option>`]
         .concat(availableFonts().map((f) => `<option value="${esc(f)}"${curCardFont === f ? " selected" : ""}>${esc(f)}</option>`))
@@ -305,6 +308,7 @@ function applyForm(widget: Widget, data: Record<string, string>): Widget {
       updated.config.layout = ["fan", "row", "grid"].includes(data.cardsLayout) ? data.cardsLayout : "fan";
       updated.config.art = data.cardsArt === "token" ? "token" : "portrait";
       updated.config.showNames = data.cardsShowNames === "on";
+      updated.config.showToAll = data.cardsShowAll === "on";
       updated.config.nameFont = typeof data.cardsNameFont === "string" ? data.cardsNameFont : "";
       const ns = Number(data.cardsNameSize);
       updated.config.nameSize = Number.isFinite(ns) ? Math.min(48, Math.max(6, ns)) : 12;

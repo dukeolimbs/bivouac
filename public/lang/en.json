@@ -125,6 +125,8 @@
       "CardsArt_portrait": "Portrait",
       "CardsArt_token": "Token",
       "CardsShowNames": "Show card names",
+      "CardsShowAll": "Card visibility",
+      "CardsShowAllLabel": "Show every card to all players (ignore ownership)",
       "CardsNameFont": "Name font",
       "CardsNameSize": "Name size (px)",
       "CardsRole": "Who can arrange this collection",

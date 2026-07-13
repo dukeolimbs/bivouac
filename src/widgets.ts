@@ -765,7 +765,7 @@ registerWidgetType({
   type: "cards",
   label: "BIVOUAC.Widgets.Cards.Label",
   icon: "fa-solid fa-id-badge",
-  defaultConfig: () => ({ cards: [], layout: "fan", art: "portrait", showNames: true, nameSize: 12, nameFont: "" }),
+  defaultConfig: () => ({ cards: [], layout: "fan", art: "portrait", showNames: true, nameSize: 12, nameFont: "", showToAll: false }),
   renderBody(ctx) {
     const cfg = ctx.widget.config;
     const layout = ["fan", "row", "grid"].includes(String(cfg.layout)) ? String(cfg.layout) : "fan";
@@ -773,6 +773,7 @@ registerWidgetType({
     const showNames = cfg.showNames !== false;
     const nameSize = Number(cfg.nameSize) || 12;
     const nameFont = String(cfg.nameFont ?? "");
+    const showToAll = cfg.showToAll === true; // reveal cards even to viewers who don't own the doc
     const control = cardsCanControl(cfg);
     const wrap = el("div", `bivouac-cards bivouac-cards--${layout}`);
     const emit = (op: string, detail: Record<string, unknown>): void => {
@@ -816,7 +817,7 @@ registerWidgetType({
       const built: HTMLElement[] = [];
       for (const entry of list) {
         const doc = (await fromUuid(entry.uuid).catch(() => null)) as Record<string, unknown> | null;
-        if (!doc || !canView(doc)) continue;
+        if (!doc || (!showToAll && !canView(doc))) continue;
         const card = el("div", "bivouac-cards__card");
         card.dataset.cid = entry.cid;
         const img = document.createElement("img");

@@ -616,14 +616,17 @@
   white-space: nowrap;
 }
 /* Remove (×) — a circular frosted-glass button (faked with a translucent light
-   fill + blur, so it reads frosted even without backdrop-filter support). Always
-   shown in edit mode (only rendered then). */
+   fill + blur). Shown only while hovering the card. The !important dimensions
+   override Foundry's default button min-height (which otherwise ovals it). */
 .bivouac-cards__remove {
   position: absolute;
   top: 5px;
   right: 5px;
-  width: 20px;
-  height: 20px;
+  box-sizing: border-box;
+  width: 20px !important;
+  height: 20px !important;
+  min-width: 20px !important;
+  min-height: 20px !important;
   padding: 0;
   display: flex;
   align-items: center;
@@ -639,7 +642,13 @@
   cursor: pointer;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(255, 255, 255, 0.08);
   z-index: 6;
-  transition: background 120ms ease, border-color 120ms ease, transform 120ms ease;
+  opacity: 0;
+  pointer-events: none;
+  transition: background 120ms ease, border-color 120ms ease, transform 120ms ease, opacity 120ms ease;
+}
+.bivouac-cards__card:hover .bivouac-cards__remove {
+  opacity: 1;
+  pointer-events: auto;
 }
 .bivouac-cards__remove:hover {
   background: rgba(255, 255, 255, 0.3);

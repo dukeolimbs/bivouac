@@ -819,9 +819,12 @@ registerWidgetType({
     wrap.appendChild(hand);
     void (async () => {
       const built: HTMLElement[] = [];
+      // Controllers (and "show to all") see every card so they can arrange the
+      // whole collection; otherwise a viewer only sees cards they can view.
+      const seeAll = showToAll || control;
       for (const entry of list) {
         const doc = (await fromUuid(entry.uuid).catch(() => null)) as Record<string, unknown> | null;
-        if (!doc || (!showToAll && !canView(doc))) continue;
+        if (!doc || (!seeAll && !canView(doc))) continue;
         const card = el("div", "bivouac-cards__card");
         card.dataset.cid = entry.cid;
         const img = document.createElement("img");

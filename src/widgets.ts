@@ -775,6 +775,10 @@ registerWidgetType({
     const nameFont = String(cfg.nameFont ?? "");
     const showToAll = cfg.showToAll === true; // reveal cards even to viewers who don't own the doc
     const control = cardsCanControl(cfg);
+    // Whether to show the arrange affordances (reorder + remove). GMs manage via
+    // edit mode; players have no edit mode, so they get them in normal play as
+    // long as they have control permission for this collection.
+    const manage = control && (ctx.editMode || !game.user?.isGM);
     const wrap = el("div", `bivouac-cards bivouac-cards--${layout}`);
     const emit = (op: string, detail: Record<string, unknown>): void => {
       wrap.dispatchEvent(new CustomEvent("bivouac-card-op", { bubbles: true, detail: { id: ctx.widget.id, op, ...detail } }));
@@ -860,7 +864,12 @@ registerWidgetType({
           card.classList.add("bivouac-cards__card--dragging");
         });
         card.addEventListener("dragend", () => card.classList.remove("bivouac-cards__card--dragging"));
-        if (ctx.editMode && control) {
+        // Outside edit mode a click opens the sheet (drag still reorders / drags out).
+        if (!ctx.editMode) {
+          card.classList.add("bivouac-interactive");
+          card.addEventListener("click", () => (doc.sheet as { render?: (b: boolean) => void })?.render?.(true));
+        }
+        if (manage) {
           const rm = el("button", "bivouac-cards__remove");
           rm.type = "button";
           rm.title = game.i18n.localize("BIVOUAC.Widgets.Cards.Remove");
@@ -870,15 +879,12 @@ registerWidgetType({
             emit("remove", { cid: entry.cid });
           });
           card.appendChild(rm);
-        } else {
-          card.classList.add("bivouac-interactive");
-          card.addEventListener("click", () => (doc.sheet as { render?: (b: boolean) => void })?.render?.(true));
         }
         built.push(card);
       }
       hand.replaceChildren(...built);
       if (layout === "fan") applyFan(hand, built);
-      if (ctx.editMode && control) attachHandReorder(hand, built, emit);
+      if (manage) attachHandReorder(hand, built, emit);
     })();
     return wrap;
   },

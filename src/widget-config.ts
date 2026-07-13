@@ -86,10 +86,15 @@ function buildForm(widget: Widget): string {
       break;
     }
     case "actor":
-    case "table":
       content.push(group(t("BIVOUAC.Config.LinkedDoc"),
         `<input type="text" name="uuid" value="${esc(widget.config.uuid ?? "")}" placeholder="${esc(t("BIVOUAC.Config.LinkedDocPlaceholder"))}">` +
           `<p class="bivouac-config__hint">${esc(t("BIVOUAC.Config.LinkedDocHint"))}</p>`));
+      break;
+    case "table":
+      content.push(group(t("BIVOUAC.Config.LinkedDoc"),
+        `<input type="text" name="uuid" value="${esc(widget.config.uuid ?? "")}" placeholder="${esc(t("BIVOUAC.Config.LinkedDocPlaceholder"))}">`));
+      content.push(group(t("BIVOUAC.Config.TableTextSize"),
+        `<input type="number" name="tableTextScale" value="${esc(Number(widget.config.textScale) || 1)}" min="0.4" max="3" step="0.1">`));
       break;
     case "macro": {
       content.push(group(t("BIVOUAC.Config.LinkedDoc"),
@@ -250,9 +255,14 @@ function applyForm(widget: Widget, data: Record<string, string>): Widget {
       break;
     }
     case "actor":
-    case "table":
       updated.config.uuid = data.uuid?.trim() ?? "";
       break;
+    case "table": {
+      updated.config.uuid = data.uuid?.trim() ?? "";
+      const ts = Number(data.tableTextScale);
+      updated.config.textScale = Number.isFinite(ts) ? Math.min(3, Math.max(0.4, ts)) : 1;
+      break;
+    }
     case "macro": {
       updated.config.uuid = data.uuid?.trim() ?? "";
       updated.config.showIcon = data.macroShowIcon === "on";

@@ -537,8 +537,8 @@
   opacity: 0.8;
 }
 .bivouac-table__thumb {
-  width: 24px;
-  height: 24px;
+  width: 1.7em;
+  height: 1.7em;
   object-fit: cover;
   border-radius: 4px;
 }
@@ -645,10 +645,10 @@
   opacity: 0.85;
 }
 .bivouac-cards__card--before {
-  box-shadow: inset 3px 0 0 0 var(--bivouac-accent), 0 4px 14px rgba(0, 0, 0, 0.45);
+  box-shadow: inset 5px 0 0 0 var(--bivouac-accent), 0 0 9px 1px var(--bivouac-accent), 0 4px 14px rgba(0, 0, 0, 0.45);
 }
 .bivouac-cards__card--after {
-  box-shadow: inset -3px 0 0 0 var(--bivouac-accent), 0 4px 14px rgba(0, 0, 0, 0.45);
+  box-shadow: inset -5px 0 0 0 var(--bivouac-accent), 0 0 9px 1px var(--bivouac-accent), 0 4px 14px rgba(0, 0, 0, 0.45);
 }
 /* Row: overlapping horizontal spread. Grid: wrapped. */
 .bivouac-cards--row .bivouac-cards__hand,
@@ -989,30 +989,31 @@ body.bivouac-dnd-active .bivouac-card__body iframe {
 }
 /* Join a row → an accent bar on the target card's left/right edge. */
 .bivouac-card.bivouac-drop-left {
-  box-shadow: inset 4px 0 0 0 var(--bivouac-accent);
+  box-shadow: inset 6px 0 0 0 var(--bivouac-accent), 0 0 9px 1px var(--bivouac-accent);
 }
 .bivouac-card.bivouac-drop-right {
-  box-shadow: inset -4px 0 0 0 var(--bivouac-accent);
+  box-shadow: inset -6px 0 0 0 var(--bivouac-accent), 0 0 9px 1px var(--bivouac-accent);
 }
 /* New row → a full-width line across the drawer, centred in the gap above/below
-   the whole row (spans the entire horizontal axis, not just one card). */
+   the whole row (spans the entire horizontal axis, not just one card). Rounded +
+   glow so the thicker bar reads smooth, not aliased. */
 .bivouac-drawer__row.bivouac-drop-top::before,
 .bivouac-drawer__row.bivouac-drop-bottom::after {
   content: "";
   position: absolute;
   left: 0;
   right: 0;
-  height: 3px;
-  border-radius: 2px;
+  height: 5px;
+  border-radius: 3px;
   background: var(--bivouac-accent);
-  box-shadow: 0 0 7px var(--bivouac-accent);
+  box-shadow: 0 0 10px 1px var(--bivouac-accent);
   pointer-events: none;
 }
 .bivouac-drawer__row.bivouac-drop-top::before {
-  top: calc(-0.5 * var(--bivouac-gap) - 1.5px);
+  top: calc(-0.5 * var(--bivouac-gap) - 2.5px);
 }
 .bivouac-drawer__row.bivouac-drop-bottom::after {
-  bottom: calc(-0.5 * var(--bivouac-gap) - 1.5px);
+  bottom: calc(-0.5 * var(--bivouac-gap) - 2.5px);
 }
 /* Active edit toggle in the drawer header. */
 .bivouac-drawer__btn--active {

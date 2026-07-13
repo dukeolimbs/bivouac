@@ -506,10 +506,12 @@ registerWidgetType({
   type: "table",
   label: "BIVOUAC.Widgets.Table.Label",
   icon: "fa-solid fa-dice-d20",
-  defaultConfig: () => ({ uuid: "" }),
+  defaultConfig: () => ({ uuid: "", textScale: 1 }),
   renderBody(ctx) {
+    const scale = Number(ctx.widget.config.textScale) || 1;
     return docBody(ctx, (doc, host) => {
       const box = el("div", "bivouac-table");
+      box.style.fontSize = `${(14 * Math.min(3, Math.max(0.4, scale))).toFixed(1)}px`;
 
       const header = el("div", "bivouac-table__header");
       header.appendChild(el("span", "bivouac-table__name", String(doc.name ?? "")));

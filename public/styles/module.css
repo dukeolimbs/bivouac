@@ -615,8 +615,9 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* Remove (×) — a clean, subtle glass circle at the card's top-right that turns
-   red on hover. Always shown in edit mode (only rendered then). */
+/* Remove (×) — a circular frosted-glass button (faked with a translucent light
+   fill + blur, so it reads frosted even without backdrop-filter support). Always
+   shown in edit mode (only rendered then). */
 .bivouac-cards__remove {
   position: absolute;
   top: 5px;
@@ -629,20 +630,20 @@
   justify-content: center;
   font-size: 15px;
   line-height: 1;
-  border: 1px solid rgba(255, 255, 255, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.45);
   border-radius: 50%;
-  background: rgba(12, 13, 19, 0.66);
-  backdrop-filter: blur(3px);
-  -webkit-backdrop-filter: blur(3px);
+  background: rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
   color: #fff;
   cursor: pointer;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(255, 255, 255, 0.08);
   z-index: 6;
   transition: background 120ms ease, border-color 120ms ease, transform 120ms ease;
 }
 .bivouac-cards__remove:hover {
-  background: #c0392b;
-  border-color: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.3);
+  border-color: rgba(255, 255, 255, 0.75);
   transform: scale(1.1);
 }
 /* Keep the source card solid while dragging (a small proxy is the drag image). */

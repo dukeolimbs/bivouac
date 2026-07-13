@@ -499,7 +499,9 @@ registerWidgetType({
   },
 });
 
-/** Rollable table tile: name + a Roll button that draws to chat. */
+/** Rollable table tile: a scrollable list of the table's entries + a Roll button.
+ *  Rolling draws normally (posts to chat, so Dice So Nice etc. animate) and then
+ *  highlights the matching result row and scrolls it into view. */
 registerWidgetType({
   type: "table",
   label: "BIVOUAC.Widgets.Table.Label",
@@ -507,16 +509,61 @@ registerWidgetType({
   defaultConfig: () => ({ uuid: "" }),
   renderBody(ctx) {
     return docBody(ctx, (doc, host) => {
-      const box = el("div", "bivouac-doctile bivouac-tabletile");
-      box.appendChild(el("span", "bivouac-doctile__name", String(doc.name ?? "")));
-      const roll = el("button", "bivouac-doctile__action");
+      const box = el("div", "bivouac-table");
+
+      const header = el("div", "bivouac-table__header");
+      header.appendChild(el("span", "bivouac-table__name", String(doc.name ?? "")));
+      const roll = el("button", "bivouac-table__roll");
       roll.type = "button";
-      roll.innerHTML = `<i class="fa-solid fa-dice-d20"></i> ${game.i18n.localize("BIVOUAC.Widgets.Table.Roll")}`;
+      roll.appendChild(el("i", "fa-solid fa-dice-d20"));
+      roll.append(` ${String(doc.formula ?? "") || game.i18n.localize("BIVOUAC.Widgets.Table.Roll")}`);
+      header.appendChild(roll);
+      box.appendChild(header);
+
+      const listEl = el("div", "bivouac-table__list");
+      const results = ((doc.results as { contents?: unknown[] } | undefined)?.contents ?? []) as Record<
+        string,
+        unknown
+      >[];
+      const rows: HTMLElement[] = [];
+      for (const rr of results) {
+        const range = Array.isArray(rr.range) ? (rr.range as number[]) : [0, 0];
+        const row = el("div", "bivouac-table__row");
+        row.dataset.low = String(range[0]);
+        row.dataset.high = String(range[1]);
+        row.appendChild(el("span", "bivouac-table__range", range[0] === range[1] ? `${range[0]}` : `${range[0]}–${range[1]}`));
+        const rimg = String(rr.img ?? rr.icon ?? "");
+        if (rimg) {
+          const im = document.createElement("img");
+          im.className = "bivouac-table__thumb";
+          im.src = rimg;
+          row.appendChild(im);
+        }
+        row.appendChild(el("span", "bivouac-table__text", String(rr.text ?? rr.name ?? rr.description ?? "")));
+        listEl.appendChild(row);
+        rows.push(row);
+      }
+      box.appendChild(listEl);
+
+      const doRoll = async (): Promise<void> => {
+        const res = await (doc.draw as (() => Promise<{ roll?: { total?: number } }>) | undefined)?.();
+        const total = res?.roll?.total;
+        if (typeof total !== "number") return;
+        let hit: HTMLElement | undefined;
+        for (const r of rows) {
+          const on = total >= Number(r.dataset.low) && total <= Number(r.dataset.high);
+          r.classList.remove("bivouac-table__row--rolled");
+          if (on && !hit) {
+            r.classList.add("bivouac-table__row--rolled");
+            hit = r;
+          }
+        }
+        hit?.scrollIntoView({ block: "nearest" });
+      };
       roll.addEventListener("click", (e) => {
         e.stopPropagation();
-        void (doc.draw as (() => Promise<unknown>) | undefined)?.();
+        void doRoll();
       });
-      box.appendChild(roll);
       host.replaceChildren(box);
     });
   },

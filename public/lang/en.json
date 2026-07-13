@@ -104,6 +104,8 @@
       "Action_runMacro": "Run macro",
       "TargetUuid": "Target UUID",
       "TargetUuidPlaceholder": "Actor.xx…  /  JournalEntry.xx…  /  Macro.xx…",
+      "TextColor": "Text colour",
+      "TextColorCustom": "Custom",
       "TableTextSize": "Text size",
       "MacroShowIcon": "Show icon",
       "MacroIconSize": "Icon size (px)",

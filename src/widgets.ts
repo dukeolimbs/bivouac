@@ -146,6 +146,14 @@ export function applyBackground(el: HTMLElement, widget: Widget): void {
   el.style.setProperty("--bivouac-bg-image", img ? `url("${img.replace(/"/g, "%22")}")` : "none");
 }
 
+/** Apply an optional per-tile text colour (`config.textColor`, a #rrggbb) via the
+ *  `--bivouac-text-color` var that text tiles inherit. Empty → theme default. */
+export function applyTextColor(el: HTMLElement, widget: Widget): void {
+  const c = typeof widget.config.textColor === "string" ? widget.config.textColor : "";
+  if (/^#[0-9a-fA-F]{6}$/.test(c)) el.style.setProperty("--bivouac-text-color", c);
+  else el.style.removeProperty("--bivouac-text-color");
+}
+
 function placeholder(icon: string, label: string): HTMLElement {
   const box = el("div", "bivouac-placeholder");
   box.appendChild(el("i", `bivouac-placeholder__icon ${icon}`));

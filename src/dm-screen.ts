@@ -5,6 +5,7 @@ import {
   applyBackground,
   applyCardOp,
   applyFrameStyle,
+  applyTextColor,
   attachInteractions,
   backgroundOf,
   createWidget,
@@ -426,6 +427,7 @@ class DMScreen {
     el.dataset.id = widget.id;
     applyFrameStyle(el, widget);
     applyBackground(el, widget);
+    applyTextColor(el, widget);
 
     // Chrome (grip · title · gear · trash) only in edit mode — a clean board at play.
     if (edit) {

@@ -400,6 +400,7 @@
   line-height: 1.5;
   overflow-wrap: anywhere; /* wrap long words / URLs instead of overflowing */
   white-space: pre-wrap; /* preserve the author's line breaks (HTML collapses raw newlines) while still wrapping */
+  color: var(--bivouac-text-color, inherit);
 }
 /* Landing tiles: note text scales with the tile size (container = scaler) and
    the per-tile Text-size multiplier. DM-screen notes keep the inherited size. */
@@ -435,7 +436,7 @@
   bottom: 0;
   padding: 4px 8px;
   background: linear-gradient(transparent, rgba(0, 0, 0, 0.72));
-  color: #fff;
+  color: var(--bivouac-text-color, #fff);
   font-weight: 600;
   font-size: 13px;
   overflow: hidden;
@@ -454,7 +455,7 @@
   gap: 8px;
   padding: 8px;
   text-align: center;
-  color: var(--bivouac-text);
+  color: var(--bivouac-text-color, var(--bivouac-text));
 }
 .bivouac-doclink__icon,
 .bivouac-doctile__icon {
@@ -486,6 +487,7 @@
   display: flex;
   flex-direction: column;
   height: 100%;
+  color: var(--bivouac-text-color, inherit);
 }
 .bivouac-table__header {
   display: flex;
@@ -605,7 +607,7 @@
   bottom: 0;
   padding: 3px 6px;
   background: linear-gradient(transparent, rgba(0, 0, 0, 0.78));
-  color: #fff;
+  color: var(--bivouac-text-color, #fff);
   font-weight: 600;
   font-size: 11px;
   text-align: center;
@@ -1097,6 +1099,12 @@ body.bivouac-dnd-active .bivouac-card__body iframe {
   text-align: right;
   opacity: 0.8;
   font-variant-numeric: tabular-nums;
+}
+.bivouac-config__inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
 }
 /* Helper text under a field (e.g. the note editor's formatting shortcuts). */
 .bivouac-config__hint {

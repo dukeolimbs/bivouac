@@ -7,6 +7,7 @@ import {
   applyBackground,
   applyCardOp,
   applyFrameStyle,
+  applyTextColor,
   attachInteractions,
   backgroundOf,
   createWidget,
@@ -395,6 +396,7 @@ class WorldLayer {
     el.classList.add(`bivouac-frame-${frameOf(widget)}`, `bivouac-bg-${backgroundOf(widget)}`);
     applyFrameStyle(el, widget);
     applyBackground(el, widget);
+    applyTextColor(el, widget);
     const titleEl = el.querySelector(".bivouac-widget__title");
     if (titleEl) {
       const def = getWidgetType(widget.type);

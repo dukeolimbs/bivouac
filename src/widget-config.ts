@@ -39,6 +39,14 @@ function buildForm(widget: Widget): string {
          <option value="dm"${widget.scope === "dm" ? " selected" : ""}>${esc(t("BIVOUAC.Config.ScopeDM"))}</option>
        </select>`),
   ];
+  // Text colour — offered on tiles that display text.
+  if (["note", "journal", "table", "macro", "cards", "actor"].includes(widget.type)) {
+    const tcOn = typeof widget.config.textColor === "string" && /^#[0-9a-fA-F]{6}$/.test(widget.config.textColor);
+    const tc = tcOn ? (widget.config.textColor as string) : "#ffffff";
+    general.push(group(t("BIVOUAC.Config.TextColor"),
+      `<label class="bivouac-config__inline"><input type="checkbox" name="textColorOn"${tcOn ? " checked" : ""}> ${esc(t("BIVOUAC.Config.TextColorCustom"))}</label>` +
+        `<input type="color" name="textColor" value="${esc(tc)}">`));
+  }
 
   // ---- Content (type-specific) --------------------------------------------
   const content: string[] = [];
@@ -224,6 +232,10 @@ function applyForm(widget: Widget, data: Record<string, string>): Widget {
   };
   updated.title = data.title?.trim() || undefined;
   updated.scope = (data.scope === "dm" ? "dm" : "shared") as WidgetScope;
+
+  // Optional per-tile text colour (text tiles only; the field is absent otherwise).
+  updated.config.textColor =
+    data.textColorOn === "on" && /^#[0-9a-fA-F]{6}$/.test(data.textColor ?? "") ? data.textColor : "";
 
   // Frame (border) axis.
   updated.config.frame = (["none", "subtle", "framed"].includes(data.frame) ? data.frame : "subtle") as WidgetFrame;

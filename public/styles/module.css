@@ -534,37 +534,39 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* Remove (×) — always visible in edit mode (only rendered then), styled as a
-   clear red badge so it reads over any card art. */
+/* Remove (×) — a clean, subtle glass circle at the card's top-right that turns
+   red on hover. Always shown in edit mode (only rendered then). */
 .bivouac-cards__remove {
   position: absolute;
-  top: 4px;
-  right: 4px;
-  width: 22px;
-  height: 22px;
+  top: 5px;
+  right: 5px;
+  width: 20px;
+  height: 20px;
   padding: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 17px;
-  font-weight: 700;
+  font-size: 15px;
   line-height: 1;
-  border: 1.5px solid rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.35);
   border-radius: 50%;
-  background: #c0392b;
+  background: rgba(12, 13, 19, 0.66);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
   color: #fff;
   cursor: pointer;
-  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.55);
-  z-index: 5;
-  transition: background 120ms ease, transform 120ms ease;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+  z-index: 6;
+  transition: background 120ms ease, border-color 120ms ease, transform 120ms ease;
 }
 .bivouac-cards__remove:hover {
-  background: #e04b39;
-  transform: scale(1.12);
+  background: #c0392b;
+  border-color: rgba(255, 255, 255, 0.85);
+  transform: scale(1.1);
 }
-/* Reorder drag feedback. */
+/* Keep the source card solid while dragging (a small proxy is the drag image). */
 .bivouac-cards__card--dragging {
-  opacity: 0.4;
+  opacity: 0.85;
 }
 .bivouac-cards__card--before {
   box-shadow: inset 3px 0 0 0 var(--bivouac-accent), 0 4px 14px rgba(0, 0, 0, 0.45);
@@ -603,7 +605,7 @@
   transform-origin: bottom center;
 }
 .bivouac-cards--fan .bivouac-cards__card:hover {
-  transform: translateX(-50%) rotate(var(--card-angle, 0deg)) translateY(-10%);
+  transform: translateX(-50%) rotate(var(--card-angle, 0deg)) translateY(-6%);
   z-index: 999 !important;
 }
 

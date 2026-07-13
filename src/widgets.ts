@@ -563,30 +563,42 @@ function applyFan(hand: HTMLElement, cards: HTMLElement[]): void {
   const W = hand.clientWidth || 1;
   const H = hand.clientHeight || 1;
   const ASPECT = 5 / 7; // card width : height
-  const fanDeg = Math.min(54, n * 8); // total spread; ends at ±fanDeg/2
-  const th = ((fanDeg / 2) * Math.PI) / 180;
-  const sin = Math.sin(th);
-  const cos = Math.cos(th);
-  const arc = Math.min(0.1, n * 0.012); // vertical curve depth (fraction of H)
-  // Largest card height that keeps the rotated end card inside horizontally and
-  // vertically (and the raised centre card inside the top).
-  const hMax = (0.47 * W) / ((ASPECT / 2) * cos + sin); // horizontal half-extent ≤ 47% W
-  const vMaxEnd = (0.94 * H) / (ASPECT * sin + cos); // full rotated vertical span ≤ 94% H
-  const vMaxCentre = (0.94 - arc) * H; // upright centre card + arc lift
-  let cardH = Math.min(0.82 * H, hMax, vMaxEnd, vMaxCentre);
-  cardH = Math.max(cardH, 0.18 * H);
-  const cardW = cardH * ASPECT;
-  const dip = (cardW / 2) * sin; // how far a rotated bottom corner drops below the pivot (px)
-  const baseBottom = Math.max(0.03, dip / H + 0.02); // fraction: keep that corner on-tile
-  const ex = (cardW / 2) * cos + cardH * sin; // rotated horizontal half-extent (px)
-  const margin = Math.min(48, (ex / W) * 100); // end-card pivot inset (%)
+  const fanDeg = Math.min(56, n * 10); // total spread; end cards at ±fanDeg/2
+  const phiMax = ((fanDeg / 2) * Math.PI) / 180; // rad
+  const sinM = Math.sin(phiMax) || 1e-3;
+  const cosM = Math.cos(phiMax);
+  const tanHalf = Math.tan(phiMax / 2);
+  const HOVER = 0.06 * H; // reserve headroom for the hover lift so a raised card (and its ×) stays on-tile
+  const sideGap = 0.04 * W;
+  const topGap = 0.02 * H;
+  const botGap = 0.03 * H;
+  // Cards sit on a circular arc (centre highest, ends symmetrically lower) and
+  // rotate radially. Shrink the card until the whole arc — corners, the raised
+  // centre card, and the hover lift — fits inside the tile.
+  let cardH = 0.8 * H;
+  let cardW = cardH * ASPECT;
+  let spreadX = 0;
+  let arcDepth = 0;
+  let baseBottom = botGap;
+  for (let k = 0; k < 16; k++) {
+    cardW = cardH * ASPECT;
+    const ex = (cardW / 2) * cosM + cardH * sinM; // rotated horizontal half-extent
+    spreadX = Math.max(0, W / 2 - ex - sideGap); // end-card centre offset (fills width)
+    arcDepth = spreadX * tanHalf; // true circular-arc rise from ends to centre
+    baseBottom = (cardW / 2) * sinM + botGap; // clear the rotated bottom corner
+    const topReach = baseBottom + arcDepth + cardH + HOVER; // centre card, raised, hovered
+    if (topReach <= H - topGap) break;
+    cardH *= 0.94;
+  }
   cards.forEach((c, i) => {
-    const u = n > 1 ? i / (n - 1) : 0.5; // 0 … 1 across the width
-    const t = u - 0.5; // -0.5 … 0.5
+    const s = n > 1 ? (2 * i) / (n - 1) - 1 : 0; // -1 … 1
+    const phi = phiMax * s;
+    const x = n > 1 ? spreadX * (Math.sin(phi) / sinM) : 0; // px from tile centre
+    const lift = n > 1 ? (arcDepth * (Math.cos(phi) - cosM)) / (1 - cosM || 1) : 0;
     c.style.height = `${((cardH / H) * 100).toFixed(2)}%`;
-    c.style.left = `${(n > 1 ? margin + (100 - 2 * margin) * u : 50).toFixed(2)}%`;
-    c.style.bottom = `${(baseBottom * 100 + arc * 100 * (1 - 4 * t * t)).toFixed(2)}%`; // centre higher
-    c.style.setProperty("--card-angle", `${(t * fanDeg).toFixed(2)}deg`);
+    c.style.left = `calc(50% + ${x.toFixed(1)}px)`;
+    c.style.bottom = `${(((baseBottom + lift) / H) * 100).toFixed(2)}%`;
+    c.style.setProperty("--card-angle", `${((phi * 180) / Math.PI).toFixed(2)}deg`);
     c.style.zIndex = String(i + 1);
   });
 }
@@ -596,6 +608,59 @@ function applyFan(hand: HTMLElement, cards: HTMLElement[]): void {
  *  Card add/remove is dispatched as a bubbling `bivouac-card-op` event the host
  *  surface (world layer / DM screen) persists. */
 const REORDER_TYPE = "application/x-bivouac-card"; // drag marker for in-hand reorder
+
+/** Forgiving in-hand reorder: handled at the hand level so it works across the
+ *  whole tile (gaps and overlaps alike). Continuously tracks the nearest card
+ *  to the pointer and shows a before/after marker there; on drop, moves the
+ *  dragged card to that spot. */
+function attachHandReorder(
+  hand: HTMLElement,
+  cards: HTMLElement[],
+  emit: (op: string, detail: Record<string, unknown>) => void,
+): void {
+  const clear = (): void =>
+    cards.forEach((c) => c.classList.remove("bivouac-cards__card--before", "bivouac-cards__card--after"));
+  const nearest = (clientX: number): { cid: string; after: boolean } | null => {
+    let best: HTMLElement | null = null;
+    let bestD = Infinity;
+    let after = false;
+    for (const c of cards) {
+      const r = c.getBoundingClientRect();
+      const cx = r.left + r.width / 2;
+      const d = Math.abs(clientX - cx);
+      if (d < bestD) {
+        bestD = d;
+        best = c;
+        after = clientX > cx;
+      }
+    }
+    return best?.dataset.cid ? { cid: best.dataset.cid, after } : null;
+  };
+  hand.addEventListener("dragover", (e) => {
+    if (!e.dataTransfer?.types.includes(REORDER_TYPE)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const t = nearest(e.clientX);
+    clear();
+    if (t) {
+      cards.find((c) => c.dataset.cid === t.cid)?.classList.add(
+        t.after ? "bivouac-cards__card--after" : "bivouac-cards__card--before",
+      );
+      hand.dataset.rt = t.cid;
+      hand.dataset.ra = t.after ? "1" : "0";
+    }
+  });
+  hand.addEventListener("dragleave", clear);
+  hand.addEventListener("drop", (e) => {
+    const cid = e.dataTransfer?.getData(REORDER_TYPE);
+    clear();
+    if (!cid) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const targetCid = hand.dataset.rt;
+    if (targetCid) emit("move", { cid, targetCid, after: hand.dataset.ra === "1" });
+  });
+}
 
 registerWidgetType({
   type: "cards",
@@ -679,31 +744,23 @@ registerWidgetType({
           e.dataTransfer?.setData("text/plain", JSON.stringify({ type: docType, uuid: entry.uuid }));
           if (control) e.dataTransfer?.setData(REORDER_TYPE, entry.cid);
           if (e.dataTransfer) e.dataTransfer.effectAllowed = "copyMove";
+          // Custom drag image: a small clean card-art proxy follows the cursor,
+          // instead of the browser's default (a big, transformed ghost of the card).
+          const ghost = document.createElement("img");
+          ghost.src = img.src;
+          ghost.style.cssText =
+            "position:fixed;left:-9999px;top:-9999px;width:64px;height:90px;object-fit:cover;border-radius:6px;box-shadow:0 4px 14px rgba(0,0,0,.5);";
+          document.body.appendChild(ghost);
+          try {
+            e.dataTransfer?.setDragImage(ghost, 32, 45);
+          } catch {
+            /* older browsers — fall back to the default */
+          }
+          window.setTimeout(() => ghost.remove(), 0);
           card.classList.add("bivouac-cards__card--dragging");
         });
         card.addEventListener("dragend", () => card.classList.remove("bivouac-cards__card--dragging"));
         if (ctx.editMode && control) {
-          card.addEventListener("dragover", (e) => {
-            if (!e.dataTransfer?.types.includes(REORDER_TYPE)) return;
-            e.preventDefault();
-            e.stopPropagation();
-            const r = card.getBoundingClientRect();
-            const after = e.clientX - r.left > r.width / 2;
-            card.classList.toggle("bivouac-cards__card--after", after);
-            card.classList.toggle("bivouac-cards__card--before", !after);
-          });
-          card.addEventListener("dragleave", () =>
-            card.classList.remove("bivouac-cards__card--after", "bivouac-cards__card--before"),
-          );
-          card.addEventListener("drop", (e) => {
-            const cid = e.dataTransfer?.getData(REORDER_TYPE);
-            const after = card.classList.contains("bivouac-cards__card--after");
-            card.classList.remove("bivouac-cards__card--after", "bivouac-cards__card--before");
-            if (!cid) return;
-            e.preventDefault();
-            e.stopPropagation();
-            emit("move", { cid, targetCid: entry.cid, after });
-          });
           const rm = el("button", "bivouac-cards__remove");
           rm.type = "button";
           rm.title = game.i18n.localize("BIVOUAC.Widgets.Cards.Remove");
@@ -721,6 +778,7 @@ registerWidgetType({
       }
       hand.replaceChildren(...built);
       if (layout === "fan") applyFan(hand, built);
+      if (ctx.editMode && control) attachHandReorder(hand, built, emit);
     })();
     return wrap;
   },

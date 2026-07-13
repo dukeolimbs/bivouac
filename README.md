@@ -1,82 +1,104 @@
 # Bivouac
 
-A starter [FoundryVTT](https://foundryvtt.com/) module: **TypeScript + Vite**, targeting Foundry **v13+** (verified on v14).
+A persistent, modular **campaign landing page** for [Foundry VTT](https://foundryvtt.com/) — a
+zoomable "table surface" of tiles (web views, images, notes, actors, journals, rollable tables,
+macros, card collections…) laid over a scene, plus a GM-only **DM screen** drawer for the tools
+you want at hand during play.
 
-> Don't edit this template directly to build a real module. Instead run
-> `node ../scripts/new-module.mjs <id> "Title"` from the workspace root to
-> stamp out a renamed copy.
+> Status: early and actively developed (**v0.1.0**). Expect rapid change.
 
-## Commands
+Built with **TypeScript + Vite**, targeting Foundry **v13+** (verified on v14).
 
-| Command           | What it does                                                        |
-| ----------------- | ------------------------------------------------------------------- |
-| `npm install`     | Install dev dependencies (Vite, TypeScript, ESLint).                |
-| `npm run build`   | Bundle `src/module.ts` → `dist/module.js`, copy `public/` → `dist/`.|
-| `npm run watch`   | Rebuild automatically on every save.                                |
-| `npm run link`    | Junction `dist/` into Foundry's modules folder.                     |
-| `npm run unlink`  | Remove that junction.                                               |
-| `npm run typecheck` | Type-check without emitting.                                      |
-| `npm run lint`    | Lint `src/`.                                                        |
-| `npm run package` | Build, then zip `dist/` → `module.zip` for manual distribution.     |
+---
 
-## What the template demonstrates
+## What it is
 
-`src/module.ts` shows the patterns you reach for most often:
+- **Landing board** — designate any scene as a landing page and lay out a grid of tiles on it.
+  The board tracks the scene's pan/zoom, so tile chrome stays crisp at any zoom while content
+  scales with the map. Any number of scenes can be landing pages.
+- **DM screen** — a per-GM drawer that docks to any edge (beside / over the sidebar, or left /
+  top / bottom), is drag-resizable, and arranges its own tiles in a dynamic row grid.
 
-- **A world setting** registered in the `init` hook (visible under Configure Settings).
-- **A settings-menu button** (`registerMenu`) that opens the window below.
-- **An `ApplicationV2` + Handlebars window** (`ExampleApp`), the modern v13+ app framework.
-- **A rebindable keybinding** (unbound by default) that opens the window.
+## Tiles
+
+- **Web view** — embed a site (e.g. LegendKeeper); browser-style Content Zoom; graceful
+  placeholder / pop-out for sites that refuse embedding.
+- **Image** — click actions (open sheet / journal / run macro), fit + framing options.
+- **Note** — rich HTML with Foundry enrichment (`@UUID` links, inline rolls), keyboard
+  formatting + paste-to-link, per-note font (incl. Google Fonts) and size; scales to the tile.
+- **Actor / Journal / Rollable table / Macro** — drag a document onto the board (in edit mode)
+  or the DM screen to create a live, permission-gated tile: an actor portrait that opens its
+  sheet, an inline journal page (or link), a visual rollable table that rolls and highlights the
+  result row, a configurable macro button.
+- **Card collection** — a hand of cards (fan / row / grid). Drop actors/items in (duplicates
+  allowed); drag a card onto the scene to place its token (or, in edit mode, a tile); reorder,
+  remove, and name-display options.
+- Every tile has independent **Frame** (border) and **Background** (none / solid / frosted /
+  gradient / image) styling with colour + opacity.
+
+## Requirements
+
+- Foundry VTT **v13+** (verified on v14).
+
+## Install (development)
+
+The build output (`dist/`) is git-ignored and produced by Vite.
+
+```bash
+npm install
+npm run build      # bundle src/module.ts → dist/module.js and copy public/ → dist/
+npm run link       # junction dist/ into Foundry's modules folder (dev)
+```
+
+Then enable **Bivouac** in a world. (`npm run link` / `package` use helper scripts kept in the
+workspace root outside this repo; if you don't have them, symlink the built `dist/` into
+`Data/modules/bivouac/` yourself.)
+
+## Development
+
+| Command             | What it does                                                |
+| ------------------- | ----------------------------------------------------------- |
+| `npm run watch`     | Rebuild on every save.                                      |
+| `npm run typecheck` | Type-check (`tsc --noEmit`).                                |
+| `npm run lint`      | Lint `src/`.                                                |
+| `npm run build`     | One-off production bundle.                                  |
+
+- Foundry globals (`game`, `canvas`, `foundry`, …) are typed as `any` via `src/foundry-shim.d.ts`.
+- Bundles to a single ESM (`dist/module.js`); styles in `public/styles/module.css`; **all**
+  user-facing copy in `public/lang/en.json`.
+- JavaScript changes need a Foundry page reload; enable Foundry's Hot Reload for CSS/lang.
 
 ## Releasing
 
-`.github/workflows/release.yml` publishes a GitHub Release when you push a
-version tag:
+`.github/workflows/release.yml` cuts a GitHub Release when you push a version tag — it builds,
+rewrites `module.json` with the tag version + release URLs, and attaches `module.json` +
+`module.zip`:
 
-```powershell
-git tag v0.1.0
-git push origin v0.1.0
+```bash
+git tag v0.1.0 && git push origin v0.1.0
 ```
 
-It builds, rewrites `module.json` with the tag version and release URLs, zips
-the module, and attaches `module.json` + `module.zip`. Users then install from
-the **latest manifest URL**:
-`https://github.com/<owner>/<repo>/releases/latest/download/module.json`
+Users then install from the latest manifest URL:
+`https://github.com/<owner>/bivouac/releases/latest/download/module.json`
 
-## Layout
+## Project structure
 
 ```
-bivouac/
-├── src/
-│   ├── module.ts           Entry point — registers Hooks/settings
-│   └── foundry-shim.d.ts   Loose ambient types (replace with fvtt-types)
-├── public/                 Copied verbatim into dist/ at build time
-│   ├── module.json         The manifest Foundry reads
-│   ├── lang/en.json        Localization strings
-│   ├── styles/module.css   Styles listed in the manifest
-│   └── templates/*.hbs     Handlebars templates
-├── vite.config.ts
-├── tsconfig.json
-└── eslint.config.js
+src/
+  module.ts         Init/hooks, settings, scene-control toolbar, doc-tile refresh
+  world-layer.ts    The board: DOM-over-canvas surface, screen-space tile layout, drag/resize
+  dm-screen.ts      The GM DM-screen drawer (dock edges, resize, row grid, drop targets)
+  widgets.ts        Tile registry + renderers (webview/image/note/actor/journal/table/macro/cards)
+  widget-config.ts  Per-tile configuration dialog + live preview
+  drop.ts           Parse Foundry document drags → tiles
+  layout.ts         Persistence (scene flags = board, user flags = DM screen) + undo/redo
+  constants.ts      Data model, settings keys, permission helper
+public/
+  module.json       Foundry manifest    lang/en.json   UI copy    styles/module.css   Styles
 ```
 
-## Real type support
+## Settings
 
-The shim types everything as `any`. For full IntelliSense install the
-community types:
-
-```powershell
-npm i -D github:League-of-Foundry-Developers/foundry-vtt-types#main
-```
-
-then add `"fvtt-types"` to `compilerOptions.types` in `tsconfig.json` and
-delete `src/foundry-shim.d.ts`.
-
-## Dev loop
-
-1. `npm run watch` (rebuilds on save)
-2. In Foundry: enable the module in a world.
-3. Edit code → reload the Foundry browser tab to pick up changes.
-
-Foundry can auto-reload CSS/templates if you enable **Hot Reload** in its
-config, but JavaScript changes always need a page reload.
+Client/world settings include the DM-screen position + tab placement, drawer size, maximum tile
+size, how many live web views before level-of-detail kicks in, and the minimum user role that can
+control tiles/cards.

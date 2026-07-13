@@ -546,6 +546,9 @@
   flex: 1;
   overflow-wrap: anywhere;
 }
+.bivouac-table__row--cycling {
+  background: color-mix(in srgb, var(--bivouac-accent) 20%, transparent);
+}
 .bivouac-table__row--rolled {
   background: color-mix(in srgb, var(--bivouac-accent) 35%, transparent);
   outline: 1px solid var(--bivouac-accent);

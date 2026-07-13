@@ -547,24 +547,50 @@ registerWidgetType({
       }
       box.appendChild(listEl);
 
-      const doRoll = async (): Promise<void> => {
-        const res = await (doc.draw as (() => Promise<{ roll?: { total?: number } }>) | undefined)?.();
-        const total = res?.roll?.total;
-        if (typeof total !== "number") return;
+      const settle = (total: number | undefined): void => {
         let hit: HTMLElement | undefined;
         for (const r of rows) {
-          const on = total >= Number(r.dataset.low) && total <= Number(r.dataset.high);
-          r.classList.remove("bivouac-table__row--rolled");
-          if (on && !hit) {
-            r.classList.add("bivouac-table__row--rolled");
-            hit = r;
-          }
+          r.classList.remove("bivouac-table__row--cycling");
+          const on = typeof total === "number" && total >= Number(r.dataset.low) && total <= Number(r.dataset.high);
+          r.classList.toggle("bivouac-table__row--rolled", on && !hit);
+          if (on && !hit) hit = r;
         }
         hit?.scrollIntoView({ block: "nearest" });
       };
+      const doRoll = (): void => {
+        if (!rows.length || roll.disabled) return;
+        roll.disabled = true;
+        rows.forEach((r) => r.classList.remove("bivouac-table__row--rolled"));
+        // Kick off the real draw (posts to chat, so the dice roll / Dice So Nice
+        // animate), and spin the on-tile highlight through the rows, decelerating,
+        // before landing on the drawn result — like Foundry's own table popout.
+        const draw = (doc.draw as (() => Promise<{ roll?: { total?: number } }>) | undefined)?.();
+        const spinEnd = performance.now() + 1100;
+        let delay = 55;
+        let last = -1;
+        const tick = (): void => {
+          rows.forEach((r) => r.classList.remove("bivouac-table__row--cycling"));
+          if (performance.now() < spinEnd) {
+            let idx = last;
+            if (rows.length > 1) while (idx === last) idx = Math.floor(Math.random() * rows.length);
+            else idx = 0;
+            last = idx;
+            rows[idx].classList.add("bivouac-table__row--cycling");
+            rows[idx].scrollIntoView({ block: "nearest" });
+            delay = Math.min(240, delay * 1.14);
+            window.setTimeout(tick, delay);
+          } else {
+            void Promise.resolve(draw).then((res) => {
+              settle(res?.roll?.total);
+              roll.disabled = false;
+            });
+          }
+        };
+        tick();
+      };
       roll.addEventListener("click", (e) => {
         e.stopPropagation();
-        void doRoll();
+        doRoll();
       });
       host.replaceChildren(box);
     });

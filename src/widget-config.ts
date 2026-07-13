@@ -148,7 +148,19 @@ function buildForm(widget: Widget): string {
         .join("");
       content.push(group(t("BIVOUAC.Config.CardsNameFont"), `<select name="cardsNameFont">${cardFontOpts}</select>`));
       content.push(group(t("BIVOUAC.Config.CardsNameSize"),
-        `<input type="number" name="cardsNameSize" value="${esc(Number(widget.config.nameSize) || 12)}" min="6" max="48" step="1">` +
+        `<input type="number" name="cardsNameSize" value="${esc(Number(widget.config.nameSize) || 12)}" min="6" max="48" step="1">`));
+      const curRole = String(Number(widget.config.editRole) || 0);
+      const roleOpts: [string, string][] = [
+        ["0", t("BIVOUAC.Config.CardsRole_inherit")],
+        ["1", t("BIVOUAC.Config.CardsRole_player")],
+        ["2", t("BIVOUAC.Config.CardsRole_trusted")],
+        ["3", t("BIVOUAC.Config.CardsRole_assistant")],
+        ["4", t("BIVOUAC.Config.CardsRole_gm")],
+      ];
+      content.push(group(t("BIVOUAC.Config.CardsRole"),
+        `<select name="cardsEditRole">${roleOpts
+          .map(([v, l]) => `<option value="${v}"${curRole === v ? " selected" : ""}>${esc(l)}</option>`)
+          .join("")}</select>` +
           `<p class="bivouac-config__hint">${esc(t("BIVOUAC.Config.CardsHint"))}</p>`));
       break;
     }
@@ -284,6 +296,8 @@ function applyForm(widget: Widget, data: Record<string, string>): Widget {
       updated.config.nameFont = typeof data.cardsNameFont === "string" ? data.cardsNameFont : "";
       const ns = Number(data.cardsNameSize);
       updated.config.nameSize = Number.isFinite(ns) ? Math.min(48, Math.max(6, ns)) : 12;
+      const er = Number(data.cardsEditRole);
+      updated.config.editRole = Number.isFinite(er) ? Math.min(4, Math.max(0, er)) : 0;
       break;
     }
   }

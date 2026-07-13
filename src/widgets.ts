@@ -3,7 +3,7 @@
 import {
   GRID,
   MODULE_ID,
-  canControl,
+  cardsCanControl,
   type Widget,
   type WidgetBackground,
   type WidgetFrame,
@@ -739,7 +739,7 @@ registerWidgetType({
     const showNames = cfg.showNames !== false;
     const nameSize = Number(cfg.nameSize) || 12;
     const nameFont = String(cfg.nameFont ?? "");
-    const control = canControl();
+    const control = cardsCanControl(cfg);
     const wrap = el("div", `bivouac-cards bivouac-cards--${layout}`);
     const emit = (op: string, detail: Record<string, unknown>): void => {
       wrap.dispatchEvent(new CustomEvent("bivouac-card-op", { bubbles: true, detail: { id: ctx.widget.id, op, ...detail } }));
@@ -803,7 +803,7 @@ registerWidgetType({
         // dropCanvasData hook) a tile in edit mode. In edit mode it also reorders
         // within the hand (REORDER_TYPE marker).
         const docType = String(doc.documentName ?? (entry.uuid.includes("Item") ? "Item" : "Actor"));
-        card.draggable = true;
+        card.draggable = control; // arranging (reorder + drag-out) is gated per-collection
         card.addEventListener("dragstart", (e) => {
           e.stopPropagation();
           e.dataTransfer?.setData("text/plain", JSON.stringify({ type: docType, uuid: entry.uuid }));

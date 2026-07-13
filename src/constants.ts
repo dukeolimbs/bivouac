@@ -48,6 +48,15 @@ export function canControl(): boolean {
   }
 }
 
+/** May the current user arrange a specific card collection (add / remove /
+ *  reorder / drag its cards)? Uses the tile's own `config.editRole` (minimum
+ *  role, 1–4) when set, else inherits the global `canControl()`. */
+export function cardsCanControl(config: Record<string, unknown>): boolean {
+  const per = Number((config as { editRole?: unknown }).editRole);
+  if (Number.isFinite(per) && per >= 1) return Number(game.user?.role ?? 0) >= per;
+  return canControl();
+}
+
 /** Widget geometry, measured in whole scene grid squares. */
 export interface WidgetCell {
   gx: number;

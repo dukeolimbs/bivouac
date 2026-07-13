@@ -16,7 +16,7 @@ import {
 import { isDocDrag, parseDrop, widgetFromDrop } from "./drop";
 import { readDMLayout, writeDMLayout } from "./layout";
 import { openWidgetConfig, pickWidgetType } from "./widget-config";
-import { MODULE_ID, SETTINGS, type Widget, type WidgetType } from "./constants";
+import { MODULE_ID, SETTINGS, cardsCanControl, type Widget, type WidgetType } from "./constants";
 
 /** Drag-resize bounds for the drawer, in px (upper bounds also capped at 90vw /
  *  90vh). Width applies to left/right docks; height to top/bottom docks. */
@@ -315,12 +315,11 @@ class DMScreen {
   async #cardOp(
     e: CustomEvent<{ id?: string; op?: string; uuid?: string; cid?: string; targetCid?: string; after?: boolean }>,
   ): Promise<void> {
-    if (!game.user?.isGM) return;
     const d = e.detail ?? {};
     if (!d.id) return;
     const layout = readDMLayout();
     const w = layout.widgets.find((x) => x.id === d.id);
-    if (!w) return;
+    if (!w || !cardsCanControl(w.config)) return;
     const next = applyCardOp(w.config, d);
     if (!next) return;
     w.config = next;

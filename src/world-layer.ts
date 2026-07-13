@@ -1,7 +1,7 @@
 /** Bivouac — the world layer: a DOM surface over the canvas whose transform
  *  tracks the scene's pan/zoom, hosting widgets placed on scene grid squares. */
 
-import { GRID, LOD, MODULE_ID, SETTINGS, canControl, type Widget, type WidgetCell, type WidgetType } from "./constants";
+import { GRID, LOD, MODULE_ID, SETTINGS, canControl, cardsCanControl, type Widget, type WidgetCell, type WidgetType } from "./constants";
 import { activeLandingScene, readLayout, writeLayout } from "./layout";
 import {
   applyBackground,
@@ -128,14 +128,13 @@ class WorldLayer {
   async #cardOp(
     e: CustomEvent<{ id?: string; op?: string; uuid?: string; cid?: string; targetCid?: string; after?: boolean }>,
   ): Promise<void> {
-    if (!canControl()) return;
     const d = e.detail ?? {};
     if (!d.id) return;
     const scene = activeLandingScene();
     if (!scene) return;
     const layout = readLayout(scene);
     const w = layout.widgets.find((x) => x.id === d.id);
-    if (!w) return;
+    if (!w || !cardsCanControl(w.config)) return;
     const next = applyCardOp(w.config, d);
     if (!next) return;
     w.config = next;

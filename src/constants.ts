@@ -8,6 +8,13 @@ export const FLAGS = {
   layout: "layout",
   /** DM screen layout stored per-GM on the User document. */
   dmScreenLayout: "dmScreenLayout",
+  /** Cast Bar roster + speaker + visibility, stored per Scene (broadcast to all). */
+  castBar: "castBar",
+  /** Second Cast Bar's roster (a separate strip — e.g. party vs NPCs), per Scene. */
+  castBar2: "castBar2",
+  /** Per-Actor: remembered "name hidden from players" default for the Cast Bar,
+   *  so re-adding an actor reuses the last choice instead of defaulting to hidden. */
+  castNameHidden: "castNameHidden",
 } as const;
 
 export const SETTINGS = {
@@ -32,6 +39,31 @@ export const SETTINGS = {
   dmDock: "dmDock",
   /** World setting: minimum user role that can control tiles/cards (role number). */
   controlRole: "controlRole",
+  /** Client setting: which edge the Cast Bar docks to (bottom/top/left/right). */
+  castBarDock: "castBarDock",
+  /** Client setting: position of the Cast Bar toggle tab along its edge (%). */
+  castBarTabPos: "castBarTabPos",
+  /** Client setting: horizontal pad the right-dock Cast Bar tab keeps from the sidebar. */
+  castBarTabPad: "castBarTabPad",
+  /** World setting: the second Cast Bar's edge — "off" (disabled) or a dock position. */
+  castBar2Dock: "castBar2Dock",
+  /** Client setting: Cast Bar cross-axis size in px (drag-set; player-resizable). */
+  castBarSize: "castBarSize",
+  /** World settings: enable each Cast Bar stat globally (AC / perception / HP / investigation). */
+  castStatAC: "castStatAC",
+  castStatPP: "castStatPP",
+  castStatHP: "castStatHP",
+  castStatInv: "castStatInv",
+  /** Client settings: per-bar quick scale multiplier (hover +/-, 0.25–1.5 of size). */
+  castBarScale: "castBarScale",
+  castBar2Scale: "castBar2Scale",
+  /** World setting: hide the Cast Bar(s) while a combat encounter is running. */
+  castHideInCombat: "castHideInCombat",
+  /** Client settings: Cast Bar font — a Foundry font pick + a custom Google Font. */
+  castBarFont: "castBarFont",
+  castBarFontCustom: "castBarFontCustom",
+  /** Client setting: Cast Bar name font-size multiplier (slider). */
+  castBarFontSize: "castBarFontSize",
 } as const;
 
 /** May the current user control Bivouac tiles/cards (add / remove / reorder /
@@ -101,6 +133,43 @@ export interface Widget {
 export interface Layout {
   widgets: Widget[];
 }
+
+/* -------------------------------------------- Cast Bar ------------------ */
+// A dedicated, docked strip of character Plates for narrative encounters — its
+// own tool, NOT part of the Widget/Tile system above. Portrait + name, with
+// per-plate conversation states. State lives on the Scene flag so it broadcasts
+// to players (GM-authored). See docs/cast-bar-design-spec.md.
+
+/** One character Plate: references an Actor (or Item) by UUID + its states. */
+export interface Plate {
+  id: string;
+  /** The referenced document (usually an Actor). */
+  uuid: string;
+  /** Which of the document's own images to use: "profile" (default) or "token". */
+  art?: "profile" | "token";
+  /** Optional custom image, overriding `art` and the document's own art. */
+  img?: string;
+  /** Darkened: physically in the scene but not in this conversation. */
+  exited: boolean;
+  /** GM-only: filtered out of the players' view entirely (like a hidden token). */
+  hidden: boolean;
+  /** Players see "?" instead of the name; the GM sees the real name greyed. */
+  nameHidden: boolean;
+  /** Show the Actor's stat overlay (AC / passive perception / HP / investigation)
+   *  on this plate. Off by default; toggled per-plate from the hover controls. */
+  stats?: boolean;
+}
+
+/** Cast Bar state for one Scene. */
+export interface CastBarData {
+  /** GM global show/hide, for everyone. */
+  visible: boolean;
+  /** The current speaker's plate id (green highlight); null = nobody. */
+  speakerId: string | null;
+  plates: Plate[];
+}
+
+export const EMPTY_CASTBAR: CastBarData = { visible: false, speakerId: null, plates: [] };
 
 export const GRID = {
   /** Default size of a freshly-added widget, in squares. */

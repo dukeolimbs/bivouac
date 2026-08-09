@@ -10,7 +10,7 @@
  * web views. See docs/landing-page-design-spec.md.
  */
 
-import { GRID, LOD, MODULE_ID, SETTINGS, log } from "./constants";
+import { FLAGS, GRID, MODULE_ID, SETTINGS, log } from "./constants";
 import {
   activeLandingScene,
   clearLayoutHistory,
@@ -24,6 +24,8 @@ import {
 } from "./layout";
 import { worldLayer } from "./world-layer";
 import { dmScreen } from "./dm-screen";
+import { castBar, castBar2, castBars, onRaiseHandMessage } from "./cast-bar";
+import { availableFonts, ensureGoogleFont } from "./widgets";
 import { pickWidgetType } from "./widget-config";
 
 Hooks.once("init", () => {
@@ -89,7 +91,7 @@ Hooks.once("init", () => {
     config: true,
     type: Number,
     range: { min: -200, max: 400, step: 1 }, // negative pushes the tab toward / over the sidebar edge
-    default: 16,
+    default: -33,
     onChange: () => applyTabSettings(),
   });
 
@@ -101,7 +103,7 @@ Hooks.once("init", () => {
     config: true,
     type: Number,
     range: { min: 0, max: 100, step: 0.1 },
-    default: 50,
+    default: 45.1,
     onChange: () => applyTabSettings(),
   });
 
@@ -144,7 +146,7 @@ Hooks.once("init", () => {
     config: true,
     type: Number,
     range: { min: 1, max: 60, step: 1 },
-    default: LOD.minWebviews,
+    default: 10,
     onChange: () => worldLayer.render("lod"),
   });
 
@@ -163,8 +165,178 @@ Hooks.once("init", () => {
       top: "BIVOUAC.Settings.DmDock.Top",
       bottom: "BIVOUAC.Settings.DmDock.Bottom",
     },
-    default: "beside",
+    default: "over",
     onChange: () => dmScreen.applyDock(),
+  });
+
+  // --- Cast Bar (per-client placement; roster/visibility live on the scene) ---
+  // Which edge the Cast Bar docks to. Per client, so each user can place it.
+  game.settings.register(MODULE_ID, SETTINGS.castBarDock, {
+    name: "BIVOUAC.Settings.CastBarDock.Name",
+    hint: "BIVOUAC.Settings.CastBarDock.Hint",
+    scope: "client",
+    config: true,
+    type: String,
+    choices: {
+      top: "BIVOUAC.Settings.CastBarDock.Top",
+      bottom: "BIVOUAC.Settings.CastBarDock.Bottom",
+      left: "BIVOUAC.Settings.CastBarDock.Left",
+      right: "BIVOUAC.Settings.CastBarDock.Right",
+    },
+    default: "right",
+    onChange: () => {
+      castBar.applyDock();
+      castBar.applySize();
+    },
+  });
+
+  // Position of the Cast Bar toggle tab along its docked edge (%).
+  game.settings.register(MODULE_ID, SETTINGS.castBarTabPos, {
+    name: "BIVOUAC.Settings.CastBarTabPos.Name",
+    hint: "BIVOUAC.Settings.CastBarTabPos.Hint",
+    scope: "client",
+    config: true,
+    type: Number,
+    range: { min: 0, max: 100, step: 0.1 },
+    default: 50,
+    onChange: () => castBars.forEach((b) => b.applyTabPos()),
+  });
+
+  // Horizontal gap the right-docked Cast Bar toggle tab keeps from the sidebar
+  // (same method + range as the DM-screen tab's edge padding; negative pushes it
+  // toward / over the sidebar edge). Only affects a right-docked Cast Bar.
+  game.settings.register(MODULE_ID, SETTINGS.castBarTabPad, {
+    name: "BIVOUAC.Settings.CastBarTabPad.Name",
+    hint: "BIVOUAC.Settings.CastBarTabPad.Hint",
+    scope: "client",
+    config: true,
+    type: Number,
+    range: { min: -200, max: 400, step: 1 },
+    default: -33,
+    onChange: () => castBars.forEach((b) => b.applyTabPos()),
+  });
+
+  // Cast Bar plate size (px). Per client, so each user (players too) sizes the
+  // floating plates to taste.
+  game.settings.register(MODULE_ID, SETTINGS.castBarSize, {
+    name: "BIVOUAC.Settings.CastBarSize.Name",
+    hint: "BIVOUAC.Settings.CastBarSize.Hint",
+    scope: "client",
+    config: true,
+    type: Number,
+    range: { min: 100, max: 400, step: 5 },
+    default: 220,
+    onChange: () => castBars.forEach((b) => b.applySize()),
+  });
+
+  // Optional SECOND Cast Bar — "off" (default) or which edge it docks to, so a GM
+  // can run two strips (e.g. party in one, NPCs in the other). World-scoped so
+  // enabling it shows it for every client. It keeps its own per-scene roster;
+  // Actor size / tab position / tab padding are shared with the primary bar.
+  game.settings.register(MODULE_ID, SETTINGS.castBar2Dock, {
+    name: "BIVOUAC.Settings.CastBar2Dock.Name",
+    hint: "BIVOUAC.Settings.CastBar2Dock.Hint",
+    scope: "world",
+    config: true,
+    type: String,
+    choices: {
+      off: "BIVOUAC.Settings.CastBar2Dock.Off",
+      top: "BIVOUAC.Settings.CastBar2Dock.Top",
+      bottom: "BIVOUAC.Settings.CastBar2Dock.Bottom",
+      left: "BIVOUAC.Settings.CastBar2Dock.Left",
+      right: "BIVOUAC.Settings.CastBar2Dock.Right",
+    },
+    default: "off",
+    onChange: () => {
+      castBar2.applyDock();
+      castBar2.applySize();
+      castBar2.refresh();
+    },
+  });
+
+  // Which stats a plate may overlay (AC / passive perception / current HP /
+  // passive investigation). GM/world toggles, all on by default; each plate still
+  // starts with its stats hidden (toggle per-plate from the bar's hover controls).
+  for (const [key, label] of [
+    [SETTINGS.castStatAC, "AC"],
+    [SETTINGS.castStatPP, "PP"],
+    [SETTINGS.castStatHP, "HP"],
+    [SETTINGS.castStatInv, "Inv"],
+  ] as const) {
+    game.settings.register(MODULE_ID, key, {
+      name: `BIVOUAC.Settings.CastStat${label}.Name`,
+      hint: `BIVOUAC.Settings.CastStat${label}.Hint`,
+      scope: "world",
+      config: true,
+      type: Boolean,
+      default: true,
+      onChange: () => castBars.forEach((b) => b.refresh()),
+    });
+  }
+
+  // Per-bar quick scale multiplier (driven by the hover +/- on each bar), per
+  // client. Hidden from the settings menu.
+  game.settings.register(MODULE_ID, SETTINGS.castBarScale, {
+    scope: "client",
+    config: false,
+    type: Number,
+    default: 1,
+    onChange: () => castBar.applySize(),
+  });
+  game.settings.register(MODULE_ID, SETTINGS.castBar2Scale, {
+    scope: "client",
+    config: false,
+    type: Number,
+    default: 1,
+    onChange: () => castBar2.applySize(),
+  });
+
+  // Hide the Cast Bar(s) while a combat encounter is running (edit mode overrides).
+  game.settings.register(MODULE_ID, SETTINGS.castHideInCombat, {
+    name: "BIVOUAC.Settings.CastHideInCombat.Name",
+    hint: "BIVOUAC.Settings.CastHideInCombat.Hint",
+    scope: "world",
+    config: true,
+    type: Boolean,
+    default: true,
+    onChange: () => castBars.forEach((b) => b.refresh()),
+  });
+
+  // Cast Bar font — a dropdown of Foundry's known fonts (incl. Manage-Fonts ones)
+  // plus a custom Google Font that overrides it, mirroring the tile font chooser.
+  // Per client. Empty = the theme default.
+  const castFontChoices: Record<string, string> = { "": "BIVOUAC.Settings.CastBarFont.Default" };
+  for (const f of availableFonts()) castFontChoices[f] = f;
+  game.settings.register(MODULE_ID, SETTINGS.castBarFont, {
+    name: "BIVOUAC.Settings.CastBarFont.Name",
+    hint: "BIVOUAC.Settings.CastBarFont.Hint",
+    scope: "client",
+    config: true,
+    type: String,
+    choices: castFontChoices,
+    default: "",
+    onChange: () => applyCastFont(),
+  });
+  game.settings.register(MODULE_ID, SETTINGS.castBarFontCustom, {
+    name: "BIVOUAC.Settings.CastBarFontCustom.Name",
+    hint: "BIVOUAC.Settings.CastBarFontCustom.Hint",
+    scope: "client",
+    config: true,
+    type: String,
+    default: "",
+    onChange: () => applyCastFont(),
+  });
+  // Cast Bar name font-size multiplier (1 = the auto size that scales with the
+  // plate). Per client.
+  game.settings.register(MODULE_ID, SETTINGS.castBarFontSize, {
+    name: "BIVOUAC.Settings.CastBarFontSize.Name",
+    hint: "BIVOUAC.Settings.CastBarFontSize.Hint",
+    scope: "client",
+    config: true,
+    type: Number,
+    range: { min: 0.5, max: 2, step: 0.05 },
+    default: 1,
+    onChange: () => applyCastFont(),
   });
 
   // Ctrl+Z / Ctrl+Y undo & redo of the landing layout. Foundry's own undo only
@@ -207,8 +379,12 @@ Hooks.on("getSceneControlButtons", (controls: Record<string, unknown>) => {
     icon: "fa-solid fa-campground",
     order: 90,
     // Being in the Bivouac control group *is* edit mode: activating the group
-    // turns editing on, switching to any other control group turns it off.
-    onChange: (_event: Event, active: boolean) => worldLayer.setEditMode(active),
+    // turns editing on, switching to any other control group turns it off. The
+    // Cast Bar also keys its drop-zone off this, so refresh it too.
+    onChange: (_event: Event, active: boolean) => {
+      worldLayer.setEditMode(active);
+      castBars.forEach((b) => b.refresh()); // both bars key their drop-zone off edit mode
+    },
     activeTool: "arrange",
     tools: {
       // Plain default tool — required as the group's activeTool (buttons/toggles
@@ -257,6 +433,8 @@ Hooks.on("canvasReady", () => {
   // layout context, so drop it (prevents undoing one landing scene onto another).
   clearLayoutHistory();
   worldLayer.refresh();
+  // The Cast Bars' rosters are per-scene — reflect the newly-loaded scene's cast.
+  castBars.forEach((b) => b.refresh());
 });
 
 // Keep the world layer glued to the map as the user pans / zooms.
@@ -271,8 +449,18 @@ Hooks.on("dropCanvasData", (_canvas: unknown, data: { x?: number; y?: number } &
 
 // React to layout changes (from this GM or, for players, broadcast writes).
 Hooks.on("updateScene", (scene: { id: string }, changes: object) => {
-  if (!isLandingScene(scene)) return;
-  if (foundry.utils.hasProperty(changes, `flags.${MODULE_ID}`)) worldLayer.render("updateScene");
+  if (isLandingScene(scene) && foundry.utils.hasProperty(changes, `flags.${MODULE_ID}.${FLAGS.layout}`)) {
+    worldLayer.render("updateScene");
+  }
+  // Cast Bar state is per-scene and works on any scene — refresh when the current
+  // scene's cast-bar flags change (broadcast to players too).
+  if (
+    scene.id === canvas?.scene?.id &&
+    (foundry.utils.hasProperty(changes, `flags.${MODULE_ID}.${FLAGS.castBar}`) ||
+      foundry.utils.hasProperty(changes, `flags.${MODULE_ID}.${FLAGS.castBar2}`))
+  ) {
+    castBars.forEach((b) => b.refresh());
+  }
 });
 
 // Keep document-backed tiles (Actor / Journal / Table / Macro …) live: when a
@@ -282,16 +470,28 @@ function refreshDocTiles(doc: { uuid?: string; parent?: { uuid?: string } } | un
   if (doc?.uuid) {
     worldLayer.refreshDocTiles(doc.uuid);
     dmScreen.refreshDocTiles(doc.uuid);
+    castBars.forEach((b) => b.refreshActor(doc.uuid as string));
   }
   if (doc?.parent?.uuid) {
     worldLayer.refreshDocTiles(doc.parent.uuid);
     dmScreen.refreshDocTiles(doc.parent.uuid);
+    castBars.forEach((b) => b.refreshActor(doc.parent!.uuid as string));
   }
 }
 for (const kind of ["Actor", "Item", "JournalEntry", "JournalEntryPage", "RollableTable", "Macro"]) {
   Hooks.on(`update${kind}`, (doc: { uuid?: string; parent?: { uuid?: string } }) => refreshDocTiles(doc));
   Hooks.on(`delete${kind}`, (doc: { uuid?: string; parent?: { uuid?: string } }) => refreshDocTiles(doc));
 }
+
+// The cast bar can hide while a combat runs (per the setting) — re-evaluate the
+// bars whenever combat state changes (start / end / round / turn).
+for (const hook of ["combatStart", "createCombat", "deleteCombat", "updateCombat"]) {
+  Hooks.on(hook, () => castBars.forEach((b) => b.refresh()));
+}
+
+// Raised-hand tie-in: a flag-based raised-hand module changes a user flag when a
+// player raises/lowers their hand → update just the hand overlays (no flash).
+Hooks.on("updateUser", () => castBars.forEach((b) => b.refreshHands()));
 
 // React to a change in the set of landing scenes (cross-client).
 function onSettingChange(setting: { key?: string }): void {
@@ -306,14 +506,85 @@ Hooks.on("createSetting", onSettingChange);
 
 Hooks.once("ready", () => {
   const mod = game.modules.get(MODULE_ID);
-  if (mod) mod.api = { worldLayer, dmScreen };
+  if (mod) mod.api = { worldLayer, dmScreen, castBar, castBar2 };
   if (game.user?.isGM) {
     dmScreen.mountControl();
     void migrateLandingScenes();
   }
+  // The Cast Bars are player-facing — mount for everyone (the toggle tab and
+  // controls are gated to controllers inside `mount`).
+  castBars.forEach((b) => b.mount());
+  wireRaiseHand();
   applyTabSettings();
+  applyCastFont();
   log("Ready");
 });
+
+/** Wire the "Raise My Hand" (raise-my-hand / -plus) integration so a plate's hand
+ *  badge tracks live. It fires no hooks, so we hook several signals:
+ *   • incoming socket — OTHER users' raises/lowers reach us here;
+ *   • outgoing socket — the LOCAL user's own raise/lower (socketlib emits only to
+ *     others, so our own never echoes back) — we read the outgoing message, which
+ *     carries our user id, so the raiser sees their OWN hand;
+ *   • the players-list ✋ marker + the old module's `game.handRaiser` — extra
+ *     coverage for state we joined into. */
+function wireRaiseHand(): void {
+  // Only the hand overlays are updated (not a full re-render), so raise/lower
+  // never flashes the bar or restarts the wave animation.
+  const bump = (): void => void window.setTimeout(() => castBars.forEach((b) => b.refreshHands()), 0);
+  try {
+    game.socket?.on?.("module.raise-my-hand", (msg: unknown) => {
+      onRaiseHandMessage(msg);
+      bump();
+    });
+  } catch {
+    /* socket unavailable */
+  }
+  // Wrap the outgoing emit so the LOCAL user's own raise/lower is seen too
+  // (thin passthrough — only inspects the one channel; guarded so it never
+  // breaks other socket traffic).
+  try {
+    const sock = game.socket as { emit?: (...a: unknown[]) => unknown; _bivouacEmit?: boolean };
+    if (sock?.emit && !sock._bivouacEmit) {
+      sock._bivouacEmit = true;
+      const orig = sock.emit.bind(sock);
+      sock.emit = (channel: unknown, ...rest: unknown[]): unknown => {
+        if (channel === "module.raise-my-hand") {
+          try {
+            onRaiseHandMessage(rest[0]);
+            bump();
+          } catch {
+            /* ignore */
+          }
+        }
+        return orig(channel, ...rest);
+      };
+    }
+  } catch {
+    /* can't wrap emit */
+  }
+  const players = document.getElementById("players");
+  if (players && "MutationObserver" in window) {
+    new MutationObserver(bump).observe(players, { childList: true, subtree: true });
+  }
+  const patch = (): void => {
+    const hr = (game as { handRaiser?: Record<string, unknown> & { _bivouacPatched?: boolean } }).handRaiser;
+    if (!hr || hr._bivouacPatched) return;
+    hr._bivouacPatched = true;
+    for (const name of ["raise", "lower", "toggle"]) {
+      const fn = hr[name];
+      if (typeof fn === "function") {
+        hr[name] = function (this: unknown, ...args: unknown[]): unknown {
+          const r = (fn as (...a: unknown[]) => unknown).apply(this, args);
+          bump();
+          return r;
+        };
+      }
+    }
+  };
+  patch();
+  window.setTimeout(patch, 3000); // in case raise-my-hand initialised after us
+}
 
 /** One-time migration: fold the legacy single `landingSceneId` into the
  *  `landingSceneIds` set, then clear the legacy value so removing all landing
@@ -324,6 +595,24 @@ async function migrateLandingScenes(): Promise<void> {
     await setLandingScenes([legacy]);
     await setLandingSceneId("");
   }
+}
+
+/** Apply the Cast Bar font — a custom Google Font name (lazy-loaded from the CDN)
+ *  overrides the dropdown pick; empty = the theme default. Sets a CSS var both
+ *  bars inherit. Per client. */
+function applyCastFont(): void {
+  const custom = String(game.settings.get(MODULE_ID, SETTINGS.castBarFontCustom) ?? "").trim();
+  const picked = String(game.settings.get(MODULE_ID, SETTINGS.castBarFont) ?? "").trim();
+  const family = custom || picked;
+  const root = document.documentElement.style;
+  if (family) {
+    if (custom) ensureGoogleFont(custom);
+    root.setProperty("--bivouac-castbar-font", `"${family}", var(--font-primary, "Signika", sans-serif)`);
+  } else {
+    root.removeProperty("--bivouac-castbar-font");
+  }
+  const size = Number(game.settings.get(MODULE_ID, SETTINGS.castBarFontSize) ?? 1);
+  root.setProperty("--bivouac-castbar-font-scale", `${Number.isFinite(size) ? size : 1}`);
 }
 
 /** Push the DM-tab settings into their CSS vars and reposition the tab. */
@@ -346,6 +635,13 @@ function previewTabSettings(root: HTMLElement): void {
   if (pad?.value != null && pad.value !== "") style.setProperty("--bivouac-dmtab-pad", `${Number(pad.value)}px`);
   if (top?.value != null && top.value !== "") style.setProperty("--bivouac-dmtab-top", `${Number(top.value)}%`);
   dmScreen.refreshTab();
+
+  // …and the Cast Bar tab (shared pos/pad settings) — preview both bars' tabs.
+  const cPos = root.querySelector(`[name="${MODULE_ID}.${SETTINGS.castBarTabPos}"]`) as { value?: string } | null;
+  const cPad = root.querySelector(`[name="${MODULE_ID}.${SETTINGS.castBarTabPad}"]`) as { value?: string } | null;
+  const pos = cPos?.value != null && cPos.value !== "" ? Number(cPos.value) : NaN;
+  const padPx = cPad?.value != null && cPad.value !== "" ? Number(cPad.value) : NaN;
+  if (Number.isFinite(pos) || Number.isFinite(padPx)) castBars.forEach((b) => b.previewTab(pos, padPx));
 }
 
 // While the Settings window is open, preview our tab settings live on any input;
@@ -355,7 +651,10 @@ Hooks.on("renderSettingsConfig", (_app: unknown, html: unknown) => {
   const root = html instanceof HTMLElement ? html : (html as { [0]?: HTMLElement } | null)?.[0];
   if (root) root.addEventListener("input", () => previewTabSettings(root));
 });
-Hooks.on("closeSettingsConfig", () => applyTabSettings());
+Hooks.on("closeSettingsConfig", () => {
+  applyTabSettings();
+  castBars.forEach((b) => b.applyTabPos()); // revert cast-bar tab preview to saved
+});
 
 /* -------------------------------------------- toolbar actions ----------- */
 

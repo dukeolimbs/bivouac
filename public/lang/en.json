@@ -156,6 +156,29 @@
       "Reorder": "Drag to move — beside a tile to share its row, above/below for a new row",
       "Empty": "No tools yet. Use + to add a tile."
     },
+    "CastBar": {
+      "Toggle": "Toggle the Cast Bar",
+      "Close": "Hide the Cast Bar",
+      "Reveal": "Show the Cast Bar to players",
+      "ScaleUp": "Larger",
+      "ScaleDown": "Smaller",
+      "Reorder": "Drag to reorder",
+      "Empty": "Drag characters (from the sidebar or a compendium) here to add Actors.",
+      "Missing": "(missing)",
+      "Exit": "Exit the conversation (darken — still in the scene)",
+      "Enter": "Rejoin the conversation",
+      "Hide": "Hide from players",
+      "Show": "Show to players",
+      "Remove": "Remove Actor",
+      "NameToggle": "Click to show/hide this name from players",
+      "StatsShow": "Show stats (AC · Perception · HP · Investigation)",
+      "StatsHide": "Hide stats",
+      "ImageTitle": "Plate image",
+      "ImagePrompt": "Which image should this Actor's plate use?",
+      "ImageProfile": "Profile",
+      "ImageToken": "Token",
+      "ImageCustom": "Custom image…"
+    },
     "Keybindings": {
       "CloseDMScreen": "Close the DM screen",
       "Undo": "Undo landing layout change",
@@ -194,6 +217,68 @@
         "Left": "Left",
         "Top": "Top",
         "Bottom": "Bottom"
+      },
+      "CastBarDock": {
+        "Name": "Cast Bar position",
+        "Hint": "Which edge the floating Cast Bar (the character-portrait strip for narrative encounters) centres on. Per-user. It's sized to its Actors, so it never spans the full width or covers the sidebar / chat.",
+        "Top": "Top",
+        "Bottom": "Bottom",
+        "Left": "Left",
+        "Right": "Right"
+      },
+      "CastBarTabPos": {
+        "Name": "Cast Bar tab — position along edge",
+        "Hint": "Where the Cast Bar toggle tab sits along its docked edge, as a percentage (0 = start, 50 = middle, 100 = end). For a top/bottom dock this is horizontal; for a left/right dock it's vertical."
+      },
+      "CastBarTabPad": {
+        "Name": "Cast Bar tab — edge padding",
+        "Hint": "Horizontal gap (px) the right-docked Cast Bar toggle tab keeps to the left of the sidebar. Increase it to clear other UI docked there; negative values push it toward — or over — the sidebar edge. (Only affects a right-docked Cast Bar.)"
+      },
+      "CastBar2Dock": {
+        "Name": "Second Cast Bar",
+        "Hint": "Add a second, independent Cast Bar on another edge — e.g. the party on one strip and NPCs on the other. Each bar keeps its own roster; 'Off' disables it. GM setting, applied for everyone. (Shares the Actor size / tab settings with the first Cast Bar.)",
+        "Off": "Off",
+        "Top": "Top",
+        "Bottom": "Bottom",
+        "Left": "Left",
+        "Right": "Right"
+      },
+      "CastStatAC": {
+        "Name": "Cast Bar stat — Armor Class",
+        "Hint": "Allow the AC (shield) stat to be shown on Cast Bar plates. Each plate still starts with its stats hidden — reveal them per-plate from the bar's hover controls."
+      },
+      "CastStatPP": {
+        "Name": "Cast Bar stat — Passive Perception",
+        "Hint": "Allow the Passive Perception (eye) stat to be shown on Cast Bar plates."
+      },
+      "CastStatHP": {
+        "Name": "Cast Bar stat — Current HP",
+        "Hint": "Allow the current Hit Points (heart) stat to be shown on Cast Bar plates."
+      },
+      "CastStatInv": {
+        "Name": "Cast Bar stat — Passive Investigation",
+        "Hint": "Allow the Passive Investigation (mask) stat to be shown on Cast Bar plates."
+      },
+      "CastHideInCombat": {
+        "Name": "Hide the Cast Bar during combat",
+        "Hint": "When a combat encounter is running, hide the Cast Bar(s) — you're usually on tokens/initiative then. Entering Bivouac edit mode still shows it. GM setting, applied for everyone."
+      },
+      "CastBarFont": {
+        "Name": "Cast Bar font",
+        "Hint": "Font for the Cast Bar's names. Pick one Foundry already knows (including fonts added via Manage Fonts). A custom Google Font below overrides this.",
+        "Default": "Default (theme font)"
+      },
+      "CastBarFontCustom": {
+        "Name": "Cast Bar font — custom (Google Fonts)",
+        "Hint": "Type a Google Font name (e.g. Cinzel) to load it on demand and use it for the Cast Bar, overriding the dropdown. Leave blank to use the dropdown. Needs Foundry's CSP to allow fonts.googleapis.com / gstatic.com (standard)."
+      },
+      "CastBarFontSize": {
+        "Name": "Cast Bar font size",
+        "Hint": "Scales the Actor name text on the Cast Bar. 1 is the default size (which already scales with the plates); drag up for bigger, down for smaller. Per client."
+      },
+      "CastBarSize": {
+        "Name": "Cast Bar — Actor size",
+        "Hint": "How large the floating character Actors are, in pixels. Per-user — size them to taste."
       }
     }
   }

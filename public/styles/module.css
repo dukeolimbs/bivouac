@@ -5,23 +5,34 @@
    ========================================================================== */
 
 :root {
-  --bivouac-z: 1;                 /* above the canvas, below Foundry's UI panels */
+  --bivouac-z: 1; /* above the canvas, below Foundry's UI panels */
   --bivouac-drawer-z: 60;
   --bivouac-drawer-w: min(380px, 90vw);
-  --bivouac-drawer-h: min(320px, 90vh);   /* drawer height for top/bottom docks (drag-resizable) */
-  --bivouac-drawer-right: 0px;    /* JS-driven: drawer's right edge sits at the sidebar's left edge, so it docks beside the sidebar (not over chat/dice) */
-  --bivouac-dmtab-pad: 16px;      /* gap the tab keeps to the LEFT of the sidebar edge; driven by the "DM screen tab — edge padding" setting (this is the fallback) */
-  --bivouac-dmtab-top: 50%;       /* vertical position of the tab; driven by the "DM screen tab — vertical position" setting */
-  --bivouac-dmtab-inset: 168px;   /* JS-driven from the sidebar's live edge; this is only the pre-measure fallback */
+  --bivouac-drawer-h: min(
+    320px,
+    90vh
+  ); /* drawer height for top/bottom docks (drag-resizable) */
+  --bivouac-drawer-right: 0px; /* JS-driven: drawer's right edge sits at the sidebar's left edge, so it docks beside the sidebar (not over chat/dice) */
+  --bivouac-dmtab-pad: 16px; /* gap the tab keeps to the LEFT of the sidebar edge; driven by the "DM screen tab — edge padding" setting (this is the fallback) */
+  --bivouac-dmtab-top: 50%; /* vertical position of the tab; driven by the "DM screen tab — vertical position" setting */
+  --bivouac-dmtab-inset: 168px; /* JS-driven from the sidebar's live edge; this is only the pre-measure fallback */
   --bivouac-radius: 10px;
   --bivouac-gap: 8px;
   --bivouac-blur: 7px;
   --bivouac-accent: var(--color-warm-2, #d98b3a);
+  --bivouac-castbar-size: 200px; /* cross-axis size of the Cast Bar (drag-resizable) */
+  --bivouac-casttab-pos: 50%; /* position of the Cast Bar toggle tab along its edge */
+  --bivouac-casttab-inset: 40px; /* JS-driven: right-dock tab parks left of the sidebar edge (pre-measure fallback) */
+  --bivouac-speaker: #67d074; /* green highlight for the current speaker */
 
-  --bivouac-panel-bg: rgba(16, 18, 25, 0.40);
+  --bivouac-panel-bg: rgba(16, 18, 25, 0.4);
   --bivouac-panel-bg-strong: rgba(16, 18, 25, 0.86);
-  --bivouac-panel-border: rgba(255, 255, 255, 0.10);
-  --bivouac-frame-border: color-mix(in srgb, var(--bivouac-accent) 65%, rgba(255, 255, 255, 0.18));
+  --bivouac-panel-border: rgba(255, 255, 255, 0.1);
+  --bivouac-frame-border: color-mix(
+    in srgb,
+    var(--bivouac-accent) 65%,
+    rgba(255, 255, 255, 0.18)
+  );
 
   --bivouac-text: var(--color-text-primary, #ecebe6);
   --bivouac-muted: rgba(255, 255, 255, 0.55);
@@ -43,9 +54,9 @@
    Foundry UI rather than diverging per client's OS setting. Defined after the
    media query so, at equal specificity, these win. */
 .theme-dark {
-  --bivouac-panel-bg: rgba(16, 18, 25, 0.40);
+  --bivouac-panel-bg: rgba(16, 18, 25, 0.4);
   --bivouac-panel-bg-strong: rgba(16, 18, 25, 0.86);
-  --bivouac-panel-border: rgba(255, 255, 255, 0.10);
+  --bivouac-panel-border: rgba(255, 255, 255, 0.1);
   --bivouac-text: var(--color-text-primary, #ecebe6);
   --bivouac-muted: rgba(255, 255, 255, 0.55);
 }
@@ -81,7 +92,8 @@
   background-image:
     linear-gradient(to right, rgba(255, 255, 255, 0.06) 1px, transparent 1px),
     linear-gradient(to bottom, rgba(255, 255, 255, 0.06) 1px, transparent 1px);
-  background-size: var(--bivouac-grid-screen, 100px) var(--bivouac-grid-screen, 100px);
+  background-size: var(--bivouac-grid-screen, 100px)
+    var(--bivouac-grid-screen, 100px);
   background-position: var(--bivouac-grid-x, 0px) var(--bivouac-grid-y, 0px);
 }
 
@@ -139,14 +151,21 @@
 .bivouac-frame-framed {
   border: 1.5px solid var(--bivouac-frame-border);
   border-radius: calc(var(--bivouac-radius) + 3px);
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.48), inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+  box-shadow:
+    0 10px 28px rgba(0, 0, 0, 0.48),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.06);
 }
 .bivouac-frame-framed::before {
   content: "";
   position: absolute;
   inset: 0 0 auto 0;
   height: 3px;
-  background: linear-gradient(90deg, transparent, var(--bivouac-frame-accent, var(--bivouac-accent)), transparent);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--bivouac-frame-accent, var(--bivouac-accent)),
+    transparent
+  );
   opacity: 0.85;
   z-index: 2;
   pointer-events: none;
@@ -270,7 +289,11 @@
   width: 16px;
   height: 16px;
   cursor: nwse-resize;
-  background: linear-gradient(135deg, transparent 50%, var(--bivouac-accent) 50%);
+  background: linear-gradient(
+    135deg,
+    transparent 50%,
+    var(--bivouac-accent) 50%
+  );
   opacity: 0.7;
   z-index: 3;
 }
@@ -351,7 +374,11 @@
   justify-content: center;
   gap: 8px;
   color: var(--bivouac-muted);
-  background: radial-gradient(120% 100% at 50% 40%, rgba(255, 255, 255, 0.04), transparent);
+  background: radial-gradient(
+    120% 100% at 50% 40%,
+    rgba(255, 255, 255, 0.04),
+    transparent
+  );
 }
 .bivouac-webview__lod-icon {
   font-size: 1.5em;
@@ -364,8 +391,13 @@
   opacity: 0.75;
 }
 @keyframes bivouac-pulse {
-  0%, 100% { opacity: 0.3; }
-  50% { opacity: 0.6; }
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 0.6;
+  }
 }
 
 .bivouac-image__img {
@@ -390,7 +422,8 @@
   z-index: 1;
 }
 .bivouac-interactive:hover::after {
-  box-shadow: inset 0 0 0 3px color-mix(in srgb, var(--bivouac-accent) 80%, transparent);
+  box-shadow: inset 0 0 0 3px
+    color-mix(in srgb, var(--bivouac-accent) 80%, transparent);
 }
 
 .bivouac-note {
@@ -592,7 +625,9 @@
   border: 2px solid rgba(0, 0, 0, 0.82);
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
   background: #0b0d13;
-  transition: transform 140ms ease, box-shadow 140ms ease;
+  transition:
+    transform 140ms ease,
+    box-shadow 140ms ease;
 }
 .bivouac-cards__art {
   width: 100%;
@@ -640,11 +675,17 @@
   -webkit-backdrop-filter: blur(4px);
   color: #fff;
   cursor: pointer;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  box-shadow:
+    0 1px 4px rgba(0, 0, 0, 0.45),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08);
   z-index: 6;
   opacity: 0;
   pointer-events: none;
-  transition: background 120ms ease, border-color 120ms ease, transform 120ms ease, opacity 120ms ease;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    transform 120ms ease,
+    opacity 120ms ease;
 }
 .bivouac-cards__card:hover .bivouac-cards__remove {
   opacity: 1;
@@ -660,10 +701,16 @@
   opacity: 0.85;
 }
 .bivouac-cards__card--before {
-  box-shadow: inset 5px 0 0 0 var(--bivouac-accent), 0 0 9px 1px var(--bivouac-accent), 0 4px 14px rgba(0, 0, 0, 0.45);
+  box-shadow:
+    inset 5px 0 0 0 var(--bivouac-accent),
+    0 0 9px 1px var(--bivouac-accent),
+    0 4px 14px rgba(0, 0, 0, 0.45);
 }
 .bivouac-cards__card--after {
-  box-shadow: inset -5px 0 0 0 var(--bivouac-accent), 0 0 9px 1px var(--bivouac-accent), 0 4px 14px rgba(0, 0, 0, 0.45);
+  box-shadow:
+    inset -5px 0 0 0 var(--bivouac-accent),
+    0 0 9px 1px var(--bivouac-accent),
+    0 4px 14px rgba(0, 0, 0, 0.45);
 }
 /* Row: overlapping horizontal spread. Grid: wrapped. */
 .bivouac-cards--row .bivouac-cards__hand,
@@ -866,7 +913,7 @@ body.bivouac-dnd-active .bivouac-card__body iframe {
    while the drawer is open (closed via the drawer ✕ or Esc). */
 .bivouac-dmscreen-tab {
   position: absolute;
-  z-index: calc(var(--bivouac-drawer-z) + 1);   /* above Foundry's UI */
+  z-index: calc(var(--bivouac-drawer-z) + 1); /* above Foundry's UI */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -880,11 +927,19 @@ body.bivouac-dnd-active .bivouac-card__body iframe {
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
   backdrop-filter: blur(calc(var(--bivouac-blur) + 2px));
   -webkit-backdrop-filter: blur(calc(var(--bivouac-blur) + 2px));
-  transition: background 120ms ease, color 120ms ease, transform 160ms ease, opacity 160ms ease;
+  transition:
+    background 120ms ease,
+    color 120ms ease,
+    transform 160ms ease,
+    opacity 160ms ease;
 }
 .bivouac-dmscreen-tab:hover {
   color: var(--bivouac-accent);
-  background: color-mix(in srgb, var(--bivouac-accent) 18%, var(--bivouac-panel-bg));
+  background: color-mix(
+    in srgb,
+    var(--bivouac-accent) 18%,
+    var(--bivouac-panel-bg)
+  );
 }
 /* Vertical pill on the left/right edge; --bivouac-dmtab-top positions it along
    the edge. Right tracks the sidebar via --bivouac-dmtab-inset; left sits flush. */
@@ -982,7 +1037,9 @@ body.bivouac-dnd-active .bivouac-card__body iframe {
   flex-direction: column;
   /* Fill + border come from the .bivouac-bg-* / .bivouac-frame-* axis classes
      (same as landing tiles); a card always carries both. */
-  transition: box-shadow 100ms ease, opacity 100ms ease;
+  transition:
+    box-shadow 100ms ease,
+    opacity 100ms ease;
 }
 .bivouac-card--dragging {
   opacity: 0.5;
@@ -1004,10 +1061,14 @@ body.bivouac-dnd-active .bivouac-card__body iframe {
 }
 /* Join a row → an accent bar on the target card's left/right edge. */
 .bivouac-card.bivouac-drop-left {
-  box-shadow: inset 6px 0 0 0 var(--bivouac-accent), 0 0 9px 1px var(--bivouac-accent);
+  box-shadow:
+    inset 6px 0 0 0 var(--bivouac-accent),
+    0 0 9px 1px var(--bivouac-accent);
 }
 .bivouac-card.bivouac-drop-right {
-  box-shadow: inset -6px 0 0 0 var(--bivouac-accent), 0 0 9px 1px var(--bivouac-accent);
+  box-shadow:
+    inset -6px 0 0 0 var(--bivouac-accent),
+    0 0 9px 1px var(--bivouac-accent);
 }
 /* New row → a full-width line across the drawer, centred in the gap above/below
    the whole row (spans the entire horizontal axis, not just one card). Rounded +
@@ -1127,4 +1188,583 @@ body.bivouac-dnd-active .bivouac-card__body iframe {
 .bivouac-pick-hint {
   margin: 0 0 8px;
   opacity: 0.8;
+}
+
+/* ============================================================================
+   Cast Bar — a dedicated, docked strip of character Plates (narrative encounters).
+   Docked/resized like the DM drawer; roster is per-scene (broadcast to players).
+   ========================================================================== */
+
+.bivouac-castbar {
+  position: absolute;
+  z-index: var(--bivouac-drawer-z);
+  display: flex;
+  pointer-events: none; /* floating — only the plates (and edit chrome) capture events */
+  opacity: 0;
+  color: var(--bivouac-text);
+  /* Font chooser (Settings): a picked/custom font, else the theme default. */
+  font-family: var(--bivouac-castbar-font, var(--font-primary, "Signika", sans-serif));
+  transition: opacity 180ms ease;
+}
+.bivouac-castbar.bivouac-castbar--open {
+  opacity: 1;
+  pointer-events: auto;
+}
+/* Hidden-from-players while editing: the bar stays visible (so it can be arranged)
+   but its plates dim, so the hide button gives clear feedback. */
+.bivouac-castbar--dimmed .bivouac-castbar__strip {
+  opacity: 0.4;
+}
+/* Floating + centred on the chosen edge (small inset). Content-sized, so it never
+   spans the full width and can't cover the sidebar / chat. The top inset clears
+   Foundry's scene-navigation bar. */
+.bivouac-castdock-top {
+  top: 55px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+.bivouac-castdock-bottom {
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+.bivouac-castdock-left {
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+.bivouac-castdock-right {
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.bivouac-castbar__strip {
+  display: flex;
+  flex-direction: row;
+  gap: var(--bivouac-gap);
+  align-items: center;
+  max-width: 94vw;
+  /* overflow:auto enables horizontal scroll when there are many plates, but it
+     also clips each plate's drop-shadow / speaker glow at its edge. The padding
+     gives those effects room INSIDE the scroll box so nothing is cut off — and
+     doubles as the hover/fade zone for the hide button. */
+  padding: 22px 34px;
+  overflow: auto;
+}
+.bivouac-castdock-left .bivouac-castbar__strip,
+.bivouac-castdock-right .bivouac-castbar__strip {
+  flex-direction: column;
+  max-width: none;
+  max-height: 88vh;
+}
+/* Edit mode: give the (otherwise transparent) area a visible drop target. */
+.bivouac-castbar--editing .bivouac-castbar__strip {
+  min-width: 200px;
+  min-height: 80px;
+  border: 2px dashed color-mix(in srgb, var(--bivouac-accent) 55%, transparent);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.3);
+}
+.bivouac-castbar__empty {
+  margin: auto;
+  padding: 6px 12px;
+  color: var(--bivouac-muted);
+  text-align: center;
+  font-size: 13px;
+}
+
+/* A Plate — portrait fills, name banner along the bottom. In a horizontal strip
+   its height fills the bar and width follows the 3:4 portrait ratio; in a
+   vertical strip it fills the width instead. */
+.bivouac-plate {
+  position: relative;
+  flex: 0 0 auto;
+  height: var(--bivouac-castbar-fit, var(--bivouac-castbar-size));
+  aspect-ratio: 3 / 4;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 2px solid var(--bivouac-panel-border);
+  background: rgba(0, 0, 0, 0.4);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5); /* read as floating above the scene */
+  transition:
+    box-shadow 120ms ease,
+    transform 120ms ease,
+    border-color 120ms ease,
+    opacity 120ms ease;
+}
+.bivouac-castdock-left .bivouac-plate,
+.bivouac-castdock-right .bivouac-plate {
+  height: auto;
+  width: var(--bivouac-castbar-fit, var(--bivouac-castbar-size));
+}
+.bivouac-plate--interactive {
+  cursor: pointer;
+}
+.bivouac-plate__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.bivouac-plate__name {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  padding: 5px 12px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.85));
+  color: #fff;
+  font-weight: 600;
+  /* Scales with the plate size and wraps to multiple lines rather than
+     truncating with an ellipsis. The whole range is multiplied by the
+     per-client font-size setting (--bivouac-castbar-font-scale, default 1). */
+  font-size: clamp(
+    calc(10px * var(--bivouac-castbar-font-scale, 1)),
+    calc(var(--bivouac-castbar-fit, var(--bivouac-castbar-size)) * 0.085 * var(--bivouac-castbar-font-scale, 1)),
+    calc(17px * var(--bivouac-castbar-font-scale, 1))
+  );
+  line-height: 1.15;
+  text-align: center;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  /* Wrap, but cap at two lines (ellipsis beyond). */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+}
+.bivouac-plate__name--editable {
+  cursor: pointer;
+  transition:
+    color 110ms ease,
+    background 110ms ease,
+    opacity 110ms ease;
+}
+/* Hover a shown name (controller) → PREVIEW the hidden state: fade the real name
+   and reveal a centred "?" (exactly what players see when hidden), making it
+   obvious the click hides it. */
+.bivouac-plate__name--editable:not(.bivouac-plate__name--hidden):hover {
+  color: transparent;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.92));
+}
+/* Hover an already-hidden (greyed) name → brighten it to preview revealing it. */
+.bivouac-plate__name--editable.bivouac-plate__name--hidden:hover {
+  opacity: 1;
+  color: var(--bivouac-accent);
+}
+/* The "?" preview overlay — centred over the name banner, matching the player
+   "?" (see --q below). Hidden until the shown name is hovered. */
+.bivouac-plate__namehint {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 7px 16px;
+  min-height: 1.15em;
+  font-size: 20px;
+  font-weight: 700;
+  color: #fff;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 110ms ease;
+}
+.bivouac-plate__name--editable:not(.bivouac-plate__name--hidden):hover
+  ~ .bivouac-plate__namehint {
+  opacity: 0.55;
+}
+/* Name hidden from players → the GM sees it greyed/italic for reference. */
+.bivouac-plate__name--hidden {
+  opacity: 0.5;
+  font-style: italic;
+}
+/* The "?" a player sees when the name is hidden. */
+.bivouac-plate__name--q {
+  font-size: 20px;
+}
+
+/* Actor stat overlay (AC / passive perception / HP / investigation) — a compact
+   top-left column, icons + colours mirroring Monk's Tokenbar. Scales with the
+   plate size. */
+.bivouac-plate__stats {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 3px 5px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  pointer-events: none;
+}
+.bivouac-plate__stat {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: clamp(9px, calc(var(--bivouac-castbar-fit, var(--bivouac-castbar-size)) * 0.072), 14px);
+  font-weight: 700;
+  line-height: 1.1;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+}
+.bivouac-plate__stat i {
+  width: 1.1em;
+  text-align: center;
+  font-size: 0.92em;
+}
+.bivouac-plate__stat--ac i {
+  color: #b7bec6;
+}
+.bivouac-plate__stat--pp i {
+  color: #57c26a; /* Passive Perception — green */
+}
+.bivouac-plate__stat--hp i {
+  color: #e0555a;
+}
+.bivouac-plate__stat--inv i {
+  color: #d9a94a; /* Passive Investigation — gold */
+}
+/* Active state for the "toggle stats" hover control. */
+.bivouac-plate__ctrl--active,
+.bivouac-plate__ctrl--active:hover {
+  color: var(--bivouac-accent);
+}
+
+/* Raised-hand overlay — a large gold hand centred on the plate (a player who owns
+   this actor has their hand up, via an active raised-hand module). */
+.bivouac-plate__hand {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #f2c14a; /* gold, like a raised hand */
+  font-size: clamp(28px, calc(var(--bivouac-castbar-fit, var(--bivouac-castbar-size)) * 0.42), 130px);
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.85);
+  pointer-events: none;
+  transform-origin: 50% 88%; /* pivot at the wrist */
+  /* A single wave when the hand first appears, then it settles (no loop). */
+  animation: bivouac-hand-wave 1.1s ease-in-out both;
+}
+@keyframes bivouac-hand-wave {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  20% {
+    transform: rotate(16deg);
+  }
+  40% {
+    transform: rotate(-6deg);
+  }
+  60% {
+    transform: rotate(16deg);
+  }
+  80% {
+    transform: rotate(-6deg);
+  }
+}
+
+/* Current speaker — green highlight. Only one plate carries this at a time. */
+.bivouac-plate--speaker {
+  border-color: var(--bivouac-speaker);
+  box-shadow:
+    0 0 0 1px var(--bivouac-speaker),
+    0 0 14px 1px var(--bivouac-speaker);
+}
+/* Exited — physically in the scene but not in this conversation. Darkened for
+   everyone (the darken sits above the portrait + name). */
+.bivouac-plate--exited::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  background: rgba(0, 0, 0, 0.66);
+  pointer-events: none;
+}
+/* Hidden — GM-only marker (players never receive the plate at all). */
+.bivouac-plate--hidden {
+  opacity: 0.55;
+  outline: 2px dashed var(--bivouac-muted);
+  outline-offset: -2px;
+}
+.bivouac-plate--dragging {
+  opacity: 0.5;
+}
+
+/* GM hover controls: reorder grip · exit · hide · remove. */
+.bivouac-plate__controls {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  background: linear-gradient(rgba(0, 0, 0, 0.62), transparent);
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.bivouac-castbar--editable .bivouac-plate:hover .bivouac-plate__controls {
+  opacity: 1;
+}
+.bivouac-plate__grip {
+  cursor: grab;
+  padding: 2px 3px;
+  margin-right: auto; /* keep the grip left, buttons right */
+  opacity: 0.85;
+}
+.bivouac-plate__grip:hover {
+  opacity: 1;
+}
+.bivouac-plate__ctrl {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 5px;
+  background: rgba(0, 0, 0, 0.4);
+  color: #fff;
+  font-size: 11px;
+  cursor: pointer;
+}
+.bivouac-plate__ctrl:hover {
+  background: color-mix(in srgb, var(--bivouac-accent) 45%, rgba(0, 0, 0, 0.5));
+  color: var(--bivouac-accent);
+}
+.bivouac-plate__ctrl--danger:hover {
+  background: rgba(200, 60, 60, 0.65);
+  color: #fff;
+}
+
+/* Reorder drop indicator — an accent bar on the main-axis side the plate will
+   land (before/after). Horizontal strip → vertical bars; vertical → horizontal. */
+.bivouac-plate--drop-before::before,
+.bivouac-plate--drop-after::after {
+  content: "";
+  position: absolute;
+  z-index: 5;
+  background: var(--bivouac-accent);
+  box-shadow: 0 0 8px 1px var(--bivouac-accent);
+  border-radius: 3px;
+  pointer-events: none;
+}
+.bivouac-castdock-bottom .bivouac-plate--drop-before::before,
+.bivouac-castdock-top .bivouac-plate--drop-before::before {
+  top: 0;
+  bottom: 0;
+  left: calc(-0.5 * var(--bivouac-gap) - 2px);
+  width: 4px;
+}
+.bivouac-castdock-bottom .bivouac-plate--drop-after::after,
+.bivouac-castdock-top .bivouac-plate--drop-after::after {
+  top: 0;
+  bottom: 0;
+  right: calc(-0.5 * var(--bivouac-gap) - 2px);
+  width: 4px;
+}
+.bivouac-castdock-left .bivouac-plate--drop-before::before,
+.bivouac-castdock-right .bivouac-plate--drop-before::before {
+  left: 0;
+  right: 0;
+  top: calc(-0.5 * var(--bivouac-gap) - 2px);
+  height: 4px;
+}
+.bivouac-castdock-left .bivouac-plate--drop-after::after,
+.bivouac-castdock-right .bivouac-plate--drop-after::after {
+  left: 0;
+  right: 0;
+  bottom: calc(-0.5 * var(--bivouac-gap) - 2px);
+  height: 4px;
+}
+
+/* GM close button — a small round badge floating at the strip's top-right,
+   to globally hide the bar (the toggle tab brings it back). */
+.bivouac-castbar__close {
+  position: absolute;
+  z-index: 6;
+  top: 18px; /* near the plate top, tucked into the strip's top padding */
+  right: 4px; /* ~6px right of the right-most plate, inside the hover zone */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--bivouac-panel-border);
+  border-radius: 50%;
+  background: var(--bivouac-panel-bg-strong);
+  color: var(--bivouac-text);
+  cursor: pointer;
+  opacity: 0; /* only appears while hovering the cast */
+  pointer-events: none;
+  transition:
+    opacity 140ms ease,
+    color 120ms ease;
+}
+.bivouac-castbar--open:hover .bivouac-castbar__close {
+  opacity: 0.85;
+  pointer-events: auto;
+}
+.bivouac-castbar__close:hover {
+  opacity: 1;
+  color: var(--bivouac-accent);
+}
+/* Right dock: the column hugs the right edge, so put the hide button on its LEFT
+   (otherwise it's tucked against the sidebar). */
+.bivouac-castdock-right .bivouac-castbar__close {
+  right: auto;
+  left: 4px;
+}
+
+/* Client-side quick-scale +/- — a hover-revealed pair centred just OUTSIDE the
+   bar: underneath it (4px gap, matching the hide button's inset), or above it for
+   a bottom-aligned bar so it never runs off-screen. */
+.bivouac-castbar__scale {
+  position: absolute;
+  z-index: 6;
+  left: 50%;
+  /* Touch the bar's edge (no dead gap to cross) and make the 4px visual gap a
+     transparent padding, so the control's hit-area stays contiguous with the bar
+     — the buttons don't fade while the pointer travels to them. */
+  top: 100%;
+  padding-top: 4px;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 140ms ease;
+}
+.bivouac-castdock-bottom .bivouac-castbar__scale {
+  top: auto;
+  bottom: 100%;
+  padding-top: 0;
+  padding-bottom: 4px;
+}
+.bivouac-castbar--open:hover .bivouac-castbar__scale {
+  opacity: 0.85;
+  pointer-events: auto;
+}
+.bivouac-castbar__scalebtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--bivouac-panel-border);
+  border-radius: 50%;
+  background: var(--bivouac-panel-bg-strong);
+  color: var(--bivouac-text);
+  cursor: pointer;
+  font-size: 11px;
+}
+.bivouac-castbar__scalebtn:hover {
+  color: var(--bivouac-accent);
+}
+
+/* GM-only toggle tab — a glassy pill on the docked edge, mirroring the DM tab. */
+.bivouac-castbar-tab {
+  position: absolute;
+  /* Below the DM-screen drawer (--bivouac-drawer-z) so a rolled-out DM screen
+     covers this tab rather than the tab poking through it. */
+  z-index: calc(var(--bivouac-drawer-z) - 1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  color: var(--bivouac-text);
+  font-size: 15px;
+  cursor: pointer;
+  border: 1px solid var(--bivouac-panel-border);
+  border-radius: 9px;
+  background: var(--bivouac-panel-bg);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(calc(var(--bivouac-blur) + 2px));
+  -webkit-backdrop-filter: blur(calc(var(--bivouac-blur) + 2px));
+  transition:
+    background 120ms ease,
+    color 120ms ease,
+    transform 160ms ease,
+    opacity 160ms ease;
+}
+.bivouac-castbar-tab:hover {
+  color: var(--bivouac-accent);
+  background: color-mix(
+    in srgb,
+    var(--bivouac-accent) 18%,
+    var(--bivouac-panel-bg)
+  );
+}
+.bivouac-casttab-bottom,
+.bivouac-casttab-top {
+  width: 60px;
+  height: 34px;
+  left: var(--bivouac-casttab-pos);
+  transform: translateX(-50%);
+}
+.bivouac-casttab-bottom {
+  bottom: 12px;
+}
+.bivouac-casttab-top {
+  top: 55px; /* clear the scene-navigation bar */
+}
+.bivouac-casttab-left,
+.bivouac-casttab-right {
+  width: 34px;
+  height: 60px;
+  top: var(--bivouac-casttab-pos);
+  transform: translateY(-50%);
+}
+.bivouac-casttab-left {
+  left: 0;
+}
+.bivouac-casttab-right {
+  /* Park just left of the sidebar's live edge (JS-driven, same method as the DM
+     screen tab) so it never sits under the sidebar. */
+  right: var(--bivouac-casttab-inset, 40px);
+}
+.bivouac-casttab-bottom:hover {
+  transform: translateX(-50%) translateY(-2px);
+}
+.bivouac-casttab-top:hover {
+  transform: translateX(-50%) translateY(2px);
+}
+.bivouac-casttab-left:hover {
+  transform: translateY(-50%) translateX(2px);
+}
+.bivouac-casttab-right:hover {
+  transform: translateY(-50%) translateX(-2px);
+}
+.bivouac-castbar-tab--open {
+  opacity: 0;
+  pointer-events: none;
+}
+.bivouac-casttab-bottom.bivouac-castbar-tab--open {
+  transform: translateX(-50%) translateY(12px);
+}
+.bivouac-casttab-top.bivouac-castbar-tab--open {
+  transform: translateX(-50%) translateY(-12px);
+}
+.bivouac-casttab-left.bivouac-castbar-tab--open {
+  transform: translateY(-50%) translateX(-12px);
+}
+.bivouac-casttab-right.bivouac-castbar-tab--open {
+  transform: translateY(-50%) translateX(12px);
 }

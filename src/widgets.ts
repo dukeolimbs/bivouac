@@ -309,7 +309,7 @@ export function availableFonts(): string[] {
  *  family). Only used for the note's "custom font" field — dropdown fonts are
  *  already loaded by Foundry. */
 const loadedGoogleFonts = new Set<string>();
-function ensureGoogleFont(family: string): void {
+export function ensureGoogleFont(family: string): void {
   const name = family.trim();
   if (!name) return;
   const key = name.toLowerCase();
@@ -439,7 +439,7 @@ function docBody(ctx: RenderContext, fill: (doc: Record<string, unknown>, host: 
 }
 
 /** Best-effort image for a document (portrait, falling back to the token). */
-function docImg(doc: Record<string, unknown>): string {
+export function docImg(doc: Record<string, unknown>): string {
   const token = (doc.prototypeToken as { texture?: { src?: string } } | undefined)?.texture?.src;
   return (doc.img as string) || token || "icons/svg/mystery-man.svg";
 }

@@ -1,6 +1,6 @@
 /** Bivouac — persistence for landing layouts (scene flags) and DM screens (user flags). */
 
-import { MODULE_ID, FLAGS, SETTINGS, EMPTY_LAYOUT, type Layout } from "./constants";
+import { MODULE_ID, FLAGS, SETTINGS, EMPTY_LAYOUT, EMPTY_CASTBAR, type CastBarData, type Layout } from "./constants";
 
 /* -------------------------------------------- Landing scene ------------- */
 
@@ -126,4 +126,35 @@ export function readDMLayout(): Layout {
 
 export async function writeDMLayout(layout: Layout): Promise<void> {
   await game.user?.setFlag(MODULE_ID, FLAGS.dmScreenLayout, layout);
+}
+
+/* -------------------------------------------- Cast Bar ------------------ */
+// Roster + speaker + visibility live on the Scene flag, so a GM write broadcasts
+// to players via `updateScene` (same mechanism as the landing layout). No undo
+// history here — the Cast Bar isn't part of the board's edit-mode history.
+
+function normalizeCastBar(raw: unknown): CastBarData {
+  const c = raw as Partial<CastBarData> | undefined;
+  const plates = Array.isArray(c?.plates)
+    ? c!.plates.filter((p): p is CastBarData["plates"][number] => !!p && typeof (p as { uuid?: unknown }).uuid === "string")
+    : [];
+  // Deep-clone so callers mutate a PRIVATE copy, never the live flag object
+  // (same reasoning as `normalize` above).
+  return foundry.utils.deepClone({
+    visible: !!c?.visible,
+    speakerId: typeof c?.speakerId === "string" ? c.speakerId : null,
+    plates,
+  }) as CastBarData;
+}
+
+export function readCastBar(scene: unknown, flag: string = FLAGS.castBar): CastBarData {
+  const s = scene as { getFlag?: (m: string, k: string) => unknown } | null;
+  if (!s?.getFlag) return { ...EMPTY_CASTBAR, plates: [] };
+  return normalizeCastBar(s.getFlag(MODULE_ID, flag));
+}
+
+/** Persist a Cast Bar to a scene under its flag. GM only (Foundry permissions). */
+export async function writeCastBar(scene: unknown, flag: string, data: CastBarData): Promise<void> {
+  const s = scene as { setFlag?: (m: string, k: string, v: unknown) => Promise<unknown> } | null;
+  await s?.setFlag?.(MODULE_ID, flag, data);
 }

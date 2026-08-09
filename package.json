@@ -1,7 +1,7 @@
 {
   "name": "bivouac",
-  "version": "0.1.0",
-  "description": "A FoundryVTT module built with TypeScript and Vite.",
+  "version": "1.0.0",
+  "description": "A persistent campaign landing page for Foundry VTT: a zoomable board of tiles, a GM DM screen, and a Cast Bar.",
   "type": "module",
   "private": true,
   "scripts": {

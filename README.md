@@ -1,93 +1,262 @@
 # Bivouac
 
-A persistent, modular **campaign landing page** for [Foundry VTT](https://foundryvtt.com/) — a
-zoomable "table surface" of tiles (web views, images, notes, actors, journals, rollable tables,
-macros, card collections…) laid over a scene, plus a GM-only **DM screen** drawer for the tools
-you want at hand during play.
+A persistent **campaign landing page** for [Foundry VTT](https://foundryvtt.com/).
 
-> Status: early and actively developed (**v0.1.0**). Expect rapid change.
+Pick any scene and Bivouac turns it into your table's home screen: a board of
+**tiles** laid over the map — your wiki, session notes, character portraits,
+journal pages, rollable tables, macro buttons, a hand of cards. It pans and
+zooms with the scene, so it feels like a real table you've laid things out on
+rather than another window.
 
-Built with **TypeScript + Vite**, targeting Foundry **v13+** (verified on v14).
+It also gives the GM two things to run the game with: a **DM screen** drawer
+that slides out from any edge with your own tools in it, and a **Cast Bar** — a
+strip of character portraits that shows who's in the scene and who's talking.
 
----
+## Features
 
-## What it is
-
-- **Landing board** — designate any scene as a landing page and lay out a grid of tiles on it.
-  The board tracks the scene's pan/zoom, so tile chrome stays crisp at any zoom while content
-  scales with the map. Any number of scenes can be landing pages.
-- **DM screen** — a per-GM drawer that docks to any edge (beside / over the sidebar, or left /
-  top / bottom), is drag-resizable, and arranges its own tiles in a dynamic row grid.
-
-## Tiles
-
-- **Web view** — embed a site (e.g. LegendKeeper); browser-style Content Zoom; graceful
-  placeholder / pop-out for sites that refuse embedding.
-- **Image** — click actions (open sheet / journal / run macro), fit + framing options.
-- **Note** — rich HTML with Foundry enrichment (`@UUID` links, inline rolls), keyboard
-  formatting + paste-to-link, per-note font (incl. Google Fonts) and size; scales to the tile.
-- **Actor / Journal / Rollable table / Macro** — drag a document onto the board (in edit mode)
-  or the DM screen to create a live, permission-gated tile: an actor portrait that opens its
-  sheet, an inline journal page (or link), a visual rollable table that rolls and highlights the
-  result row, a configurable macro button.
-- **Card collection** — a hand of cards (fan / row / grid). Drop actors/items in (duplicates
-  allowed); drag a card onto the scene to place its token (or, in edit mode, a tile); reorder,
-  remove, and name-display options.
-- Every tile has independent **Frame** (border) and **Background** (none / solid / frosted /
-  gradient / image) styling with colour + opacity.
+- **A landing board on any scene.** Designate as many scenes as you like as
+  landing pages. Tiles sit on the scene's grid and travel with the map as you
+  pan and zoom, staying sharp at any zoom level.
+- **Eight kinds of tile.** Web views, images, notes, actors, journals, rollable
+  tables, macros, and card collections — most of them created by simply dragging
+  a document out of the sidebar and onto the board.
+- **Everything is styled per tile.** Each tile has its own frame and background
+  — none, solid, frosted glass, gradient, or an image — with your own colour and
+  opacity. A board can be as plain or as decorated as you want.
+- **A DM screen that stays out of the way.** A GM-only drawer that docks beside
+  the sidebar (so chat and dice stay visible), or over it, or to the left, top,
+  or bottom. Drag to resize; arrange its tiles into rows.
+- **A Cast Bar for narrative scenes.** A floating strip of character plates for
+  roleplay-heavy moments: click a portrait to mark who's speaking, dim characters
+  who've stepped out of the conversation, hide names players shouldn't know yet.
+- **Players can join in.** Card collections and tiles can be handed to players
+  or trusted players to arrange, and every tile respects Foundry's normal
+  ownership rules — a player never sees a document they don't have access to.
+- **Undo and redo.** `Ctrl+Z` / `Ctrl+Y` on the board, so a mistaken drag or
+  delete is never a problem.
 
 ## Requirements
 
-- Foundry VTT **v13+** (verified on v14).
+- **Foundry VTT v13 or newer** (verified on v14).
+- No other modules required. Bivouac works with any game system; a few extras
+  are system-specific and say so below.
 
-## Install (development)
+## Installation
 
-The build output (`dist/`) is git-ignored and produced by Vite.
+### Option A — Manifest URL (recommended)
+
+1. In Foundry, go to the **Setup** screen → **Add-on Modules** → **Install
+   Module**.
+2. Paste this into the **Manifest URL** field at the bottom:
+
+   ```
+   https://github.com/dukeolimbs/bivouac/releases/latest/download/module.json
+   ```
+
+3. Click **Install**. This URL always points at the newest release, so Foundry's
+   normal update check will keep you current.
+
+### Option B — Foundry module browser
+
+Search for **Bivouac** in **Install Module** and click Install. *(Available once
+the package is listed in Foundry's registry.)*
+
+### Then enable it
+
+1. Load your world.
+2. Open **Game Settings → Manage Modules**, tick **Bivouac**, and save.
+
+## Quick start
+
+1. Open the scene you want as your landing page — a decorative map, a table
+   surface, even a plain colour.
+2. In the scene controls on the left, open the **Landing Page** group and click
+   **Set this scene as a Landing Page**.
+3. Click **Arrange tiles (edit mode)**. The board is now editable.
+4. Click **Add a tile**, or just **drag an actor, journal, table, or macro from
+   the sidebar onto the map** — it becomes a tile where you dropped it.
+5. Drag tiles to move them, drag their corner to resize, and click the gear to
+   configure one. Leave edit mode when you're happy.
+
+**Fit all tiles to view** re-frames the scene around your board, which is the
+quickest way back when you've zoomed off somewhere.
+
+## The tiles
+
+| Tile | What it's for |
+| --- | --- |
+| **Web view** | Embeds a web page — a campaign wiki, LegendKeeper, a shared doc, a music player. Has its own **Content zoom** so you can fit a page nicely into a small tile. |
+| **Image** | A picture that can do something when clicked: open an actor or item sheet, open a journal, or run a macro. Good for hand-drawn menus and hotspots. |
+| **Note** | Rich text with full Foundry enrichment — `@UUID` links and inline `[[/r 1d20]]` rolls work. Select and `Ctrl+B`/`I`/`U` to format; paste a URL over selected text to link it. Choose any Foundry font or name a Google Font. |
+| **Actor** | A portrait that opens the sheet. Drag an actor onto the board. |
+| **Journal** | A journal page shown inline on the board, or as a link that opens it. |
+| **Rollable table** | The table's entries listed out; press **Roll** and it draws, then highlights and scrolls to the winning row. |
+| **Macro** | A button that runs a macro, with the icon and title shown or hidden and sized to taste. |
+| **Card collection** | A hand of cards laid out as a **fan**, a row, or a grid. Drop actors or items in to add cards; drag a card onto the scene to place its token. Handy as an NPC roster, a loot pile, or a Daggerheart domain hand. |
+
+All tiles have a **Visibility** setting — *Everyone* or *GM only* — on top of
+Foundry's own permissions.
+
+> **A note on web views:** some sites (GitHub, Google, X, most login pages)
+> refuse to be embedded anywhere and will stay blank. That's their policy, not a
+> bug — use the ⇗ button on the tile to open them in a window instead. Wikis,
+> docs, dashboards, and LegendKeeper embed fine.
+
+## The DM screen
+
+A drawer only the GM sees, opened from its own tab at the screen edge. It holds
+the same kinds of tiles as the board — your notes, a rules table, the initiative
+macro — and is completely separate from any scene, so it follows you everywhere.
+
+- **Position** — set **DM screen position** in the settings, or the gear in the
+  drawer's header: beside the sidebar (the default, which keeps chat and dice
+  usable), over the sidebar, or from the left, top, or bottom.
+- **Resize** — drag the drawer's inner edge. The size is remembered.
+- **Arrange** — in the drawer's edit mode, drag a tile beside another to share
+  its row, or above/below it to start a new one.
+
+## The Cast Bar
+
+A floating strip of character **plates** — a portrait and a name — for running
+narrative encounters. It answers "who's in this conversation, and who's
+speaking?" without putting tokens on a map.
+
+- **Adding characters** — in Bivouac's edit mode, drag an actor onto the bar.
+  You'll be asked which image the plate should use: the actor's **profile**
+  picture, its **token** art, or a **custom** image.
+- **Speaking and sheets** — **single-click** a plate to mark that character as
+  the current speaker (they highlight); **double-click** to open the sheet.
+- **Per-plate states** (GM, from the hover controls):
+  - **Exit the conversation** — the plate dims: still in the scene, just not
+    part of this exchange.
+  - **Hide from players** — removed from the players' view entirely.
+  - **Name hidden** — players see **?** instead of the name. New plates start
+    name-hidden, and Bivouac remembers your choice per actor.
+- **Two bars** — turn on a **Second Cast Bar** on another edge, e.g. the party
+  along the top and NPCs along the bottom. Each keeps its own roster and speaker.
+- **Size and position** — dock it to any edge; it keeps clear of Foundry's scene
+  controls and sidebar. Players can resize it by dragging, or use the hover
+  **−/+** buttons to scale it 25–150%. It shrinks to fit so a big cast never
+  overflows.
+- **Stat overlay** *(D&D 5e)* — optionally show **AC, Passive Perception, HP,
+  and Passive Investigation** on a plate. The GM chooses which of the four are
+  available; each plate starts with them hidden.
+- **Raise My Hand tie-in** — if the [Raise My
+  Hand](https://foundryvtt.com/packages/raise-my-hand) module is active, a player
+  raising their hand shows a large hand on their character's plate.
+- **During combat** — optionally hide the Cast Bar automatically while a combat
+  encounter is running.
+
+Bar visibility is per-scene and the GM broadcasts it to everyone.
+
+## Settings
+
+Under **Game Settings → Configure Settings → Bivouac**. The ones worth knowing:
+
+| Setting | What it does |
+| --- | --- |
+| **Maximum tile size** | The largest a tile can be resized to, in grid squares. |
+| **Who can control tiles & cards** | Minimum role that can add, remove and reorder cards or drop documents to make tiles. (They also need Foundry permission to save — usually ownership of the scene.) |
+| **Live web views before LOD** | How many web views may stay live before distant ones become a quiet placeholder when zoomed out. Raise it to keep everything live, lower it if the board feels heavy. |
+| **DM screen position** | Which edge the drawer emerges from. |
+| **Cast Bar position** / **Second Cast Bar** | Which edge each bar centres on. |
+| **Cast Bar font / font size / Actor size** | Per-client look of the bar. |
+| **Hide the Cast Bar during combat** | Auto-hide while an encounter runs. |
+
+Most Cast Bar appearance settings are **per client**, so each player sizes it to
+their own screen; rosters, visibility and the stat toggles are shared.
+
+## Troubleshooting
+
+**A web view tile is blank.** The site refuses embedding (see the note above).
+Use the ⇗ pop-out button on the tile.
+
+**The board feels sluggish with lots of web views.** Each live web view is a real
+browser frame. Lower **Live web views before LOD** so distant ones drop to a
+placeholder while you're zoomed out.
+
+**A player can't see a tile.** Check the tile's **Visibility** setting, then the
+underlying document's ownership — Bivouac never shows a player a document
+Foundry wouldn't.
+
+**Tiles moved unexpectedly.** `Ctrl+Z` on the board undoes layout changes.
+
+## Reporting problems / requests
+
+Found a bug or want a tile type that isn't here? Open an issue:
+<https://github.com/dukeolimbs/bivouac/issues>
+
+## Credits
+
+- **Created by Owen Tidy** ([@dukeolimbs](https://github.com/dukeolimbs)).
+- Developed with help from **Claude Opus 4.8** (Anthropic).
+- **No third-party assets are bundled** — Bivouac ships only its own code, CSS,
+  and language files, with no fonts, images, or icons, and doesn't redistribute
+  any Foundry core assets. If you name a Google Font for a note or the Cast Bar,
+  that font is fetched from Google on demand under its own license; a web view
+  tile shows whatever site you point it at.
+- Thanks to the **Foundry VTT team** for the v13/v14 application and theming
+  APIs this builds on.
+
+## License
+
+[MIT](LICENSE) © 2026 Owen Tidy.
+
+---
+
+## Under the hood (for the technically curious)
+
+You don't need any of this to use the module.
+
+Bivouac is **TypeScript + Vite**, bundled to a single ES module. Foundry globals
+(`game`, `canvas`, `foundry`, …) are typed as `any` via `src/foundry-shim.d.ts`.
+It targets Foundry v13+ and uses the ApplicationV2 / DialogV2 APIs.
+
+**How the board works.** The board is *not* drawn on the canvas — it's a DOM
+layer positioned over it, re-synced to the scene on every `canvasPan`. Tile
+chrome (borders, text) is laid out in screen space so it stays crisp at any
+zoom, while tile content scales with the map. That split is what makes a tile
+readable when zoomed out and sharp when zoomed in.
+
+**Where things are stored.** The landing board lives in **scene flags** (so it
+travels with the scene and any GM sees the same board); the DM screen lives in
+**user flags** (so it's yours alone). Undo/redo is a snapshot stack over the
+scene-flag writes.
+
+**Live updates.** Document-backed tiles register the UUIDs they reference, and
+`updateX` / `deleteX` hooks refresh only the tiles pointing at the changed
+document — so renaming an actor doesn't reload every web view on the board.
+
+### Building it yourself
 
 ```bash
 npm install
-npm run build      # bundle src/module.ts → dist/module.js and copy public/ → dist/
+npm run build      # bundle src/module.ts → dist/module.js, copy public/ → dist/
 npm run link       # junction dist/ into Foundry's modules folder (dev)
 ```
 
-Then enable **Bivouac** in a world. (`npm run link` / `package` use helper scripts kept in the
-workspace root outside this repo; if you don't have them, symlink the built `dist/` into
-`Data/modules/bivouac/` yourself.)
+`npm run link` / `package` use helper scripts kept in the workspace root outside
+this repo; without them, symlink the built `dist/` into `Data/modules/bivouac/`
+yourself.
 
-## Development
+| Command | What it does |
+| --- | --- |
+| `npm run watch` | Rebuild on every save. |
+| `npm run typecheck` | Type-check (`tsc --noEmit`). |
+| `npm run lint` | Lint `src/`. |
+| `npm run build` | One-off production bundle. |
 
-| Command             | What it does                                                |
-| ------------------- | ----------------------------------------------------------- |
-| `npm run watch`     | Rebuild on every save.                                      |
-| `npm run typecheck` | Type-check (`tsc --noEmit`).                                |
-| `npm run lint`      | Lint `src/`.                                                |
-| `npm run build`     | One-off production bundle.                                  |
+JavaScript changes need a Foundry page reload; enable Foundry's Hot Reload for
+CSS and language files.
 
-- Foundry globals (`game`, `canvas`, `foundry`, …) are typed as `any` via `src/foundry-shim.d.ts`.
-- Bundles to a single ESM (`dist/module.js`); styles in `public/styles/module.css`; **all**
-  user-facing copy in `public/lang/en.json`.
-- JavaScript changes need a Foundry page reload; enable Foundry's Hot Reload for CSS/lang.
-
-## Releasing
-
-`.github/workflows/release.yml` cuts a GitHub Release when you push a version tag — it builds,
-rewrites `module.json` with the tag version + release URLs, and attaches `module.json` +
-`module.zip`:
-
-```bash
-git tag v0.1.0 && git push origin v0.1.0
-```
-
-Users then install from the latest manifest URL:
-`https://github.com/<owner>/bivouac/releases/latest/download/module.json`
-
-## Project structure
+### Project structure
 
 ```
 src/
   module.ts         Init/hooks, settings, scene-control toolbar, doc-tile refresh
-  world-layer.ts    The board: DOM-over-canvas surface, screen-space tile layout, drag/resize
+  world-layer.ts    The board: DOM-over-canvas surface, screen-space layout, drag/resize
   dm-screen.ts      The GM DM-screen drawer (dock edges, resize, row grid, drop targets)
+  cast-bar.ts       The Cast Bar(s): docked plate strip, states, stats, scale/fit, raise-hand
   widgets.ts        Tile registry + renderers (webview/image/note/actor/journal/table/macro/cards)
   widget-config.ts  Per-tile configuration dialog + live preview
   drop.ts           Parse Foundry document drags → tiles
@@ -97,8 +266,15 @@ public/
   module.json       Foundry manifest    lang/en.json   UI copy    styles/module.css   Styles
 ```
 
-## Settings
+All user-facing copy lives in `public/lang/en.json`. In the code, tiles are
+still called *widgets*; the user-facing term is **tile**.
 
-Client/world settings include the DM-screen position + tab placement, drawer size, maximum tile
-size, how many live web views before level-of-detail kicks in, and the minimum user role that can
-control tiles/cards.
+### Releasing
+
+`.github/workflows/release.yml` cuts a GitHub Release when you push a version
+tag — it builds, stamps `module.json` with the tag version and release URLs, and
+attaches `module.json` + `module.zip`:
+
+```bash
+git tag v1.0.0 && git push origin v1.0.0
+```

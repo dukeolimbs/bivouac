@@ -50,6 +50,11 @@ jobs:
           console.log(`module.json -> version ${version}`);
           EOF
 
+      # The MIT license requires the notice to travel with the distribution, and
+      # the README is what a user sees if they unzip the module by hand.
+      - name: Include README + CHANGELOG + LICENSE in the distributed module
+        run: cp README.md CHANGELOG.md LICENSE dist/
+
       - name: Zip module
         run: cd dist && zip -r ../module.zip . && cd ..
 

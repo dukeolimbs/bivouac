@@ -1,10 +1,10 @@
 {
   "id": "bivouac",
   "title": "Bivouac",
-  "description": "A persistent, modular campaign landing page: a zoomable table surface of web views, clickable images, and notes, with a GM-only DM screen.",
-  "version": "0.1.0",
+  "description": "A persistent campaign landing page for your table: designate any scene as a zoomable board of tiles — web views, images, notes, actors, journals, rollable tables, macros, and card hands — plus a GM-only DM screen drawer and a Cast Bar of character plates for narrative scenes.",
+  "version": "1.0.0",
   "authors": [
-    { "name": "Owen" }
+    { "name": "Owen Tidy", "url": "https://github.com/dukeolimbs" }
   ],
   "compatibility": {
     "minimum": "13",
@@ -15,7 +15,11 @@
   "languages": [
     { "lang": "en", "name": "English", "path": "lang/en.json" }
   ],
-  "url": "",
-  "manifest": "",
-  "download": ""
+  "license": "MIT",
+  "readme": "https://github.com/dukeolimbs/bivouac/blob/main/README.md",
+  "changelog": "https://github.com/dukeolimbs/bivouac/blob/main/CHANGELOG.md",
+  "bugs": "https://github.com/dukeolimbs/bivouac/issues",
+  "url": "https://github.com/dukeolimbs/bivouac",
+  "manifest": "https://github.com/dukeolimbs/bivouac/releases/latest/download/module.json",
+  "download": "https://github.com/dukeolimbs/bivouac/releases/latest/download/module.zip"
 }

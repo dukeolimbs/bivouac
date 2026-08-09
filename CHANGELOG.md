@@ -3,6 +3,23 @@
 All notable changes to Bivouac are documented here. This project follows
 [Semantic Versioning](https://semver.org/).
 
+## [1.1.0] — 2026-08-10
+
+### Added
+
+- **Meter tile** — a single number with five display styles: a **gauge** as a
+  fill bar or a dial with a needle, a **circle** drawn as a ring of segments
+  that fills clockwise from the bottom (a countdown clock) with an optional
+  Font Awesome **icon in the middle**, a **sliding scale** with a draggable
+  handle showing the number, and a **token pool** of pips packed to fill the
+  tile. Configure the label, range, step, fill/track colours, whether the number
+  shows, a **font for the label**, and **separate colours and sizes for the
+  label and the numbers**. Adjust it during normal play — drag the bar, scale or needle, or
+  click a segment or pip (clicking the last filled one empties it) — and the new
+  value is saved to the board, so every player sees it. A per-tile **"Who can
+  adjust this meter"** role gate decides who may change it; values are static
+  for now (actor / world / combat bindings are still to come).
+
 ## [1.0.0] — 2026-08-09
 
 First public release. Bivouac is feature-complete for its core purpose: a

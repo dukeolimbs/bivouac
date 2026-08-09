@@ -88,6 +88,7 @@ quickest way back when you've zoomed off somewhere.
 | **Web view** | Embeds a web page — a campaign wiki, LegendKeeper, a shared doc, a music player. Has its own **Content zoom** so you can fit a page nicely into a small tile. |
 | **Image** | A picture that can do something when clicked: open an actor or item sheet, open a journal, or run a macro. Good for hand-drawn menus and hotspots. |
 | **Note** | Rich text with full Foundry enrichment — `@UUID` links and inline `[[/r 1d20]]` rolls work. Select and `Ctrl+B`/`I`/`U` to format; paste a URL over selected text to link it. Choose any Foundry font or name a Google Font. |
+| **Meter** | One number, drawn as a **gauge** (bar or dial), a **circle** — a ring of segments filling clockwise from the bottom, with an icon of your choice in the middle — a **sliding scale** with a draggable handle, or a **token pool** of pips. Drag or click it during play to change it and everyone sees the new value. Good for doom clocks, Fear/Hope pools, supplies, or a countdown. |
 | **Actor** | A portrait that opens the sheet. Drag an actor onto the board. |
 | **Journal** | A journal page shown inline on the board, or as a link that opens it. |
 | **Rollable table** | The table's entries listed out; press **Roll** and it draws, then highlights and scrolls to the winning row. |

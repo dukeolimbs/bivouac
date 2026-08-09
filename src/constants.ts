@@ -80,9 +80,9 @@ export function canControl(): boolean {
   }
 }
 
-/** May the current user arrange a specific card collection (add / remove /
- *  reorder / drag its cards)? Uses the tile's own `config.editRole` (minimum
- *  role, 1–4) when set, else inherits the global `canControl()`. */
+/** May the current user operate a specific tile's contents — arrange a card
+ *  collection (add / remove / reorder) or adjust a meter? Uses the tile's own
+ *  `config.editRole` (minimum role, 1–4) when set, else inherits `canControl()`. */
 export function cardsCanControl(config: Record<string, unknown>): boolean {
   const per = Number((config as { editRole?: unknown }).editRole);
   if (Number.isFinite(per) && per >= 1) return Number(game.user?.role ?? 0) >= per;
@@ -99,8 +99,8 @@ export interface WidgetCell {
 
 /** Tile type key. Open (any string) so tiles register via the registry without
  *  editing this file — including dropped-document tiles and future third-party
- *  types. Known built-ins: webview · image · note · actor · journal · table ·
- *  macro (+ planned: scene · playlist · meter · cards · party · combat · rules). */
+ *  types. Known built-ins: webview · image · note · meter · actor · journal ·
+ *  table · macro · cards (+ planned: scene · playlist · party · combat · rules). */
 export type WidgetType = string;
 export type WidgetScope = "shared" | "dm";
 /** Legacy single "chrome" axis — migrated to separate `frame` + `background`

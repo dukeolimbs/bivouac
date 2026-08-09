@@ -10,6 +10,7 @@ import {
   applyTextColor,
   attachInteractions,
   backgroundOf,
+  clampMeterValue,
   createWidget,
   frameOf,
   getWidgetType,
@@ -119,6 +120,8 @@ class WorldLayer {
     // Card-collection tiles emit this when an Actor/Item is dropped on them or a
     // card is removed; persist it to the layout.
     world.addEventListener("bivouac-card-op", (e) => void this.#cardOp(e as CustomEvent));
+    // Meter tiles emit this when their value is clicked/dragged to a new number.
+    world.addEventListener("bivouac-meter-set", (e) => void this.#meterSet(e as CustomEvent));
     overlay.appendChild(world);
     iface.appendChild(overlay);
 
@@ -139,6 +142,23 @@ class WorldLayer {
     const next = applyCardOp(w.config, d);
     if (!next) return;
     w.config = next;
+    await writeLayout(scene, layout);
+  }
+
+  /** Persist a meter tile's new value. The write broadcasts via the scene flag,
+   *  so every client's tile follows. NB: like card ops, a non-GM adjuster still
+   *  needs Foundry permission to update the scene. */
+  async #meterSet(e: CustomEvent<{ id?: string; value?: number }>): Promise<void> {
+    const d = e.detail ?? {};
+    if (!d.id || !Number.isFinite(d.value)) return;
+    const scene = activeLandingScene();
+    if (!scene) return;
+    const layout = readLayout(scene);
+    const w = layout.widgets.find((x) => x.id === d.id);
+    if (!w || w.type !== "meter" || !cardsCanControl(w.config)) return;
+    const value = clampMeterValue(w.config, d.value as number);
+    if (value === Number(w.config.value)) return;
+    w.config = { ...w.config, value };
     await writeLayout(scene, layout);
   }
 

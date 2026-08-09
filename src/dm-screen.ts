@@ -8,6 +8,7 @@ import {
   applyTextColor,
   attachInteractions,
   backgroundOf,
+  clampMeterValue,
   createWidget,
   frameOf,
   getWidgetType,
@@ -307,6 +308,8 @@ class DMScreen {
 
     // Card-collection cards emit this on add/remove; persist to the DM layout.
     drawer.addEventListener("bivouac-card-op", (e) => void this.#cardOp(e as CustomEvent));
+    // Meter cards emit this when their value is clicked/dragged to a new number.
+    drawer.addEventListener("bivouac-meter-set", (e) => void this.#meterSet(e as CustomEvent));
 
     iface.appendChild(drawer);
     this.#el = drawer;
@@ -326,6 +329,21 @@ class DMScreen {
     w.config = next;
     await writeDMLayout(layout);
     this.render();
+  }
+
+  /** Persist a meter card's new value. Repaints only that card — a full render
+   *  would rebuild (and reload) every other card's web view on each click. */
+  async #meterSet(e: CustomEvent<{ id?: string; value?: number }>): Promise<void> {
+    const d = e.detail ?? {};
+    if (!d.id || !Number.isFinite(d.value)) return;
+    const layout = readDMLayout();
+    const w = layout.widgets.find((x) => x.id === d.id);
+    if (!w || w.type !== "meter" || !cardsCanControl(w.config)) return;
+    const value = clampMeterValue(w.config, d.value as number);
+    if (value === Number(w.config.value)) return;
+    w.config = { ...w.config, value };
+    await writeDMLayout(layout);
+    this.#el?.querySelector(`.bivouac-card[data-id="${w.id}"]`)?.replaceWith(this.#renderWidget(w));
   }
 
   async #onDocDrop(event: DragEvent): Promise<void> {

@@ -21,6 +21,9 @@
   --bivouac-blur: 7px;
   --bivouac-accent: var(--color-warm-2, #d98b3a);
   --bivouac-castbar-size: 200px; /* cross-axis size of the Cast Bar (drag-resizable) */
+  /* Fallback only — the real value is derived on `body` below, where Foundry's
+     --z-index-app is actually defined. See the note there. */
+  --bivouac-castbar-z: 29;
   --bivouac-casttab-pos: 50%; /* position of the Cast Bar toggle tab along its edge */
   --bivouac-casttab-inset: 40px; /* JS-driven: right-dock tab parks left of the sidebar edge (pre-measure fallback) */
   --bivouac-speaker: #67d074; /* green highlight for the current speaker */
@@ -36,6 +39,21 @@
 
   --bivouac-text: var(--color-text-primary, #ecebe6);
   --bivouac-muted: rgba(255, 255, 255, 0.55);
+}
+
+/* The Cast Bar floats over the canvas as CONTENT, not as chrome, so Foundry's
+   own chrome must win where they overlap — the scene controls above all, since
+   the left-docked bar sits right on top of them. Foundry paints #ui-left,
+   #ui-right and #ui-middle at --z-index-app (30) and none of them creates a
+   stacking context, so one notch below that puts the bar under every control
+   while staying above the canvas.
+
+   DERIVED HERE, NOT ON :root — --z-index-app is declared on <body>, and a var()
+   inside a custom property resolves against the element the property is
+   DECLARED on. On :root it would never see body's value and would silently
+   freeze at the fallback. */
+body {
+  --bivouac-castbar-z: calc(var(--z-index-app, 30) - 1);
 }
 
 /* Default (no explicit Foundry theme): follow the OS / browser preference. */
@@ -596,6 +614,358 @@
   100% {
     background: color-mix(in srgb, var(--bivouac-accent) 35%, transparent);
   }
+}
+
+/* ------------------------------------------- meter ---------------------- */
+
+/* A meter is its own size container, so its parts scale with the TILE in both
+   places it can live — the world board (inside .bivouac-scaler) and a DM-screen
+   card (which has no scaler). The graphics themselves are either SVG (viewBox
+   scaling: dial, circle), percentage-based (bar, slider) or measured in JS
+   (pool pips), so nothing depends on the map zoom. */
+.bivouac-meter {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  container-type: size;
+  color: var(--bivouac-text-color, inherit);
+  --bivouac-meter-fill: var(--bivouac-accent);
+  --bivouac-meter-track: #101219;
+}
+/* Text sizes take the smaller of a width- and a height-derived size rather than
+   plain cqmin: on a one-square-high, many-squares-wide tile cqmin is the tiny
+   height, which made the type unreadably small. */
+.bivouac-meter__label {
+  flex: 0 0 auto;
+  padding: 4cqmin 4cqmin 0;
+  text-align: center;
+  font-weight: 600;
+  font-size: clamp(6px, calc(min(9cqw, 20cqh) * var(--bivouac-meter-label-scale, 1)), 96px);
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  /* Falls through to the tile's text colour when no label colour is set. */
+  color: var(--bivouac-meter-label-color, inherit);
+}
+.bivouac-meter__body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2cqmin;
+  padding: 4cqmin;
+}
+.bivouac-meter__svg {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  display: block;
+}
+.bivouac-meter__num,
+.bivouac-meter__bubble {
+  color: var(--bivouac-meter-num-color, inherit);
+}
+/* Every number honours --bivouac-meter-num-scale on top of the automatic
+   tile-relative size (the dial's numbers are SVG, so they scale in JS). */
+.bivouac-meter__num {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  font-size: clamp(6px, calc(min(9cqw, 18cqh) * var(--bivouac-meter-num-scale, 1)), 96px);
+}
+
+/* Gauge — bar. Click/drag along it sets the value, hence the resize cursor.
+   It fills a short/wide tile's height (a one-square gauge) but stays a bar
+   rather than a block in a tall one. */
+.bivouac-meter__bar {
+  position: relative;
+  width: 100%;
+  height: min(100%, 62cqh, max(28px, 18cqw));
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--bivouac-meter-track);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+  /* Its own container, so the number scales with the BAR, not the tile — the
+     whole point on a wide, one-square-high gauge. */
+  container-type: size;
+}
+.bivouac-meter__fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, #000 30%, var(--bivouac-meter-fill)),
+    var(--bivouac-meter-fill)
+  );
+  transition: width 120ms ease;
+}
+.bivouac-meter__bar .bivouac-meter__num {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* 52% of the BAR's own height, times the number-size multiplier. */
+  font-size: clamp(6px, calc(52cqh * var(--bivouac-meter-num-scale, 1)), 140px);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.75);
+}
+
+/* Gauge — dial. */
+.bivouac-meter__arc {
+  fill: none;
+  stroke-linecap: round;
+}
+.bivouac-meter__arc--track {
+  stroke: var(--bivouac-meter-track);
+  opacity: 0.85;
+}
+.bivouac-meter__arc--value {
+  stroke: var(--bivouac-meter-fill);
+}
+.bivouac-meter__needle {
+  stroke: currentColor;
+  stroke-linecap: round;
+  opacity: 0.9;
+}
+.bivouac-meter__hub {
+  fill: var(--bivouac-meter-track);
+  stroke: color-mix(in srgb, var(--bivouac-meter-fill) 60%, transparent);
+  stroke-width: 1;
+  pointer-events: none; /* clicks fall through to the wedge / dial underneath */
+}
+.bivouac-meter__svgtext {
+  /* The dial's readout and end labels are numbers too. */
+  fill: var(--bivouac-meter-num-color, currentColor);
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+.bivouac-meter__big {
+  font-weight: 700;
+}
+.bivouac-meter__end {
+  opacity: 0.6;
+}
+
+/* Circle — a ring of stroked arcs filling clockwise from the bottom, with an
+   optional icon (and/or the count) in the middle. Empty segments are a dark
+   tint of the fill colour rather than flat track, so the ring keeps its hue. */
+.bivouac-meter__ring {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  container-type: size; /* the centre icon sizes off the ring's diameter */
+}
+.bivouac-meter__ring .bivouac-meter__svg {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+}
+.bivouac-meter__seg {
+  fill: none;
+  stroke: color-mix(in srgb, var(--bivouac-meter-fill) 26%, var(--bivouac-meter-track));
+  stroke-linecap: butt;
+  transition: stroke 120ms ease;
+}
+.bivouac-meter__seg--on {
+  stroke: var(--bivouac-meter-fill);
+}
+.bivouac-meter__seghit {
+  fill: none;
+  stroke: transparent;
+  stroke-linecap: butt;
+  /* Hit-test the stroke band explicitly — a transparent stroke is not reliably
+     "painted" for the default visiblePainted. */
+  pointer-events: stroke;
+}
+.bivouac-meter__centre {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2cqmin;
+  pointer-events: none; /* clicks pass through to the segments */
+}
+.bivouac-meter__icon {
+  color: var(--bivouac-meter-fill);
+  font-size: clamp(6px, 30cqmin, 140px);
+  line-height: 1;
+}
+.bivouac-meter__centre .bivouac-meter__num {
+  font-size: clamp(6px, calc(22cqmin * var(--bivouac-meter-num-scale, 1)), 160px);
+}
+/* Icon and number together — shrink both so the pair still clears the ring. */
+.bivouac-meter__centre--both .bivouac-meter__icon {
+  font-size: clamp(6px, 22cqmin, 100px);
+}
+.bivouac-meter__centre--both .bivouac-meter__num {
+  font-size: clamp(6px, calc(14cqmin * var(--bivouac-meter-num-scale, 1)), 110px);
+}
+
+/* Sliding scale — track + draggable handle carrying the number. */
+.bivouac-meter__slider {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 2cqmin;
+}
+.bivouac-meter__track {
+  position: relative;
+  width: 100%;
+  /* Sized like the gauge bar — off the smaller of a width- and height-derived
+     size, so a wide one-square-high scale doesn't collapse to hairlines. */
+  height: clamp(6px, min(9cqw, 20cqh), 30px);
+  /* Headroom above the track so the handle's value bubble stays on-tile. */
+  margin-top: clamp(12px, min(12cqw, 30cqh), 60px);
+  border-radius: 999px;
+  background: var(--bivouac-meter-track);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+}
+.bivouac-meter__handle {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: clamp(12px, min(13cqw, 30cqh), 52px);
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: var(--bivouac-meter-fill);
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.55),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+}
+.bivouac-meter__bubble {
+  position: absolute;
+  bottom: 125%;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0.15em 0.5em;
+  border-radius: 0.4em;
+  background: var(--bivouac-meter-track);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+  font-size: clamp(6px, calc(min(9cqw, 22cqh) * var(--bivouac-meter-num-scale, 1)), 96px);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+.bivouac-meter__ends {
+  display: flex;
+  justify-content: space-between;
+  font-size: clamp(6px, calc(min(6cqw, 13cqh) * var(--bivouac-meter-num-scale, 1)), 70px);
+  font-variant-numeric: tabular-nums;
+  opacity: 0.7;
+}
+
+/* A one-square-high scale has no room to stack a bubble, a track and an end
+   row: lay the ends either side of the track and move the number INTO the
+   handle, which becomes a pill. `display: contents` promotes the two end
+   labels into the slider's own flex row so `order` can bracket the track. */
+@container (max-height: 120px) {
+  .bivouac-meter__slider {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.6em;
+  }
+  .bivouac-meter__ends {
+    display: contents;
+  }
+  .bivouac-meter__ends > span:first-child {
+    order: -1;
+  }
+  .bivouac-meter__ends > span:last-child {
+    order: 1;
+  }
+  .bivouac-meter__track {
+    flex: 1;
+    min-width: 0;
+    margin-top: 0;
+  }
+  .bivouac-meter__handle {
+    width: auto;
+    aspect-ratio: auto;
+    height: min(52cqh, 40px);
+    min-width: min(52cqh, 40px);
+    padding: 0 0.4em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    /* Track-coloured with a fill-coloured ring, so the number keeps its
+       contrast instead of sitting light-on-orange. */
+    background: var(--bivouac-meter-track);
+    box-shadow:
+      inset 0 0 0 max(1px, 0.09em) var(--bivouac-meter-fill),
+      0 2px 6px rgba(0, 0, 0, 0.55);
+  }
+  .bivouac-meter__bubble {
+    position: static;
+    transform: none;
+    padding: 0;
+    background: none;
+    box-shadow: none;
+    font-size: calc(min(34cqh, 26px) * var(--bivouac-meter-num-scale, 1));
+  }
+}
+
+/* Token pool — pip size and column count are set in JS to fill the tile.
+   `width: 100%` is load-bearing: the body centres its children, so without it
+   the grid is content-sized and every measure-and-resize pass made it narrower,
+   walking the pips down into a thin sliver in the middle. */
+.bivouac-meter__pool {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  display: grid;
+  justify-content: center;
+  align-content: center;
+  gap: var(--bivouac-pip-gap, 4px);
+}
+.bivouac-meter__pip {
+  width: var(--bivouac-pip, 16px);
+  height: var(--bivouac-pip, 16px);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--bivouac-meter-fill) 26%, var(--bivouac-meter-track));
+  transition:
+    background 120ms ease,
+    box-shadow 120ms ease;
+}
+/* Flat fill — no sheen, no bloom. */
+.bivouac-meter__pip--on {
+  background: var(--bivouac-meter-fill);
+}
+
+/* Adjustable (normal play + permitted): affordances only where they do something. */
+.bivouac-meter--live .bivouac-meter__bar,
+.bivouac-meter--live .bivouac-meter__track,
+.bivouac-meter--live.bivouac-meter--dial .bivouac-meter__svg {
+  cursor: ew-resize;
+}
+.bivouac-meter--live .bivouac-meter__handle {
+  cursor: grab;
+}
+.bivouac-meter--live .bivouac-meter__seghit,
+.bivouac-meter--live .bivouac-meter__pip {
+  cursor: pointer;
+}
+/* Hover reads as a GLOW around the thing you're about to set, not a wash over
+   it. The hit arc covers its segment, so the hover is taken on their shared
+   <g> and the glow applied to the segment inside. Filter lengths on an SVG
+   child are user units, so the glow scales with the ring. */
+.bivouac-meter--live .bivouac-meter__segwrap:hover .bivouac-meter__seg {
+  filter: drop-shadow(0 0 2.5px var(--bivouac-meter-fill)) drop-shadow(0 0 6px var(--bivouac-meter-fill));
+}
+.bivouac-meter--live .bivouac-meter__pip:hover {
+  box-shadow: 0 0 calc(var(--bivouac-pip, 16px) * 0.35) var(--bivouac-meter-fill);
 }
 
 /* ------------------------------------------- card collection ------------ */
@@ -1197,7 +1567,8 @@ body.bivouac-dnd-active .bivouac-card__body iframe {
 
 .bivouac-castbar {
   position: absolute;
-  z-index: var(--bivouac-drawer-z);
+  /* Under Foundry's scene controls / nav / hotbar — see --bivouac-castbar-z. */
+  z-index: var(--bivouac-castbar-z);
   display: flex;
   pointer-events: none; /* floating — only the plates (and edit chrome) capture events */
   opacity: 0;
@@ -1682,9 +2053,10 @@ body.bivouac-dnd-active .bivouac-card__body iframe {
 /* GM-only toggle tab — a glassy pill on the docked edge, mirroring the DM tab. */
 .bivouac-castbar-tab {
   position: absolute;
-  /* Below the DM-screen drawer (--bivouac-drawer-z) so a rolled-out DM screen
-     covers this tab rather than the tab poking through it. */
-  z-index: calc(var(--bivouac-drawer-z) - 1);
+  /* Same layer as the bar it opens, so the two never straddle Foundry's chrome.
+     Still below the DM-screen drawer (--bivouac-drawer-z, 60), so a rolled-out
+     DM screen covers this tab rather than the tab poking through it. */
+  z-index: var(--bivouac-castbar-z);
   display: flex;
   align-items: center;
   justify-content: center;

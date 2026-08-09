@@ -1,7 +1,7 @@
 /** Bivouac — per-widget configuration dialog (DialogV2). */
 
 import type { Widget, WidgetBackground, WidgetFrame, WidgetScope, WidgetType } from "./constants";
-import { availableFonts, backgroundOf, frameOf, widgetTypes } from "./widgets";
+import { METER_KINDS, availableFonts, backgroundOf, frameOf, readMeter, widgetTypes } from "./widgets";
 
 type SaveFn = (updated: Widget) => void;
 type LiveFn = (updated: Widget) => void;
@@ -28,6 +28,40 @@ function section(title: string, rows: string[]): string {
   return `<fieldset class="bivouac-config__section"><legend>${esc(title)}</legend>${rows.join("")}</fieldset>`;
 }
 
+/** Suggestions for the Circle meter's centre icon — offered as a datalist, so
+ *  any other Font Awesome class the GM types still works. */
+const METER_ICONS = [
+  "fa-solid fa-heart",
+  "fa-solid fa-bolt",
+  "fa-solid fa-shield-halved",
+  "fa-solid fa-flask",
+  "fa-solid fa-skull",
+  "fa-solid fa-hourglass-half",
+  "fa-solid fa-clock",
+  "fa-solid fa-fire",
+  "fa-solid fa-droplet",
+  "fa-solid fa-moon",
+  "fa-solid fa-sun",
+  "fa-solid fa-star",
+  "fa-solid fa-gem",
+  "fa-solid fa-coins",
+  "fa-solid fa-wheat-awn",
+  "fa-solid fa-eye",
+] as const;
+
+/** `<option>`s for a per-tile minimum-role gate (`config.editRole`; 0 = inherit
+ *  the global control role). Shared by the card and meter tiles — the value
+ *  labels live under the `CardsRole_*` keys. */
+function roleOptions(current: unknown): string {
+  const cur = String(Number(current) || 0);
+  return (["inherit", "player", "trusted", "assistant", "gm"] as const)
+    .map((key, value) => {
+      const v = String(value);
+      return `<option value="${v}"${cur === v ? " selected" : ""}>${esc(t(`BIVOUAC.Config.CardsRole_${key}`))}</option>`;
+    })
+    .join("");
+}
+
 function buildForm(widget: Widget): string {
   // ---- General -------------------------------------------------------------
   const general = [
@@ -40,7 +74,7 @@ function buildForm(widget: Widget): string {
        </select>`),
   ];
   // Text colour — offered on tiles that display text.
-  if (["note", "journal", "table", "macro", "cards", "actor"].includes(widget.type)) {
+  if (["note", "journal", "table", "macro", "cards", "actor", "meter"].includes(widget.type)) {
     const tcOn = typeof widget.config.textColor === "string" && /^#[0-9a-fA-F]{6}$/.test(widget.config.textColor);
     const tc = tcOn ? (widget.config.textColor as string) : "#ffffff";
     general.push(group(t("BIVOUAC.Config.TextColor"),
@@ -91,6 +125,55 @@ function buildForm(widget: Widget): string {
       content.push(group(t("BIVOUAC.Config.NoteFontCustom"),
         `<input type="text" name="noteFontCustom" value="${esc(widget.config.fontCustom ?? "")}" placeholder="${esc(t("BIVOUAC.Config.NoteFontCustomPlaceholder"))}">` +
           `<p class="bivouac-config__hint">${esc(t("BIVOUAC.Config.NoteFontHint"))}</p>`));
+      break;
+    }
+    case "meter": {
+      const m = readMeter(widget.config);
+      content.push(group(t("BIVOUAC.Config.MeterKind"),
+        `<select name="meterKind">${METER_KINDS
+          .map((k) => `<option value="${k}"${m.kind === k ? " selected" : ""}>${esc(t(`BIVOUAC.Config.MeterKind_${k}`))}</option>`)
+          .join("")}</select>` +
+          `<p class="bivouac-config__hint">${esc(t("BIVOUAC.Config.MeterKindHint"))}</p>`));
+      content.push(group(t("BIVOUAC.Config.MeterLabel"),
+        `<input type="text" name="meterLabel" value="${esc(m.label)}" placeholder="${esc(t("BIVOUAC.Config.MeterLabelPlaceholder"))}">`));
+      const curMeterFont = m.labelFont;
+      const meterFontOpts = [`<option value=""${curMeterFont === "" ? " selected" : ""}>${esc(t("BIVOUAC.Config.NoteFontDefault"))}</option>`]
+        .concat(availableFonts().map((f) => `<option value="${esc(f)}"${curMeterFont === f ? " selected" : ""}>${esc(f)}</option>`))
+        .join("");
+      content.push(group(t("BIVOUAC.Config.MeterLabelFont"), `<select name="meterLabelFont">${meterFontOpts}</select>`));
+      content.push(group(t("BIVOUAC.Config.MeterLabelFontCustom"),
+        `<input type="text" name="meterLabelFontCustom" value="${esc(m.labelFontCustom)}" placeholder="${esc(t("BIVOUAC.Config.NoteFontCustomPlaceholder"))}">` +
+          `<p class="bivouac-config__hint">${esc(t("BIVOUAC.Config.NoteFontHint"))}</p>`));
+      content.push(group(t("BIVOUAC.Config.MeterLabelColor"),
+        `<label class="bivouac-config__inline"><input type="checkbox" name="meterLabelColorOn"${m.labelColor ? " checked" : ""}> ${esc(t("BIVOUAC.Config.TextColorCustom"))}</label>` +
+          `<input type="color" name="meterLabelColor" value="${esc(m.labelColor || "#ffffff")}">`));
+      content.push(group(t("BIVOUAC.Config.MeterLabelSize"),
+        `<input type="number" name="meterLabelScale" value="${esc(m.labelScale)}" min="0.3" max="3" step="0.1">`));
+      content.push(group(t("BIVOUAC.Config.MeterNumberColor"),
+        `<label class="bivouac-config__inline"><input type="checkbox" name="meterNumColorOn"${m.numberColor ? " checked" : ""}> ${esc(t("BIVOUAC.Config.TextColorCustom"))}</label>` +
+          `<input type="color" name="meterNumColor" value="${esc(m.numberColor || "#ffffff")}">`));
+      content.push(group(t("BIVOUAC.Config.MeterNumberSize"),
+        `<input type="number" name="meterNumScale" value="${esc(m.numberScale)}" min="0.3" max="3" step="0.1">` +
+          `<p class="bivouac-config__hint">${esc(t("BIVOUAC.Config.MeterTextHint"))}</p>`));
+      content.push(group(t("BIVOUAC.Config.MeterMin"),
+        `<input type="number" name="meterMin" value="${esc(m.min)}" step="any" title="${esc(t("BIVOUAC.Config.MeterRangeHint"))}">`));
+      content.push(group(t("BIVOUAC.Config.MeterMax"),
+        `<input type="number" name="meterMax" value="${esc(m.max)}" step="any" title="${esc(t("BIVOUAC.Config.MeterRangeHint"))}">`));
+      content.push(group(t("BIVOUAC.Config.MeterValue"),
+        `<input type="number" name="meterValue" value="${esc(m.value)}" step="any">`));
+      content.push(group(t("BIVOUAC.Config.MeterStep"),
+        `<input type="number" name="meterStep" value="${esc(m.step)}" min="0" step="any" title="${esc(t("BIVOUAC.Config.MeterStepHint"))}">`));
+      content.push(group(t("BIVOUAC.Config.MeterIcon"),
+        `<input type="text" name="meterIcon" list="bivouac-meter-icons" value="${esc(m.icon)}" placeholder="${esc(t("BIVOUAC.Config.MeterIconPlaceholder"))}">` +
+          `<datalist id="bivouac-meter-icons">${METER_ICONS.map((i) => `<option value="${esc(i)}">`).join("")}</datalist>` +
+          `<p class="bivouac-config__hint">${esc(t("BIVOUAC.Config.MeterIconHint"))}</p>`));
+      content.push(group(t("BIVOUAC.Config.MeterColor"), `<input type="color" name="meterColor" value="${esc(m.color)}">`));
+      content.push(group(t("BIVOUAC.Config.MeterTrack"), `<input type="color" name="meterTrack" value="${esc(m.trackColor)}">`));
+      content.push(group(t("BIVOUAC.Config.MeterShowValue"),
+        `<input type="checkbox" name="meterShowValue"${m.showValue ? " checked" : ""}>`));
+      content.push(group(t("BIVOUAC.Config.MeterRole"),
+        `<select name="meterEditRole">${roleOptions(widget.config.editRole)}</select>` +
+          `<p class="bivouac-config__hint">${esc(t("BIVOUAC.Config.MeterHint"))}</p>`));
       break;
     }
     case "actor":
@@ -160,18 +243,8 @@ function buildForm(widget: Widget): string {
       content.push(group(t("BIVOUAC.Config.CardsNameFont"), `<select name="cardsNameFont">${cardFontOpts}</select>`));
       content.push(group(t("BIVOUAC.Config.CardsNameSize"),
         `<input type="number" name="cardsNameSize" value="${esc(Number(widget.config.nameSize) || 12)}" min="6" max="48" step="1">`));
-      const curRole = String(Number(widget.config.editRole) || 0);
-      const roleOpts: [string, string][] = [
-        ["0", t("BIVOUAC.Config.CardsRole_inherit")],
-        ["1", t("BIVOUAC.Config.CardsRole_player")],
-        ["2", t("BIVOUAC.Config.CardsRole_trusted")],
-        ["3", t("BIVOUAC.Config.CardsRole_assistant")],
-        ["4", t("BIVOUAC.Config.CardsRole_gm")],
-      ];
       content.push(group(t("BIVOUAC.Config.CardsRole"),
-        `<select name="cardsEditRole">${roleOpts
-          .map(([v, l]) => `<option value="${v}"${curRole === v ? " selected" : ""}>${esc(l)}</option>`)
-          .join("")}</select>` +
+        `<select name="cardsEditRole">${roleOptions(widget.config.editRole)}</select>` +
           `<p class="bivouac-config__hint">${esc(t("BIVOUAC.Config.CardsHint"))}</p>`));
       break;
     }
@@ -279,6 +352,37 @@ function applyForm(widget: Widget, data: Record<string, string>): Widget {
       updated.config.textScale = Number.isFinite(s) ? Math.min(3, Math.max(0.5, s)) : 1;
       updated.config.font = typeof data.noteFont === "string" ? data.noteFont : "";
       updated.config.fontCustom = (data.noteFontCustom ?? "").trim();
+      break;
+    }
+    case "meter": {
+      const numOr = (raw: string | undefined, dflt: number): number => {
+        const n = Number(raw);
+        return Number.isFinite(n) ? n : dflt;
+      };
+      updated.config.meterKind = (METER_KINDS as readonly string[]).includes(data.meterKind) ? data.meterKind : "bar";
+      updated.config.label = data.meterLabel?.trim() ?? "";
+      updated.config.min = numOr(data.meterMin, 0);
+      updated.config.max = numOr(data.meterMax, 10);
+      updated.config.value = numOr(data.meterValue, 0);
+      updated.config.step = Math.max(0, numOr(data.meterStep, 1));
+      // Class list only — `readMeter` strips anything that isn't class-safe.
+      updated.config.icon = data.meterIcon?.trim() ?? "";
+      updated.config.labelFont = typeof data.meterLabelFont === "string" ? data.meterLabelFont : "";
+      updated.config.labelFontCustom = (data.meterLabelFontCustom ?? "").trim();
+      const hexIf = (on: string | undefined, value: string | undefined): string =>
+        on === "on" && /^#[0-9a-fA-F]{6}$/.test(value ?? "") ? (value as string) : "";
+      updated.config.labelColor = hexIf(data.meterLabelColorOn, data.meterLabelColor);
+      updated.config.numberColor = hexIf(data.meterNumColorOn, data.meterNumColor);
+      updated.config.labelScale = Math.min(3, Math.max(0.3, numOr(data.meterLabelScale, 1)));
+      updated.config.numberScale = Math.min(3, Math.max(0.3, numOr(data.meterNumScale, 1)));
+      updated.config.color = /^#[0-9a-fA-F]{6}$/.test(data.meterColor ?? "") ? data.meterColor : "#d98b3a";
+      updated.config.trackColor = /^#[0-9a-fA-F]{6}$/.test(data.meterTrack ?? "") ? data.meterTrack : "#101219";
+      updated.config.showValue = data.meterShowValue === "on";
+      const mr = Number(data.meterEditRole);
+      updated.config.editRole = Number.isFinite(mr) ? Math.min(4, Math.max(0, mr)) : 0;
+      // Range/step are sanitised on read, so re-snap the stored value now — the
+      // tile never shows a number the meter itself couldn't land on.
+      updated.config.value = readMeter(updated.config).value;
       break;
     }
     case "actor":

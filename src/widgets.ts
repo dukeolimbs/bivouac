@@ -355,6 +355,530 @@ registerWidgetType({
   },
 });
 
+/* -------------------------------------------- meter --------------------- */
+
+/** Meter display styles. `bar` and `dial` are the two Gauge shapes (a linear
+ *  fill and an arc + needle); `circle` is a segmented clock, `slider` a scale
+ *  with a draggable handle, and `pool` a spread of tokens. */
+export const METER_KINDS = ["bar", "dial", "circle", "slider", "pool"] as const;
+export type MeterKind = (typeof METER_KINDS)[number];
+
+/** The counting styles build one node per unit — a pip div, or a ring segment
+ *  plus its hit arc — so a mistyped max needs a backstop or a stray keystroke
+ *  builds tens of thousands of nodes and rebuilds them on every value change.
+ *  512 is far above any real pool or clock while still cheap (~1k SVG nodes at
+ *  the very top end). */
+const METER_MAX_PIPS = 512;
+
+/** A meter's sanitised, render-ready state. */
+export interface MeterState {
+  kind: MeterKind;
+  label: string;
+  min: number;
+  max: number;
+  value: number;
+  step: number;
+  color: string;
+  trackColor: string;
+  showValue: boolean;
+  /** Font Awesome classes for the Circle style's centre icon (empty = none). */
+  icon: string;
+  /** Optional per-part text colours (#rrggbb; empty = inherit the tile's). */
+  labelColor: string;
+  numberColor: string;
+  /** Per-part size multipliers on top of the automatic tile-relative sizing. */
+  labelScale: number;
+  numberScale: number;
+  /** Label typeface: a font Foundry knows, or a Google Font name overriding it. */
+  labelFont: string;
+  labelFontCustom: string;
+}
+
+/** Styles that draw one node per unit — always whole numbers counted from 0. */
+function isCounting(kind: MeterKind): boolean {
+  return kind === "circle" || kind === "pool";
+}
+
+function num(value: unknown, fallback: number): number {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function hexOr(value: unknown, fallback: string): string {
+  return typeof value === "string" && /^#[0-9a-fA-F]{6}$/.test(value) ? value : fallback;
+}
+
+/** Trim a value to a short display string (no trailing float dust). */
+function fmtNum(value: number): string {
+  return String(Math.round(value * 100) / 100);
+}
+
+/** Clamp a raw value onto a meter's range and snap it to its step. */
+export function snapMeter(raw: number, m: MeterState): number {
+  if (!Number.isFinite(raw)) return m.min;
+  let v = Math.min(m.max, Math.max(m.min, raw));
+  if (m.step > 0) v = m.min + Math.round((v - m.min) / m.step) * m.step;
+  v = Math.min(m.max, Math.max(m.min, v));
+  return Math.round(v * 1e6) / 1e6; // drop the float dust stepping leaves behind
+}
+
+/** Read + sanitise a meter tile's config. Counting styles (circle / pool) are
+ *  forced to whole units from 0, since each unit is a drawn node. */
+export function readMeter(config: Record<string, unknown>): MeterState {
+  const kind = (METER_KINDS as readonly string[]).includes(String(config.meterKind))
+    ? (String(config.meterKind) as MeterKind)
+    : "bar";
+  const counting = isCounting(kind);
+  const min = counting ? 0 : num(config.min, 0);
+  let max = num(config.max, counting ? 6 : 10);
+  if (counting) max = Math.min(METER_MAX_PIPS, Math.max(1, Math.round(max)));
+  else if (max <= min) max = min + 1;
+  const m: MeterState = {
+    kind,
+    label: String(config.label ?? ""),
+    min,
+    max,
+    value: min,
+    step: counting ? 1 : Math.max(0, num(config.step, 1)),
+    color: hexOr(config.color, "#d98b3a"),
+    trackColor: hexOr(config.trackColor, "#101219"),
+    showValue: config.showValue !== false,
+    // Class list only — it lands in a className, never as markup.
+    icon: String(config.icon ?? "").trim().replace(/[^\w\s-]/g, ""),
+    labelColor: hexOr(config.labelColor, ""),
+    numberColor: hexOr(config.numberColor, ""),
+    labelScale: Math.min(3, Math.max(0.3, num(config.labelScale, 1))),
+    numberScale: Math.min(3, Math.max(0.3, num(config.numberScale, 1))),
+    labelFont: String(config.labelFont ?? "").trim(),
+    labelFontCustom: String(config.labelFontCustom ?? "").trim(),
+  };
+  m.value = snapMeter(num(config.value, min), m);
+  return m;
+}
+
+/** Clamp a value against a meter widget's stored config. Used by the surfaces
+ *  that persist a change, so they validate exactly as the tile does. */
+export function clampMeterValue(config: Record<string, unknown>, raw: number): number {
+  return snapMeter(raw, readMeter(config));
+}
+
+/** How far along its range a value sits, 0–1. */
+function fraction(value: number, m: MeterState): number {
+  return m.max > m.min ? Math.min(1, Math.max(0, (value - m.min) / (m.max - m.min))) : 0;
+}
+
+/* --- SVG helpers (the dial and circle scale by viewBox, so they stay crisp
+       at any tile size or map zoom without measuring anything). -------------- */
+
+const SVG_NS = "http://www.w3.org/2000/svg";
+
+function svgEl<K extends keyof SVGElementTagNameMap>(
+  tag: K,
+  attrs: Record<string, string | number>,
+): SVGElementTagNameMap[K] {
+  const node = document.createElementNS(SVG_NS, tag);
+  for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, String(v));
+  return node;
+}
+
+function svgRoot(vbW: number, vbH: number): SVGSVGElement {
+  return svgEl("svg", {
+    class: "bivouac-meter__svg",
+    viewBox: `0 0 ${vbW} ${vbH}`,
+    preserveAspectRatio: "xMidYMid meet",
+  });
+}
+
+function svgText(x: number, y: number, size: number, anchor: string, cls: string, content: string): SVGTextElement {
+  const node = svgEl("text", {
+    class: `bivouac-meter__svgtext ${cls}`.trim(),
+    x,
+    y,
+    "font-size": size,
+    "text-anchor": anchor,
+  });
+  node.textContent = content;
+  return node;
+}
+
+/** Point on a circle. `deg` runs counter-clockwise from the +x axis with screen
+ *  y flipped, so 90 is the top of the circle. */
+function polar(cx: number, cy: number, r: number, deg: number): { x: number; y: number } {
+  const a = (deg * Math.PI) / 180;
+  return { x: cx + r * Math.cos(a), y: cy - r * Math.sin(a) };
+}
+
+/** Path `d` for a circular arc sweeping clockwise (on screen) between angles. */
+function arcPath(cx: number, cy: number, r: number, from: number, to: number): string {
+  const a = polar(cx, cy, r, from);
+  const b = polar(cx, cy, r, to);
+  const large = Math.abs(from - to) > 180 ? 1 : 0;
+  return `M ${a.x.toFixed(2)} ${a.y.toFixed(2)} A ${r} ${r} 0 ${large} 1 ${b.x.toFixed(2)} ${b.y.toFixed(2)}`;
+}
+
+/** Map client coords into an SVG's viewBox units. Derived from the element's
+ *  bounding rect + the viewBox aspect (rather than getScreenCTM) so it stays
+ *  correct under the board scaler's CSS transform. */
+function svgPoint(svg: SVGSVGElement, clientX: number, clientY: number, vbW: number, vbH: number): { x: number; y: number } {
+  const r = svg.getBoundingClientRect();
+  if (!r.width || !r.height) return { x: 0, y: 0 };
+  const s = Math.min(r.width / vbW, r.height / vbH); // preserveAspectRatio: meet
+  return {
+    x: (clientX - r.left - (r.width - vbW * s) / 2) / s,
+    y: (clientY - r.top - (r.height - vbH * s) / 2) / s,
+  };
+}
+
+/** Click or drag along a horizontal track to set the value. The whole gesture
+ *  previews locally and commits ONCE on release, so a drag is a single layout
+ *  write rather than one per pointermove. Rects and clientX are both screen
+ *  space, so this is correct under the world scaler's transform. */
+function attachScrub(
+  track: HTMLElement,
+  m: MeterState,
+  preview: (value: number) => void,
+  commit: (value: number) => void,
+): void {
+  const valueAt = (clientX: number): number => {
+    const r = track.getBoundingClientRect();
+    const t = r.width > 0 ? (clientX - r.left) / r.width : 0;
+    return snapMeter(m.min + t * (m.max - m.min), m);
+  };
+  track.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0) return; // leave right-drag to the canvas pan
+    e.preventDefault();
+    e.stopPropagation();
+    let value = valueAt(e.clientX);
+    preview(value);
+    track.setPointerCapture(e.pointerId);
+    const onMove = (ev: PointerEvent): void => {
+      value = valueAt(ev.clientX);
+      preview(value);
+    };
+    const onUp = (ev: PointerEvent): void => {
+      track.releasePointerCapture(ev.pointerId);
+      track.removeEventListener("pointermove", onMove);
+      track.removeEventListener("pointerup", onUp);
+      track.removeEventListener("pointercancel", onUp);
+      commit(value);
+    };
+    track.addEventListener("pointermove", onMove);
+    track.addEventListener("pointerup", onUp);
+    track.addEventListener("pointercancel", onUp);
+  });
+}
+
+/** Clicking node *i* fills up to it; clicking the topmost filled node again
+ *  empties it — so a pool/clock can be stepped both ways with one gesture. */
+function pipTarget(index: number, m: MeterState): number {
+  return index + 1 === m.value ? index : index + 1;
+}
+
+/** Gauge — bar: a rounded track with a proportional fill and the number. */
+function meterBar(m: MeterState, live: boolean, commit: (v: number) => void): HTMLElement {
+  const bar = el("div", "bivouac-meter__bar");
+  const fill = el("div", "bivouac-meter__fill");
+  bar.appendChild(fill);
+  const readout = m.showValue ? el("span", "bivouac-meter__num") : null;
+  if (readout) bar.appendChild(readout);
+  const show = (v: number): void => {
+    fill.style.width = `${(fraction(v, m) * 100).toFixed(2)}%`;
+    if (readout) readout.textContent = `${fmtNum(v)} / ${fmtNum(m.max)}`;
+  };
+  show(m.value);
+  if (live) attachScrub(bar, m, show, commit);
+  return bar;
+}
+
+/** Gauge — dial: a 240° arc with a needle, min/max end labels and the number.
+ *  Click or drag anywhere on it to set the value from the angle. */
+const DIAL = { vbW: 100, vbH: 78, cx: 50, cy: 46, r: 34, from: 210, sweep: 240 } as const;
+
+function meterDial(m: MeterState, live: boolean, commit: (v: number) => void): SVGSVGElement {
+  const { vbW, vbH, cx, cy, r, from, sweep } = DIAL;
+  const svg = svgRoot(vbW, vbH);
+  svg.appendChild(
+    svgEl("path", {
+      class: "bivouac-meter__arc bivouac-meter__arc--track",
+      d: arcPath(cx, cy, r, from, from - sweep),
+      "stroke-width": 10,
+    }),
+  );
+  const valueArc = svgEl("path", { class: "bivouac-meter__arc bivouac-meter__arc--value", d: "", "stroke-width": 10 });
+  const needle = svgEl("line", { class: "bivouac-meter__needle", x1: cx, y1: cy, x2: cx, y2: cy - r, "stroke-width": 3 });
+  svg.append(valueArc, needle, svgEl("circle", { class: "bivouac-meter__hub", cx, cy, r: 4.5 }));
+  // The dial's type is SVG, sized in viewBox units, so the size multiplier is
+  // applied here rather than in CSS — and capped, since the root clips and an
+  // over-scaled readout would simply be cut off.
+  const ts = Math.min(1.8, m.numberScale);
+  // End labels clear the arc's stroked ends (which reach y 68 at x 15.6–25.6).
+  svg.appendChild(svgText(8, 75.5, 7 * ts, "start", "bivouac-meter__end", fmtNum(m.min)));
+  svg.appendChild(svgText(92, 75.5, 7 * ts, "end", "bivouac-meter__end", fmtNum(m.max)));
+  const readout = m.showValue ? svgText(cx, 68, 16 * ts, "middle", "bivouac-meter__big", "") : null;
+  if (readout) svg.appendChild(readout);
+
+  const show = (v: number): void => {
+    const t = fraction(v, m);
+    const angle = from - sweep * t;
+    // A zero-length arc would still paint a dot through the round line cap.
+    valueArc.setAttribute("d", t > 0.001 ? arcPath(cx, cy, r, from, angle) : "");
+    const tip = polar(cx, cy, r * 0.7, angle);
+    needle.setAttribute("x2", tip.x.toFixed(2));
+    needle.setAttribute("y2", tip.y.toFixed(2));
+    if (readout) readout.textContent = fmtNum(v);
+  };
+  show(m.value);
+
+  if (live) {
+    const valueAt = (clientX: number, clientY: number): number => {
+      const p = svgPoint(svg, clientX, clientY, vbW, vbH);
+      let deg = (Math.atan2(cy - p.y, p.x - cx) * 180) / Math.PI; // -180 … 180
+      // The gap under the dial is centred on -90; anything past it belongs to
+      // the min end, so lift that half back above 180 before measuring.
+      if (deg < -90) deg += 360;
+      return snapMeter(m.min + ((from - deg) / sweep) * (m.max - m.min), m);
+    };
+    svg.addEventListener("pointerdown", (e) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      e.stopPropagation();
+      let value = valueAt(e.clientX, e.clientY);
+      show(value);
+      svg.setPointerCapture(e.pointerId);
+      const onMove = (ev: PointerEvent): void => {
+        value = valueAt(ev.clientX, ev.clientY);
+        show(value);
+      };
+      const onUp = (ev: PointerEvent): void => {
+        svg.releasePointerCapture(ev.pointerId);
+        svg.removeEventListener("pointermove", onMove);
+        svg.removeEventListener("pointerup", onUp);
+        svg.removeEventListener("pointercancel", onUp);
+        commit(value);
+      };
+      svg.addEventListener("pointermove", onMove);
+      svg.addEventListener("pointerup", onUp);
+      svg.addEventListener("pointercancel", onUp);
+    });
+  }
+  return svg;
+}
+
+/** Circle: a ring of `max` segments that fills CLOCKWISE FROM THE BOTTOM, with
+ *  an optional icon (and/or the count) in the middle. Click a segment to fill up
+ *  to it — a countdown clock. Drawn as stroked arcs with an angular gap between
+ *  them, so few segments read as a broken ring and many read as dashes. */
+// r leaves room inside the 100-unit viewBox for the hover glow and the wide hit
+// arc — the SVG root clips, so anything past 50 from centre would be cut off.
+const RING = { cx: 50, cy: 50, r: 39, stroke: 9, start: 270 } as const;
+
+function meterCircle(m: MeterState, live: boolean, commit: (v: number) => void): HTMLElement {
+  const n = Math.max(1, Math.round(m.max));
+  const { cx, cy, r, stroke, start } = RING;
+  const step = 360 / n;
+  // Gap scaled to the segment: a floor so it stays visible on small segments, a
+  // ceiling so it stays a gap on big ones — and the floor itself capped at 40%
+  // of the step, so a many-segment ring can never have a gap wider than its own
+  // segment (which would invert the arc). A lone segment is an unbroken ring.
+  const gap = n === 1 ? 0 : Math.min(8, Math.max(step * 0.28, Math.min(2.5, step * 0.4)));
+  const box = el("div", "bivouac-meter__ring");
+  const svg = svgRoot(100, 100);
+  for (let i = 0; i < n; i++) {
+    // Clockwise on screen = decreasing angle, and 270 is the bottom of the ring.
+    const from = start - i * step - gap / 2;
+    const to = start - (i + 1) * step + gap / 2;
+    const shape = (width: number): SVGElement =>
+      n === 1
+        ? svgEl("circle", { cx, cy, r, "stroke-width": width })
+        : svgEl("path", { d: arcPath(cx, cy, r, from, to), "stroke-width": width });
+    // Segment + its hit arc share a <g> so CSS can glow the arc the pointer is
+    // over — the hit arc sits on top, so the segment never sees the hover
+    // itself. Groups never overlap (each owns a distinct angular range).
+    const g = svgEl("g", { class: "bivouac-meter__segwrap" });
+    const seg = shape(stroke);
+    seg.setAttribute("class", `bivouac-meter__seg${i < m.value ? " bivouac-meter__seg--on" : ""}`);
+    g.appendChild(seg);
+    if (live) {
+      const hit = shape(stroke * 2.2);
+      hit.setAttribute("class", "bivouac-meter__seghit");
+      hit.addEventListener("click", (e) => {
+        e.stopPropagation();
+        commit(pipTarget(i, m));
+      });
+      g.appendChild(hit);
+    }
+    svg.appendChild(g);
+  }
+  box.appendChild(svg);
+
+  // Centre overlay. The SVG is letterboxed by preserveAspectRatio, so the box
+  // centre IS the ring centre — a plain absolute overlay lands on it.
+  const centre = el("div", "bivouac-meter__centre");
+  if (m.icon) centre.appendChild(el("i", `bivouac-meter__icon ${m.icon}`));
+  if (m.showValue) centre.appendChild(el("span", "bivouac-meter__num", `${fmtNum(m.value)}/${n}`));
+  if (m.icon && m.showValue) centre.classList.add("bivouac-meter__centre--both");
+  if (centre.childElementCount) box.appendChild(centre);
+  return box;
+}
+
+/** Sliding scale: min at one end, max at the other, a draggable handle between
+ *  them carrying the current number. */
+function meterSlider(m: MeterState, live: boolean, commit: (v: number) => void): HTMLElement {
+  const box = el("div", "bivouac-meter__slider");
+  const track = el("div", "bivouac-meter__track");
+  const fill = el("div", "bivouac-meter__fill");
+  const handle = el("div", "bivouac-meter__handle");
+  const bubble = m.showValue ? el("span", "bivouac-meter__bubble") : null;
+  if (bubble) handle.appendChild(bubble);
+  track.append(fill, handle);
+  const ends = el("div", "bivouac-meter__ends");
+  ends.append(el("span", undefined, fmtNum(m.min)), el("span", undefined, fmtNum(m.max)));
+  box.append(track, ends);
+
+  const show = (v: number): void => {
+    const pct = (fraction(v, m) * 100).toFixed(2);
+    fill.style.width = `${pct}%`;
+    handle.style.left = `${pct}%`;
+    if (bubble) bubble.textContent = fmtNum(v);
+  };
+  show(m.value);
+  if (live) attachScrub(track, m, show, commit);
+  return box;
+}
+
+/** Size a pool's pips to the tile: pick the column count that yields the
+ *  largest pip still fitting the box (same idea as the card fan's auto-fit).
+ *  Layout px, so it's independent of the map zoom the scaler applies. */
+function layoutPips(box: HTMLElement, n: number): void {
+  const w = box.clientWidth;
+  const h = box.clientHeight;
+  if (!box.isConnected || w < 2 || h < 2) return;
+  // The box is sized by its tile (full width, flexed height), never by its pips
+  // — but bail on an unchanged size anyway so a resize can never feed back into
+  // another resize and walk the pips down to nothing.
+  const key = `${Math.round(w)}x${Math.round(h)}`;
+  if (box.dataset.pipfit === key) return;
+  box.dataset.pipfit = key;
+  let best = { cols: n, size: 0 };
+  for (let cols = 1; cols <= n; cols++) {
+    const size = Math.min(w / cols, h / Math.ceil(n / cols));
+    if (size > best.size) best = { cols, size };
+  }
+  const gap = Math.max(1, best.size * 0.14);
+  box.style.setProperty("--bivouac-pip", `${Math.max(2, best.size - gap)}px`);
+  box.style.setProperty("--bivouac-pip-gap", `${gap}px`);
+  box.style.gridTemplateColumns = `repeat(${best.cols}, var(--bivouac-pip))`;
+}
+
+/** Token pool: `max` pips, filled to `value`; click one to set the count. */
+function meterPool(m: MeterState, live: boolean, commit: (v: number) => void): HTMLElement {
+  const n = Math.max(1, Math.round(m.max));
+  const box = el("div", "bivouac-meter__pool");
+  for (let i = 0; i < n; i++) {
+    const pip = el("div", `bivouac-meter__pip${i < m.value ? " bivouac-meter__pip--on" : ""}`);
+    if (live) {
+      pip.addEventListener("click", (e) => {
+        e.stopPropagation();
+        commit(pipTarget(i, m));
+      });
+    }
+    box.appendChild(pip);
+  }
+  // renderBody runs before the tile is inserted, and a DM card can be built
+  // while its drawer is closed — so size the pips from a ResizeObserver (which
+  // also fires once on observe) rather than a one-shot measurement.
+  const ro = new ResizeObserver(() => {
+    if (box.isConnected) layoutPips(box, n);
+    else ro.disconnect(); // the tile was rebuilt or removed
+  });
+  ro.observe(box);
+  return box;
+}
+
+/** Meter tile: one number, drawn as a gauge (bar or dial), a segmented circle,
+ *  a sliding scale, or a pool of tokens. The value lives in `config.value` and
+ *  adjustments are dispatched as a bubbling `bivouac-meter-set` event that the
+ *  host surface (world layer / DM screen) persists. */
+registerWidgetType({
+  type: "meter",
+  label: "BIVOUAC.Widgets.Meter.Label",
+  icon: "fa-solid fa-gauge-high",
+  defaultConfig: () => ({
+    meterKind: "bar",
+    label: "",
+    min: 0,
+    max: 10,
+    value: 0,
+    step: 1,
+    color: "#d98b3a",
+    trackColor: "#101219",
+    showValue: true,
+    icon: "",
+    labelColor: "",
+    numberColor: "",
+    labelScale: 1,
+    numberScale: 1,
+    labelFont: "",
+    labelFontCustom: "",
+    editRole: 0,
+  }),
+  renderBody(ctx) {
+    const m = readMeter(ctx.widget.config);
+    // Adjustable in normal play only — in edit mode clicks belong to selecting
+    // and dragging the tile. Who may adjust is the tile's own role gate.
+    const live = !ctx.editMode && cardsCanControl(ctx.widget.config);
+    const wrap = el("div", `bivouac-meter bivouac-meter--${m.kind}${live ? " bivouac-meter--live" : ""}`);
+    wrap.style.setProperty("--bivouac-meter-fill", m.color);
+    wrap.style.setProperty("--bivouac-meter-track", m.trackColor);
+    // Per-part text colours; unset ones fall through to the tile's text colour.
+    if (m.labelColor) wrap.style.setProperty("--bivouac-meter-label-color", m.labelColor);
+    if (m.numberColor) wrap.style.setProperty("--bivouac-meter-num-color", m.numberColor);
+    wrap.style.setProperty("--bivouac-meter-label-scale", String(m.labelScale));
+    wrap.style.setProperty("--bivouac-meter-num-scale", String(m.numberScale));
+    const commit = (value: number): void => {
+      const next = snapMeter(value, m);
+      if (next === m.value) return;
+      wrap.dispatchEvent(
+        new CustomEvent("bivouac-meter-set", { bubbles: true, detail: { id: ctx.widget.id, value: next } }),
+      );
+    };
+
+    if (m.label) {
+      const labelEl = el("span", "bivouac-meter__label", m.label);
+      // A custom Google Font name (loaded on demand) beats the dropdown pick,
+      // exactly as the note tile's font fields work.
+      const family = m.labelFontCustom || m.labelFont;
+      if (family) {
+        if (m.labelFontCustom) ensureGoogleFont(m.labelFontCustom);
+        labelEl.style.fontFamily = `"${family}", var(--font-primary, "Signika", sans-serif)`;
+      }
+      wrap.appendChild(labelEl);
+    }
+    const body = el("div", "bivouac-meter__body");
+    switch (m.kind) {
+      case "bar":
+        body.appendChild(meterBar(m, live, commit));
+        break;
+      case "dial":
+        body.appendChild(meterDial(m, live, commit));
+        break;
+      case "circle":
+        body.appendChild(meterCircle(m, live, commit));
+        break;
+      case "slider":
+        body.appendChild(meterSlider(m, live, commit));
+        break;
+      case "pool":
+        body.appendChild(meterPool(m, live, commit));
+        // The pips carry no number of their own, so caption them.
+        if (m.showValue) body.appendChild(el("span", "bivouac-meter__num", `${fmtNum(m.value)} / ${fmtNum(m.max)}`));
+        break;
+    }
+    wrap.appendChild(body);
+    return wrap;
+  },
+});
+
 /* -------------------------------------------- document tiles ------------ */
 
 /** Does this widget reference the given document UUID (for targeted refresh)? */

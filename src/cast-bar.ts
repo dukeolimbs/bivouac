@@ -10,6 +10,7 @@ import {
   SETTINGS,
   CAST_DBLCLICK,
   canControl,
+  plateAspect,
   type CastBarData,
   type Plate,
 } from "./constants";
@@ -324,6 +325,9 @@ class CastBar {
     const size = Math.min(cap, Math.max(SIZE_MIN, wanted));
     // Scoped to this bar's element (not :root) so two bars don't clobber each other.
     el.style.setProperty("--bivouac-castbar-size", `${Math.round(size)}px`);
+    // Plate shape. Published as a number (a valid `<ratio>`) so the CSS and the
+    // fit maths below are driven by the same value.
+    el.style.setProperty("--bivouac-plate-aspect", String(plateAspect()));
     this.#fit();
   }
 
@@ -395,9 +399,14 @@ class CastBar {
     const pad = vertical
       ? parseFloat(stripCS.paddingTop) + parseFloat(stripCS.paddingBottom)
       : parseFloat(stripCS.paddingLeft) + parseFloat(stripCS.paddingRight);
-    // Per-plate footprint along the strip per 1px of plate size: a 3:4 portrait
-    // is 0.75×size wide (horizontal strip) or 1.333×size tall (vertical strip).
-    const per = vertical ? 4 / 3 : 3 / 4;
+    // Per-plate footprint along the strip per 1px of plate size. The driven axis
+    // is the height on a horizontal strip and the width on a vertical one, so
+    // with an aspect of width÷height a plate takes `aspect × size` along a
+    // horizontal strip and `size ÷ aspect` along a vertical one. This must track
+    // the CSS `aspect-ratio`, or auto-shrink miscalculates and the plates overlap
+    // the sidebar or run off-screen — hence both reading `plateAspect()`.
+    const aspect = plateAspect();
+    const per = vertical ? 1 / aspect : aspect;
     const avail = this.#placeAndBand(el);
     const maxSize = (avail - (count - 1) * gap - pad) / (count * per);
     // Auto-shrink to fit, but never below 80px UNLESS the chosen size is already

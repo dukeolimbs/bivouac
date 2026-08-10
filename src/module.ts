@@ -10,7 +10,7 @@
  * web views. See docs/landing-page-design-spec.md.
  */
 
-import { CAST_DBLCLICK, FLAGS, GRID, MODULE_ID, SETTINGS, TEXT_STROKE, log } from "./constants";
+import { CAST_DBLCLICK, FLAGS, GRID, MODULE_ID, PLATE_SHAPE_DEFAULT, SETTINGS, TEXT_STROKE, log } from "./constants";
 import {
   activeLandingScene,
   clearLayoutHistory,
@@ -220,6 +220,28 @@ Hooks.once("init", () => {
     type: Number,
     range: { min: 100, max: 400, step: 5 },
     default: 220,
+    onChange: () => castBars.forEach((b) => b.applySize()),
+  });
+
+  // Plate shape. World-scoped, unlike the plate SIZE (client): size is "how big
+  // on my screen", but shape is driven by the art the GM chose for the cast —
+  // full-body character art wants a tall plate, token art wants a square one —
+  // so it should look the same for everyone at the table.
+  game.settings.register(MODULE_ID, SETTINGS.castPlateShape, {
+    name: "BIVOUAC.Settings.CastPlateShape.Name",
+    hint: "BIVOUAC.Settings.CastPlateShape.Hint",
+    scope: "world",
+    config: true,
+    type: String,
+    choices: {
+      portrait: "BIVOUAC.Settings.CastPlateShape.Portrait",
+      tarot: "BIVOUAC.Settings.CastPlateShape.Tarot",
+      square: "BIVOUAC.Settings.CastPlateShape.Square",
+      wide: "BIVOUAC.Settings.CastPlateShape.Wide",
+    },
+    default: PLATE_SHAPE_DEFAULT,
+    // applySize republishes the aspect var and re-runs the fit maths, which both
+    // depend on the shape.
     onChange: () => castBars.forEach((b) => b.applySize()),
   });
 

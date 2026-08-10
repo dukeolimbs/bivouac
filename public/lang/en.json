@@ -280,6 +280,14 @@
         "Left": "Left",
         "Right": "Right"
       },
+      "CastPlateShape": {
+        "Name": "Cast Bar — plate shape",
+        "Hint": "The proportions of each character plate. Match it to the art you use: Tarot suits tall full-body illustrations, Square suits token art, and Portrait is the original. Applies to both Cast Bars, and the strip still shrinks automatically to stay clear of the sidebar and toolbar.",
+        "Portrait": "Portrait (3:4) — the original",
+        "Tarot": "Tarot (2:3) — taller, for full-body art",
+        "Square": "Square (1:1) — for token art",
+        "Wide": "Wide (4:3) — landscape"
+      },
       "CastDoubleClickMs": {
         "Name": "Cast Bar — double-click speed",
         "Hint": "How quickly you must click a plate twice for it to count as a double-click (which opens the sheet) rather than two separate clicks (which turn Speaking Mode on, then off). Lower it if a deliberate second click keeps opening the sheet by mistake; raise it if double-clicking to open a sheet often fails. Your own setting — it doesn't affect other players."

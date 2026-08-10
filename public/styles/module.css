@@ -1655,13 +1655,18 @@ body.bivouac-dnd-active .bivouac-card__body iframe {
 }
 
 /* A Plate — portrait fills, name banner along the bottom. In a horizontal strip
-   its height fills the bar and width follows the 3:4 portrait ratio; in a
-   vertical strip it fills the width instead. */
+   its height fills the bar and width follows the shape ratio; in a vertical
+   strip it fills the width instead.
+
+   `--bivouac-plate-aspect` is width ÷ height, set on the bar element from the
+   plate-shape setting. It MUST stay in step with the `per` factor in `#fit()`
+   (cast-bar.ts), which computes how far plates can shrink to clear Foundry's
+   side UI — both read `plateAspect()`, so change the shape in one place only. */
 .bivouac-plate {
   position: relative;
   flex: 0 0 auto;
   height: var(--bivouac-castbar-fit, var(--bivouac-castbar-size));
-  aspect-ratio: 3 / 4;
+  aspect-ratio: var(--bivouac-plate-aspect, 0.75);
   border-radius: 8px;
   overflow: hidden;
   border: 2px solid var(--bivouac-panel-border);

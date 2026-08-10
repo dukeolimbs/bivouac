@@ -66,6 +66,8 @@ export const SETTINGS = {
   castBarFontSize: "castBarFontSize",
   /** Client setting: how close two plate clicks must be to count as a double. */
   castDoubleClickMs: "castDoubleClickMs",
+  /** World setting: Cast Bar plate shape (a key of `PLATE_SHAPES`). */
+  castPlateShape: "castPlateShape",
   /** World setting: draw a thin dark stroke behind text that sits over artwork. */
   textStroke: "textStroke",
   /** World setting: that stroke's width, in px. */
@@ -85,6 +87,29 @@ export const TEXT_STROKE = { default: 5, min: 0.5, max: 10, step: 0.1 } as const
  *  speaker change is persisted — they must be equal, or the write would land
  *  before we could tell a double-click was coming. */
 export const CAST_DBLCLICK = { default: 250, min: 120, max: 600, step: 10 } as const;
+
+/**
+ * Cast Bar plate shapes, as **width ÷ height**. Presets rather than a free
+ * number: the value feeds both the CSS `aspect-ratio` AND the auto-shrink maths
+ * in `#fit()`, and a known set keeps the strip looking deliberate.
+ *
+ * Full-body character art wants a tall plate, token art wants a square one —
+ * which is the whole point of the request. `portrait` is the original 3:4.
+ */
+export const PLATE_SHAPES = {
+  portrait: 3 / 4,
+  tarot: 2 / 3,
+  square: 1,
+  wide: 4 / 3,
+} as const;
+export type PlateShape = keyof typeof PLATE_SHAPES;
+export const PLATE_SHAPE_DEFAULT: PlateShape = "portrait";
+
+/** The configured plate aspect (width ÷ height), falling back to the default. */
+export function plateAspect(): number {
+  const k = String(game.settings.get(MODULE_ID, SETTINGS.castPlateShape) ?? "");
+  return PLATE_SHAPES[k as PlateShape] ?? PLATE_SHAPES[PLATE_SHAPE_DEFAULT];
+}
 
 /** May the current user control Bivouac tiles/cards (add / remove / reorder /
  *  drop-to-tile)? Gated by the `controlRole` world setting (default GM). NB: this

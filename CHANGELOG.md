@@ -21,6 +21,12 @@ All notable changes to Bivouac are documented here. This project follows
   the module setting, force it **on** (including that tile's body text), or turn
   it **off**.
 
+- **Cast Bar plate shape.** Plates were always 3:4 portraits, which suits some
+  character art badly. A **plate shape** setting now offers **Portrait (3:4)**,
+  **Tarot (2:3)** for tall full-body illustrations, **Square (1:1)** for token
+  art, and **Wide (4:3)**. The strip still shrinks automatically to stay clear
+  of the sidebar and toolbar at every shape.
+
 ### Fixed
 
 - **Clicking a Cast Bar plate again to turn Speaking Mode off no longer opens

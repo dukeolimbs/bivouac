@@ -44,10 +44,11 @@ export const SETTING_GROUPS: readonly SettingGroup[] = [
       SETTINGS.castBarDock,
       SETTINGS.castBar2Dock,
       SETTINGS.castBarSize,
+      SETTINGS.castPlateShape,
       SETTINGS.castHideInCombat,
+      SETTINGS.castDoubleClickMs,
       SETTINGS.castBarTabPos,
       SETTINGS.castBarTabPad,
-      SETTINGS.castDoubleClickMs,
     ],
   },
   {

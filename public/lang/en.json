@@ -216,6 +216,15 @@
       "Redo": "Redo landing layout change"
     },
     "Settings": {
+      "Groups": {
+        "Landing": "Landing Page",
+        "DmScreen": "DM Screen",
+        "CastBar": "Cast Bar",
+        "CastBarText": "Cast Bar — Text",
+        "CastBarStats": "Cast Bar — Stats"
+      },
+      "WorldBadge": "GM · everyone",
+      "WorldBadgeHint": "A world setting: the GM sets it once and it applies to every player. Settings without this badge only change your own display.",
       "DmTabPad": {
         "Name": "DM screen tab — edge padding",
         "Hint": "Horizontal gap (px) the DM-screen toggle tab keeps to the left of the sidebar. Increase it to clear other UI docked there, such as a party HUD; negative values push it toward — or over — the sidebar edge."

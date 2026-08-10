@@ -27,25 +27,20 @@ import { dmScreen } from "./dm-screen";
 import { castBar, castBar2, castBars, onRaiseHandMessage } from "./cast-bar";
 import { availableFonts, ensureGoogleFont } from "./widgets";
 import { pickWidgetType } from "./widget-config";
+import { decorateSettingsForm, teardownSettingsForm } from "./settings-ui";
 
 Hooks.once("init", () => {
   log("Initializing");
 
-  game.settings.register(MODULE_ID, SETTINGS.landingSceneId, {
-    scope: "world",
-    config: false,
-    type: String,
-    default: "",
-  });
+  /* ============================================================ settings ===
+   * Registration order IS the order of the rows in Foundry's Settings window,
+   * so the visible settings below are grouped and ordered exactly as they are
+   * presented — see `SETTING_GROUPS` in `settings-ui.ts`, which draws the
+   * section headings around these same rows. Add a new visible setting to both.
+   * Hidden (`config: false`) state settings live in their own block further down.
+   */
 
-  // Set of Scenes designated as landing pages (several allowed). Any of them
-  // shows the board when it's the active/viewed scene.
-  game.settings.register(MODULE_ID, SETTINGS.landingSceneIds, {
-    scope: "world",
-    config: false,
-    type: Array,
-    default: [],
-  });
+  /* -------------------------------------------- Landing Page ------------- */
 
   // Minimum user role that can control tiles/cards (add / remove / reorder /
   // drop-to-tile). Default GM. Non-GMs also need Foundry permission to persist
@@ -65,48 +60,6 @@ Hooks.once("init", () => {
     default: CONST.USER_ROLES.GAMEMASTER,
   });
 
-  // Esc closes the DM screen. Registered as a PRIORITY keybinding that consumes
-  // the key (returns true) only while the drawer is open, so it pre-empts
-  // Foundry's core "dismiss" action (which would otherwise open the Esc menu).
-  // When the drawer is closed it returns false and Esc behaves normally.
-  game.keybindings.register(MODULE_ID, "closeDMScreen", {
-    name: "BIVOUAC.Keybindings.CloseDMScreen",
-    editable: [{ key: "Escape" }],
-    restricted: true,
-    precedence: CONST.KEYBINDING_PRECEDENCE.PRIORITY,
-    onDown: () => {
-      if (!dmScreen.isOpen) return false;
-      dmScreen.toggle(false);
-      return true;
-    },
-  });
-
-  // Gap the DM-screen tab keeps to the left of the sidebar edge — exposed as a
-  // slider so it can be widened to clear other right-docked UI (e.g. a party
-  // HUD) without editing CSS. Applied live via `applyDmTabPad`.
-  game.settings.register(MODULE_ID, SETTINGS.dmTabPad, {
-    name: "BIVOUAC.Settings.DmTabPad.Name",
-    hint: "BIVOUAC.Settings.DmTabPad.Hint",
-    scope: "client",
-    config: true,
-    type: Number,
-    range: { min: -200, max: 400, step: 1 }, // negative pushes the tab toward / over the sidebar edge
-    default: -33,
-    onChange: () => applyTabSettings(),
-  });
-
-  // Vertical position of the DM-screen tab, as a percentage of viewport height.
-  game.settings.register(MODULE_ID, SETTINGS.dmTabTop, {
-    name: "BIVOUAC.Settings.DmTabTop.Name",
-    hint: "BIVOUAC.Settings.DmTabTop.Hint",
-    scope: "client",
-    config: true,
-    type: Number,
-    range: { min: 0, max: 100, step: 0.1 },
-    default: 45.1,
-    onChange: () => applyTabSettings(),
-  });
-
   // Largest a widget may be resized to, in grid squares (read live on resize).
   game.settings.register(MODULE_ID, SETTINGS.maxWidgetSize, {
     name: "BIVOUAC.Settings.MaxWidgetSize.Name",
@@ -116,24 +69,6 @@ Hooks.once("init", () => {
     type: Number,
     range: { min: 4, max: 100, step: 1 },
     default: GRID.max,
-  });
-
-  // DM-screen drawer width (px). Set by dragging the drawer's inner edge, so it
-  // is hidden from the settings menu and persisted per-GM (applied on mount by
-  // `dmScreen.applyDrawerWidth`).
-  game.settings.register(MODULE_ID, SETTINGS.dmDrawerWidth, {
-    scope: "client",
-    config: false,
-    type: Number,
-    default: 380,
-  });
-
-  // DM-screen drawer height (px, top/bottom dock). Drag-set + persisted per-GM.
-  game.settings.register(MODULE_ID, SETTINGS.dmDrawerHeight, {
-    scope: "client",
-    config: false,
-    type: Number,
-    default: 320,
   });
 
   // How many live web views the board may show before level-of-detail kicks in
@@ -149,6 +84,8 @@ Hooks.once("init", () => {
     default: 10,
     onChange: () => worldLayer.render("lod"),
   });
+
+  /* -------------------------------------------- DM Screen --------------- */
 
   // DM-screen dock mode — beside the sidebar (default; keeps chat/dice visible)
   // or over it (the original behaviour). Also toggleable from the DM header gear.
@@ -169,7 +106,35 @@ Hooks.once("init", () => {
     onChange: () => dmScreen.applyDock(),
   });
 
-  // --- Cast Bar (per-client placement; roster/visibility live on the scene) ---
+  // Vertical position of the DM-screen tab, as a percentage of viewport height.
+  game.settings.register(MODULE_ID, SETTINGS.dmTabTop, {
+    name: "BIVOUAC.Settings.DmTabTop.Name",
+    hint: "BIVOUAC.Settings.DmTabTop.Hint",
+    scope: "client",
+    config: true,
+    type: Number,
+    range: { min: 0, max: 100, step: 0.1 },
+    default: 45.1,
+    onChange: () => applyTabSettings(),
+  });
+
+  // Gap the DM-screen tab keeps to the left of the sidebar edge — exposed as a
+  // slider so it can be widened to clear other right-docked UI (e.g. a party
+  // HUD) without editing CSS. Applied live via `applyDmTabPad`.
+  game.settings.register(MODULE_ID, SETTINGS.dmTabPad, {
+    name: "BIVOUAC.Settings.DmTabPad.Name",
+    hint: "BIVOUAC.Settings.DmTabPad.Hint",
+    scope: "client",
+    config: true,
+    type: Number,
+    range: { min: -200, max: 400, step: 1 }, // negative pushes the tab toward / over the sidebar edge
+    default: -33,
+    onChange: () => applyTabSettings(),
+  });
+
+  /* -------------------------------------------- Cast Bar ---------------- */
+  // Per-client placement; roster / visibility live on the scene.
+
   // Which edge the Cast Bar docks to. Per client, so each user can place it.
   game.settings.register(MODULE_ID, SETTINGS.castBarDock, {
     name: "BIVOUAC.Settings.CastBarDock.Name",
@@ -188,6 +153,55 @@ Hooks.once("init", () => {
       castBar.applyDock();
       castBar.applySize();
     },
+  });
+
+  // Optional SECOND Cast Bar — "off" (default) or which edge it docks to, so a GM
+  // can run two strips (e.g. party in one, NPCs in the other). World-scoped so
+  // enabling it shows it for every client. It keeps its own per-scene roster;
+  // Actor size / tab position / tab padding are shared with the primary bar.
+  game.settings.register(MODULE_ID, SETTINGS.castBar2Dock, {
+    name: "BIVOUAC.Settings.CastBar2Dock.Name",
+    hint: "BIVOUAC.Settings.CastBar2Dock.Hint",
+    scope: "world",
+    config: true,
+    type: String,
+    choices: {
+      off: "BIVOUAC.Settings.CastBar2Dock.Off",
+      top: "BIVOUAC.Settings.CastBar2Dock.Top",
+      bottom: "BIVOUAC.Settings.CastBar2Dock.Bottom",
+      left: "BIVOUAC.Settings.CastBar2Dock.Left",
+      right: "BIVOUAC.Settings.CastBar2Dock.Right",
+    },
+    default: "off",
+    onChange: () => {
+      castBar2.applyDock();
+      castBar2.applySize();
+      castBar2.refresh();
+    },
+  });
+
+  // Cast Bar plate size (px). Per client, so each user (players too) sizes the
+  // floating plates to taste.
+  game.settings.register(MODULE_ID, SETTINGS.castBarSize, {
+    name: "BIVOUAC.Settings.CastBarSize.Name",
+    hint: "BIVOUAC.Settings.CastBarSize.Hint",
+    scope: "client",
+    config: true,
+    type: Number,
+    range: { min: 100, max: 400, step: 5 },
+    default: 220,
+    onChange: () => castBars.forEach((b) => b.applySize()),
+  });
+
+  // Hide the Cast Bar(s) while a combat encounter is running (edit mode overrides).
+  game.settings.register(MODULE_ID, SETTINGS.castHideInCombat, {
+    name: "BIVOUAC.Settings.CastHideInCombat.Name",
+    hint: "BIVOUAC.Settings.CastHideInCombat.Hint",
+    scope: "world",
+    config: true,
+    type: Boolean,
+    default: true,
+    onChange: () => castBars.forEach((b) => b.refresh()),
   });
 
   // Position of the Cast Bar toggle tab along its docked edge (%).
@@ -216,91 +230,7 @@ Hooks.once("init", () => {
     onChange: () => castBars.forEach((b) => b.applyTabPos()),
   });
 
-  // Cast Bar plate size (px). Per client, so each user (players too) sizes the
-  // floating plates to taste.
-  game.settings.register(MODULE_ID, SETTINGS.castBarSize, {
-    name: "BIVOUAC.Settings.CastBarSize.Name",
-    hint: "BIVOUAC.Settings.CastBarSize.Hint",
-    scope: "client",
-    config: true,
-    type: Number,
-    range: { min: 100, max: 400, step: 5 },
-    default: 220,
-    onChange: () => castBars.forEach((b) => b.applySize()),
-  });
-
-  // Optional SECOND Cast Bar — "off" (default) or which edge it docks to, so a GM
-  // can run two strips (e.g. party in one, NPCs in the other). World-scoped so
-  // enabling it shows it for every client. It keeps its own per-scene roster;
-  // Actor size / tab position / tab padding are shared with the primary bar.
-  game.settings.register(MODULE_ID, SETTINGS.castBar2Dock, {
-    name: "BIVOUAC.Settings.CastBar2Dock.Name",
-    hint: "BIVOUAC.Settings.CastBar2Dock.Hint",
-    scope: "world",
-    config: true,
-    type: String,
-    choices: {
-      off: "BIVOUAC.Settings.CastBar2Dock.Off",
-      top: "BIVOUAC.Settings.CastBar2Dock.Top",
-      bottom: "BIVOUAC.Settings.CastBar2Dock.Bottom",
-      left: "BIVOUAC.Settings.CastBar2Dock.Left",
-      right: "BIVOUAC.Settings.CastBar2Dock.Right",
-    },
-    default: "off",
-    onChange: () => {
-      castBar2.applyDock();
-      castBar2.applySize();
-      castBar2.refresh();
-    },
-  });
-
-  // Which stats a plate may overlay (AC / passive perception / current HP /
-  // passive investigation). GM/world toggles, all on by default; each plate still
-  // starts with its stats hidden (toggle per-plate from the bar's hover controls).
-  for (const [key, label] of [
-    [SETTINGS.castStatAC, "AC"],
-    [SETTINGS.castStatPP, "PP"],
-    [SETTINGS.castStatHP, "HP"],
-    [SETTINGS.castStatInv, "Inv"],
-  ] as const) {
-    game.settings.register(MODULE_ID, key, {
-      name: `BIVOUAC.Settings.CastStat${label}.Name`,
-      hint: `BIVOUAC.Settings.CastStat${label}.Hint`,
-      scope: "world",
-      config: true,
-      type: Boolean,
-      default: true,
-      onChange: () => castBars.forEach((b) => b.refresh()),
-    });
-  }
-
-  // Per-bar quick scale multiplier (driven by the hover +/- on each bar), per
-  // client. Hidden from the settings menu.
-  game.settings.register(MODULE_ID, SETTINGS.castBarScale, {
-    scope: "client",
-    config: false,
-    type: Number,
-    default: 1,
-    onChange: () => castBar.applySize(),
-  });
-  game.settings.register(MODULE_ID, SETTINGS.castBar2Scale, {
-    scope: "client",
-    config: false,
-    type: Number,
-    default: 1,
-    onChange: () => castBar2.applySize(),
-  });
-
-  // Hide the Cast Bar(s) while a combat encounter is running (edit mode overrides).
-  game.settings.register(MODULE_ID, SETTINGS.castHideInCombat, {
-    name: "BIVOUAC.Settings.CastHideInCombat.Name",
-    hint: "BIVOUAC.Settings.CastHideInCombat.Hint",
-    scope: "world",
-    config: true,
-    type: Boolean,
-    default: true,
-    onChange: () => castBars.forEach((b) => b.refresh()),
-  });
+  /* -------------------------------------------- Cast Bar — text --------- */
 
   // Cast Bar font — a dropdown of Foundry's known fonts (incl. Manage-Fonts ones)
   // plus a custom Google Font that overrides it, mirroring the tile font chooser.
@@ -337,6 +267,102 @@ Hooks.once("init", () => {
     range: { min: 0.5, max: 2, step: 0.05 },
     default: 1,
     onChange: () => applyCastFont(),
+  });
+
+  /* -------------------------------------------- Cast Bar — stats -------- */
+
+  // Which stats a plate may overlay (AC / passive perception / current HP /
+  // passive investigation). GM/world toggles, all on by default; each plate still
+  // starts with its stats hidden (toggle per-plate from the bar's hover controls).
+  for (const [key, label] of [
+    [SETTINGS.castStatAC, "AC"],
+    [SETTINGS.castStatPP, "PP"],
+    [SETTINGS.castStatHP, "HP"],
+    [SETTINGS.castStatInv, "Inv"],
+  ] as const) {
+    game.settings.register(MODULE_ID, key, {
+      name: `BIVOUAC.Settings.CastStat${label}.Name`,
+      hint: `BIVOUAC.Settings.CastStat${label}.Hint`,
+      scope: "world",
+      config: true,
+      type: Boolean,
+      default: true,
+      onChange: () => castBars.forEach((b) => b.refresh()),
+    });
+  }
+
+  /* ------------------------------ stored state (not shown in Settings) --- */
+  // `config: false` — these persist what the user set by dragging / clicking in
+  // the UI itself, so they'd only be noise in the Settings window.
+
+  // Legacy single landing Scene id, migrated into `landingSceneIds` on ready.
+  game.settings.register(MODULE_ID, SETTINGS.landingSceneId, {
+    scope: "world",
+    config: false,
+    type: String,
+    default: "",
+  });
+
+  // Set of Scenes designated as landing pages (several allowed). Any of them
+  // shows the board when it's the active/viewed scene.
+  game.settings.register(MODULE_ID, SETTINGS.landingSceneIds, {
+    scope: "world",
+    config: false,
+    type: Array,
+    default: [],
+  });
+
+  // DM-screen drawer width (px). Set by dragging the drawer's inner edge, so it
+  // is hidden from the settings menu and persisted per-GM (applied on mount by
+  // `dmScreen.applyDrawerWidth`).
+  game.settings.register(MODULE_ID, SETTINGS.dmDrawerWidth, {
+    scope: "client",
+    config: false,
+    type: Number,
+    default: 380,
+  });
+
+  // DM-screen drawer height (px, top/bottom dock). Drag-set + persisted per-GM.
+  game.settings.register(MODULE_ID, SETTINGS.dmDrawerHeight, {
+    scope: "client",
+    config: false,
+    type: Number,
+    default: 320,
+  });
+
+  // Per-bar quick scale multiplier (driven by the hover +/- on each bar), per
+  // client.
+  game.settings.register(MODULE_ID, SETTINGS.castBarScale, {
+    scope: "client",
+    config: false,
+    type: Number,
+    default: 1,
+    onChange: () => castBar.applySize(),
+  });
+  game.settings.register(MODULE_ID, SETTINGS.castBar2Scale, {
+    scope: "client",
+    config: false,
+    type: Number,
+    default: 1,
+    onChange: () => castBar2.applySize(),
+  });
+
+  /* ========================================================= keybindings === */
+
+  // Esc closes the DM screen. Registered as a PRIORITY keybinding that consumes
+  // the key (returns true) only while the drawer is open, so it pre-empts
+  // Foundry's core "dismiss" action (which would otherwise open the Esc menu).
+  // When the drawer is closed it returns false and Esc behaves normally.
+  game.keybindings.register(MODULE_ID, "closeDMScreen", {
+    name: "BIVOUAC.Keybindings.CloseDMScreen",
+    editable: [{ key: "Escape" }],
+    restricted: true,
+    precedence: CONST.KEYBINDING_PRECEDENCE.PRIORITY,
+    onDown: () => {
+      if (!dmScreen.isOpen) return false;
+      dmScreen.toggle(false);
+      return true;
+    },
   });
 
   // Ctrl+Z / Ctrl+Y undo & redo of the landing layout. Foundry's own undo only
@@ -644,14 +670,18 @@ function previewTabSettings(root: HTMLElement): void {
   if (Number.isFinite(pos) || Number.isFinite(padPx)) castBars.forEach((b) => b.previewTab(pos, padPx));
 }
 
-// While the Settings window is open, preview our tab settings live on any input;
-// on close, re-apply the SAVED values so Cancel reverts the preview (and Save
-// confirms it — its onChange fires applyTabSettings too).
+// Group our settings into labelled sections (see `settings-ui.ts`), and while
+// the window is open preview our tab settings live on any input; on close,
+// re-apply the SAVED values so Cancel reverts the preview (and Save confirms it
+// — its onChange fires applyTabSettings too).
 Hooks.on("renderSettingsConfig", (_app: unknown, html: unknown) => {
   const root = html instanceof HTMLElement ? html : (html as { [0]?: HTMLElement } | null)?.[0];
-  if (root) root.addEventListener("input", () => previewTabSettings(root));
+  if (!root) return;
+  decorateSettingsForm(root);
+  root.addEventListener("input", () => previewTabSettings(root));
 });
 Hooks.on("closeSettingsConfig", () => {
+  teardownSettingsForm();
   applyTabSettings();
   castBars.forEach((b) => b.applyTabPos()); // revert cast-bar tab preview to saved
 });

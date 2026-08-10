@@ -3,6 +3,18 @@
 All notable changes to Bivouac are documented here. This project follows
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed
+
+- **The Settings window is organised into sections.** Bivouac's settings used to
+  be one flat list of ~20 rows, most of them Cast Bar. They are now grouped under
+  **Landing Page**, **DM Screen**, **Cast Bar**, **Cast Bar — Text** and
+  **Cast Bar — Stats**, in that order, and world settings carry a small
+  **GM · everyone** badge so it's clear at a glance which ones change the table
+  for every player and which only change your own display. Searching still works
+  — sections whose settings are all filtered out hide themselves.
+
 ## [1.1.0] — 2026-08-10
 
 ### Added

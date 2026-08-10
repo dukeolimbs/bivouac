@@ -2140,3 +2140,27 @@ body.bivouac-dnd-active .bivouac-card__body iframe {
 .bivouac-casttab-right.bivouac-castbar-tab--open {
   transform: translateY(-50%) translateX(12px);
 }
+
+/* --------------------------------------------------------- settings window */
+/* Our settings rows are regrouped into <fieldset> sections at render time (see
+   settings-ui.ts). Foundry's own `.standard-form fieldset` rules already give
+   them the border, padding and gaps, so only the scope badge needs styling. */
+.bivouac-settings-group > legend {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: var(--font-size-12, 0.75rem);
+  opacity: 0.85;
+}
+.bivouac-scope {
+  margin-left: 0.5em;
+  padding: 0.1em 0.5em;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: var(--font-size-10, 0.65rem);
+  font-weight: normal;
+  line-height: 1.5;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  vertical-align: middle;
+  opacity: 0.55;
+}

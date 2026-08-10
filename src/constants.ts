@@ -70,6 +70,8 @@ export const SETTINGS = {
   castBarFontSize: "castBarFontSize",
   /** Client setting: how close two plate clicks must be to count as a double. */
   castDoubleClickMs: "castDoubleClickMs",
+  /** Client setting: which tile an Actor drop creates — "ask" / "actor" / "minisheet". */
+  actorDropTile: "actorDropTile",
   /** World setting: Cast Bar plate shape (a key of `PLATE_SHAPES`). */
   castPlateShape: "castPlateShape",
   /** World setting: draw a thin dark stroke behind text that sits over artwork. */

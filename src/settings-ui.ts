@@ -37,6 +37,7 @@ export function settingGroups(): readonly SettingGroup[] {
       keys: [
         SETTINGS.controlRole,
         SETTINGS.maxWidgetSize,
+        SETTINGS.actorDropTile,
         SETTINGS.lodMinWebviews,
       ],
     },

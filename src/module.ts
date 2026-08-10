@@ -109,6 +109,25 @@ Hooks.once("init", () => {
     default: GRID.max,
   });
 
+  // What dropping an Actor on the board makes. Per client, because it's a
+  // workflow preference of whoever is dragging, not a property of the world.
+  // "Ask" is the default per the request; the other two exist because always
+  // prompting wears thin while laying out a scene. Holding Shift while dropping
+  // brings the prompt back whatever this is set to.
+  game.settings.register(MODULE_ID, SETTINGS.actorDropTile, {
+    name: "BIVOUAC.Settings.ActorDropTile.Name",
+    hint: "BIVOUAC.Settings.ActorDropTile.Hint",
+    scope: "client",
+    config: true,
+    type: String,
+    choices: {
+      ask: "BIVOUAC.Settings.ActorDropTile.Ask",
+      actor: "BIVOUAC.Settings.ActorDropTile.Art",
+      minisheet: "BIVOUAC.Settings.ActorDropTile.Mini",
+    },
+    default: "ask",
+  });
+
   // How many live web views the board may show before level-of-detail kicks in
   // (LOD then swaps far-away web views for a quiet placeholder while zoomed out).
   // Per-client performance knob; set high to keep every web view live.

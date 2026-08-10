@@ -396,6 +396,13 @@
       "CastStatDhArmor": {
         "Name": "Cast Bar stat — Armor",
         "Hint": "Show remaining Armor slots on Cast Bar plates, as current/total. Comes from the equipped armor, so a character with none simply has no row."
+      },
+      "ActorDropTile": {
+        "Name": "Dropping a character on the board",
+        "Hint": "A character can become either an art tile (portrait card) or a mini sheet (portrait, stats and pinned abilities). Choose to be asked each time, or pin one as your default. Hold Shift while dropping to be asked anyway. Your own setting — it does not affect other players.",
+        "Ask": "Ask me each time",
+        "Art": "Always an art tile",
+        "Mini": "Always a mini sheet"
       }
     },
     "Stats": {
@@ -413,6 +420,12 @@
       "Empty": "Drag abilities, spells or items from a character sheet here to pin them for quick rolling.",
       "EmptyPlayer": "Nothing pinned yet.",
       "Unpin": "Unpin"
+    },
+    "Drop": {
+      "ActorTitle": "Add character to the board",
+      "ActorPrompt": "How should {name} appear on the board?",
+      "ActorArt": "Art tile",
+      "ActorMini": "Mini sheet"
     }
   }
 }

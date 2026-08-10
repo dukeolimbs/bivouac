@@ -1,7 +1,7 @@
 /** Bivouac — parse Foundry document drags and turn them into tiles. Shared by
  *  the world layer (board) and the DM screen. */
 
-import { type Widget, type WidgetType } from "./constants";
+import { MODULE_ID, SETTINGS, type Widget, type WidgetType } from "./constants";
 
 interface DropData {
   /** Document type, e.g. "Actor" | "JournalEntry" | "RollableTable" | "Macro". */
@@ -9,7 +9,9 @@ interface DropData {
   uuid: string;
 }
 
-/** Foundry document type → Bivouac tile type. Items reuse the actor card. */
+/** Foundry document type → Bivouac tile type. Items reuse the actor card — an
+ *  Item has no character sheet to miniaturise, so it never offers the choice
+ *  below. */
 const DOC_TO_TILE: Record<string, WidgetType> = {
   Actor: "actor",
   Item: "actor",
@@ -21,9 +23,40 @@ const DOC_TO_TILE: Record<string, WidgetType> = {
 
 /** Default tile size (grid squares) per tile type. */
 function defaultSize(type: WidgetType): { gw: number; gh: number } {
-  if (type === "journal") return { gw: 4, gh: 5 };
+  if (type === "journal" || type === "minisheet") return { gw: 4, gh: 5 };
   if (type === "macro" || type === "table") return { gw: 2, gh: 2 };
   return { gw: 3, gh: 4 }; // actor / item portrait
+}
+
+/**
+ * An Actor can become either tile, so ask which — unless the dropper has pinned a
+ * default.
+ *
+ * Always prompting would wear thin fast while laying out a scene, so the setting
+ * decides and **holding Shift while dropping always brings the prompt back**.
+ * That way the escape hatch is one rule rather than an inversion that depends on
+ * what the setting happens to be.
+ */
+async function pickActorTile(name: string): Promise<WidgetType | null> {
+  const pref = String(game.settings.get(MODULE_ID, SETTINGS.actorDropTile) ?? "ask");
+  const forceAsk = game.keyboard?.isModifierActive?.("SHIFT") === true;
+  if (!forceAsk && (pref === "actor" || pref === "minisheet")) return pref;
+
+  const t = (k: string): string => game.i18n.localize(k);
+  const choice = await foundry.applications.api.DialogV2.wait({
+    window: { title: t("BIVOUAC.Drop.ActorTitle"), icon: "fa-solid fa-user-plus" },
+    classes: ["bivouac-dialog", "bivouac-dialog--picker"],
+    position: { width: 560 },
+    content: `<p class="bivouac-pick-hint">${foundry.utils.escapeHTML(
+      game.i18n.format("BIVOUAC.Drop.ActorPrompt", { name }),
+    )}</p>`,
+    buttons: [
+      { action: "actor", label: t("BIVOUAC.Drop.ActorArt"), icon: "fa-solid fa-image", default: true },
+      { action: "minisheet", label: t("BIVOUAC.Drop.ActorMini"), icon: "fa-solid fa-id-card" },
+    ],
+    rejectClose: false,
+  });
+  return choice === "actor" || choice === "minisheet" ? choice : null;
 }
 
 /** Normalise raw Foundry drag data → `{ type, uuid }`, or null if it isn't a
@@ -66,9 +99,20 @@ export function parseDrop(event: DragEvent): DropData | null {
 /** Build a tile from a parsed drop at cell (gx, gy). Resolves the document for a
  *  default title; returns null for unsupported drops. */
 export async function widgetFromDrop(data: DropData, gx: number, gy: number): Promise<Widget | null> {
-  const type = DOC_TO_TILE[data.type];
+  let type = DOC_TO_TILE[data.type];
   if (!type) return null;
   const doc = (await fromUuid(data.uuid).catch(() => null)) as { name?: string } | null;
+
+  // An Actor can be art or a Mini Sheet. Asking here (rather than at each call
+  // site) means both drop paths — the board's canvas drop and the DM-screen
+  // panel — get the same behaviour for free. Cancelling the prompt cancels the
+  // drop, which is why this returns null rather than falling back to a default.
+  if (data.type === "Actor") {
+    const picked = await pickActorTile(doc?.name ?? "");
+    if (!picked) return null;
+    type = picked;
+  }
+
   const size = defaultSize(type);
   return {
     id: foundry.utils.randomID(),
@@ -78,7 +122,12 @@ export async function widgetFromDrop(data: DropData, gx: number, gy: number): Pr
     title: doc?.name || undefined,
     chrome: "subtle",
     interactions: [],
-    config: type === "journal" ? { uuid: data.uuid, journalMode: "inline" } : { uuid: data.uuid },
+    config:
+      type === "journal"
+        ? { uuid: data.uuid, journalMode: "inline" }
+        : type === "minisheet"
+          ? { uuid: data.uuid, cards: [] } // pins start empty; see the Mini Sheet tile
+          : { uuid: data.uuid },
   };
 }
 

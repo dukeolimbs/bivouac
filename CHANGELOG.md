@@ -38,6 +38,12 @@ All notable changes to Bivouac are documented here. This project follows
   a plate. **Remove character** ships unbound on purpose — it's destructive and
   has no confirmation.
 
+- **Dropping a character on the board asks what to make.** A character can be an
+  art tile or the new mini sheet, so dragging one in now offers the choice
+  instead of always producing art. If you'd rather not be asked while laying out
+  a scene, a setting pins your preferred default — and holding **Shift** as you
+  drop brings the prompt back whenever you want it. Items are unchanged.
+
 - **Mini sheet tile.** A new tile showing a character's portrait, name and core
   stats, with an area where you can **drag abilities, spells or items straight
   off their sheet to pin them** — then click a pin during play to roll it,

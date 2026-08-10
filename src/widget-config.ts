@@ -81,6 +81,20 @@ function buildForm(widget: Widget): string {
       `<label class="bivouac-config__inline"><input type="checkbox" name="textColorOn"${tcOn ? " checked" : ""}> ${esc(t("BIVOUAC.Config.TextColorCustom"))}</label>` +
         `<input type="color" name="textColor" value="${esc(tc)}">`));
   }
+  // Text stroke — offered on every tile (they all carry a title). Tri-state: a
+  // plain checkbox couldn't express "follow the world default".
+  {
+    const ts = String(widget.config.textStroke ?? "");
+    const opt = (v: string, label: string): string =>
+      `<option value="${v}"${ts === v || (v === "" && ts !== "on" && ts !== "off") ? " selected" : ""}>${esc(t(label))}</option>`;
+    general.push(group(t("BIVOUAC.Config.TextStroke"),
+      `<select name="textStroke">
+         ${opt("", "BIVOUAC.Config.TextStrokeInherit")}
+         ${opt("on", "BIVOUAC.Config.TextStrokeOn")}
+         ${opt("off", "BIVOUAC.Config.TextStrokeOff")}
+       </select>` +
+        `<p class="bivouac-config__hint">${esc(t("BIVOUAC.Config.TextStrokeHint"))}</p>`));
+  }
 
   // ---- Content (type-specific) --------------------------------------------
   const content: string[] = [];
@@ -312,6 +326,9 @@ function applyForm(widget: Widget, data: Record<string, string>): Widget {
   // Optional per-tile text colour (text tiles only; the field is absent otherwise).
   updated.config.textColor =
     data.textColorOn === "on" && /^#[0-9a-fA-F]{6}$/.test(data.textColor ?? "") ? data.textColor : "";
+
+  // Per-tile text-stroke override; "" = follow the world setting.
+  updated.config.textStroke = data.textStroke === "on" || data.textStroke === "off" ? data.textStroke : "";
 
   // Frame (border) axis.
   updated.config.frame = (["none", "subtle", "framed"].includes(data.frame) ? data.frame : "subtle") as WidgetFrame;

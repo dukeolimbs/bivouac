@@ -8,6 +8,7 @@ import {
   FLAGS,
   MODULE_ID,
   SETTINGS,
+  CAST_DBLCLICK,
   canControl,
   type CastBarData,
   type Plate,
@@ -25,9 +26,16 @@ type Dock = (typeof DOCKS)[number];
 const SIZE_MIN = 24;
 const SIZE_MAX = 520;
 
-/** Delay (ms) a single click waits before acting, so a double-click can pre-empt
- *  it (single = set speaker; double = open sheet — they share the plate body). */
-const CLICK_DELAY = 240;
+/** How close (ms) two plate clicks must be to count as a double — and, being the
+ *  same number, how long a single click's speaker write waits so a double can
+ *  pre-empt it (single = set speaker; double = open sheet — they share the plate
+ *  body). Per client; see `CAST_DBLCLICK` for why we don't use native
+ *  `dblclick`. */
+function castDoubleClickMs(): number {
+  const v = Number(game.settings.get(MODULE_ID, SETTINGS.castDoubleClickMs) ?? CAST_DBLCLICK.default);
+  if (!Number.isFinite(v)) return CAST_DBLCLICK.default;
+  return Math.min(CAST_DBLCLICK.max, Math.max(CAST_DBLCLICK.min, v));
+}
 
 /** The Actor stats the Cast Bar can overlay, in display order — icons + colours
  *  mirror Monk's Tokenbar. Each is gated by its own GM setting. */
@@ -162,6 +170,8 @@ class CastBar {
   /** Plate id being drag-reordered, or null. */
   #dragId: string | null = null;
   #clickTimer: number | null = null;
+  /** Last plate click, for our own double-click detection (see castDoubleClickMs). */
+  #lastClick: { id: string; at: number } | null = null;
   #fitFrames = 0;
   #fitting = false;
   #cfg: CastBarConfig;
@@ -931,38 +941,65 @@ class CastBar {
         .catch(() => fill(null));
     }
 
-    // Double-click → open the sheet (permission-gated); cancels the pending
-    // single-click (and reverts its optimistic highlight) so it doesn't also
-    // change the speaker.
-    el.addEventListener("dblclick", () => {
+    // Clicks on a plate: one toggles the speaker (controllers), two open the
+    // sheet (anyone who may view it).
+    //
+    // We count the clicks OURSELVES rather than listening for `dblclick`. What
+    // the browser calls a double-click is decided by the OS (~500ms on Windows)
+    // and is neither readable nor settable from JS — so a deliberate second click
+    // to switch Speaking Mode back off was being swallowed as a double-click,
+    // which opened a sheet nobody asked for AND cancelled the speaker change.
+    // With our own (shorter, configurable) window, a considered re-click reads as
+    // two singles and only a genuinely quick double opens the sheet.
+    el.addEventListener("click", (e) => {
+      const target = e.target as HTMLElement;
+      // The controls always have their own handlers; the name only has one for
+      // controllers, so for a player the name is just part of the plate.
+      if (target.closest(".bivouac-plate__controls")) return;
+      if (controller && target.closest(".bivouac-plate__name")) return;
+
+      const dblWindow = castDoubleClickMs();
+      const now = Date.now();
+      const isDouble = this.#lastClick?.id === plate.id && now - this.#lastClick.at <= dblWindow;
+
+      if (isDouble) {
+        this.#lastClick = null; // so a third click starts a fresh pair
+        // Drop the pending speaker write and put the highlight back where the
+        // scene says it is — the second click meant "open this", not "toggle".
+        if (this.#clickTimer) {
+          window.clearTimeout(this.#clickTimer);
+          this.#clickTimer = null;
+          this.#applySpeakerHighlight(d.speakerId);
+        }
+        if (doc && canView(doc)) (doc.sheet as { render?: (b: boolean) => void })?.render?.(true);
+        return;
+      }
+
+      this.#lastClick = { id: plate.id, at: now };
+      if (!controller) return; // players get the sheet on a double, nothing on a single
+
+      // Toggle the speaker. The highlight moves IMMEDIATELY (optimistic) so it
+      // feels instant, while the write waits out the double-click window — the
+      // two delays are the same number for exactly this reason.
+      //
+      // Any timer still pending here belongs to a DIFFERENT plate (a second click
+      // on this one was handled as a double above), so it's stale — the speaker is
+      // single-valued and the user has moved on. Drop it and let this click win,
+      // rather than ignoring the click, which is what the old fixed-delay code did
+      // and which would only feel deader the longer the window is set.
       if (this.#clickTimer) {
         window.clearTimeout(this.#clickTimer);
         this.#clickTimer = null;
-        this.#applySpeakerHighlight(d.speakerId);
       }
-      if (doc && canView(doc))
-        (doc.sheet as { render?: (b: boolean) => void })?.render?.(true);
+      const makeSpeaker = !el.classList.contains("bivouac-plate--speaker");
+      this.#applySpeakerHighlight(makeSpeaker ? plate.id : null);
+      this.#clickTimer = window.setTimeout(() => {
+        this.#clickTimer = null;
+        void this.#setSpeaker(plate.id);
+      }, dblWindow);
     });
 
     if (controller) {
-      // Single-click → toggle the speaker. Reflect the highlight IMMEDIATELY
-      // (optimistic) so it feels instant; the persist is debounced so a
-      // double-click can still pre-empt it.
-      el.addEventListener("click", (e) => {
-        if (
-          (e.target as HTMLElement).closest(
-            ".bivouac-plate__name, .bivouac-plate__controls",
-          )
-        )
-          return;
-        if (this.#clickTimer) return;
-        const makeSpeaker = !el.classList.contains("bivouac-plate--speaker");
-        this.#applySpeakerHighlight(makeSpeaker ? plate.id : null);
-        this.#clickTimer = window.setTimeout(() => {
-          this.#clickTimer = null;
-          void this.#setSpeaker(plate.id);
-        }, CLICK_DELAY);
-      });
       // Click the name → toggle whether players see it (they get "?").
       name.classList.add("bivouac-plate__name--editable");
       name.title = game.i18n.localize("BIVOUAC.CastBar.NameToggle");

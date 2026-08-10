@@ -3,6 +3,8 @@
 import {
   GRID,
   MODULE_ID,
+  SETTINGS,
+  TEXT_STROKE,
   cardsCanControl,
   type Widget,
   type WidgetBackground,
@@ -152,6 +154,43 @@ export function applyTextColor(el: HTMLElement, widget: Widget): void {
   const c = typeof widget.config.textColor === "string" ? widget.config.textColor : "";
   if (/^#[0-9a-fA-F]{6}$/.test(c)) el.style.setProperty("--bivouac-text-color", c);
   else el.style.removeProperty("--bivouac-text-color");
+}
+
+/** Write the text-stroke vars on an element. Switching it OFF has to null the
+ *  COLOUR, not just the width: the outline is a ring of glyph copies (see the
+ *  text-stroke block in module.css), and at width 0 those copies sit exactly
+ *  behind the glyph, where they would still show through its antialiased edge
+ *  pixels and subtly bolden the text. */
+export function setTextStrokeVars(el: HTMLElement, on: boolean, width: number): void {
+  el.style.setProperty("--bivouac-text-stroke", on ? `${width}px` : "0px");
+  if (on) el.style.removeProperty("--bivouac-text-stroke-color"); // fall back to the themed default
+  else el.style.setProperty("--bivouac-text-stroke-color", "transparent");
+}
+
+/** The configured stroke width in px, clamped to the slider's bounds. */
+export function textStrokeWidth(): number {
+  const w = Number(game.settings.get(MODULE_ID, SETTINGS.textStrokeWidth) ?? TEXT_STROKE.default);
+  if (!Number.isFinite(w)) return TEXT_STROKE.default;
+  return Math.min(TEXT_STROKE.max, Math.max(TEXT_STROKE.min, w));
+}
+
+/** Apply a tile's text-stroke override (`config.textStroke`). Tri-state, because
+ *  a plain boolean couldn't express "follow the world default":
+ *   • `""`    — inherit `--bivouac-text-stroke` from the world setting;
+ *   • `"off"` — pin the width to 0 (and the colour to transparent) on this tile,
+ *               switching off every stroke rule inside it;
+ *   • `"on"`  — force the configured width AND apply the outline at the tile root,
+ *               so it inherits into prose and enriched document HTML (which the
+ *               default rules deliberately leave alone). */
+export function applyTextStroke(el: HTMLElement, widget: Widget): void {
+  const mode = String(widget.config.textStroke ?? "");
+  el.classList.toggle("bivouac-stroke-on", mode === "on");
+  if (mode === "off") setTextStrokeVars(el, false, 0);
+  else if (mode === "on") setTextStrokeVars(el, true, textStrokeWidth());
+  else {
+    el.style.removeProperty("--bivouac-text-stroke");
+    el.style.removeProperty("--bivouac-text-stroke-color");
+  }
 }
 
 function placeholder(icon: string, label: string): HTMLElement {

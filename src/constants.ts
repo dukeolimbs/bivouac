@@ -64,7 +64,27 @@ export const SETTINGS = {
   castBarFontCustom: "castBarFontCustom",
   /** Client setting: Cast Bar name font-size multiplier (slider). */
   castBarFontSize: "castBarFontSize",
+  /** Client setting: how close two plate clicks must be to count as a double. */
+  castDoubleClickMs: "castDoubleClickMs",
+  /** World setting: draw a thin dark stroke behind text that sits over artwork. */
+  textStroke: "textStroke",
+  /** World setting: that stroke's width, in px. */
+  textStrokeWidth: "textStrokeWidth",
 } as const;
+
+/** Default text-stroke width in px, and the slider's bounds. Shared by the
+ *  setting registration, the two apply paths and the live preview so they can't
+ *  drift apart. */
+export const TEXT_STROKE = { default: 5, min: 0.5, max: 10, step: 0.1 } as const;
+
+/** Cast Bar double-click window in ms, and the slider's bounds. Deliberately
+ *  DEFAULTED BELOW the browser/OS double-click threshold (~500ms on Windows, and
+ *  not readable or settable from JS) so that a deliberate second click to toggle
+ *  Speaking Mode back off reads as two separate clicks rather than a double.
+ *  This one number is both the double-click window and the debounce before a
+ *  speaker change is persisted — they must be equal, or the write would land
+ *  before we could tell a double-click was coming. */
+export const CAST_DBLCLICK = { default: 250, min: 120, max: 600, step: 10 } as const;
 
 /** May the current user control Bivouac tiles/cards (add / remove / reorder /
  *  drop-to-tile)? Gated by the `controlRole` world setting (default GM). NB: this

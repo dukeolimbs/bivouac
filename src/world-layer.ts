@@ -8,6 +8,7 @@ import {
   applyCardOp,
   applyFrameStyle,
   applyTextColor,
+  applyTextStroke,
   attachInteractions,
   backgroundOf,
   clampMeterValue,
@@ -417,6 +418,7 @@ class WorldLayer {
     applyFrameStyle(el, widget);
     applyBackground(el, widget);
     applyTextColor(el, widget);
+    applyTextStroke(el, widget);
     const titleEl = el.querySelector(".bivouac-widget__title");
     if (titleEl) {
       const def = getWidgetType(widget.type);

@@ -5,12 +5,44 @@ All notable changes to Bivouac are documented here. This project follows
 
 ## [Unreleased]
 
+### Added
+
+- **Text stroke over artwork.** Bivouac's text nearly always sits on top of
+  art — plate portraits, tile images, the map itself — so a thin dark outline
+  now keeps it readable against anything, instead of each label relying on its
+  own gradient band or drop shadow. On by default at **5px**, with a thickness
+  slider (0.5–10px) that previews live as you drag it. The outline has rounded
+  corners at every thickness, so ornate display fonts don't sprout spikes off
+  their serifs. It's applied to short labels over art
+  (tile and card titles, Actor and card names, meter labels and numbers, Cast
+  Bar plate names and stats) and deliberately **not** to body text — note prose,
+  journal pages, table results — or to text on solid panels, where an outline
+  muddies reading. Any individual tile can override this from its gear: follow
+  the module setting, force it **on** (including that tile's body text), or turn
+  it **off**.
+
+### Fixed
+
+- **Clicking a Cast Bar plate again to turn Speaking Mode off no longer opens
+  the actor sheet.** The browser decided what counted as a double-click (about
+  half a second, and not something a module can change), so a deliberate second
+  click was often swallowed as one — which opened a sheet you didn't ask for
+  *and* cancelled the speaker change you did. Bivouac now judges double-clicks
+  itself, on a window you can set: **Cast Bar — double-click speed**, defaulting
+  to a snappier 250ms so a considered re-click reads as two separate clicks.
+  Double-clicking to open a sheet works as before, including for players. Also,
+  clicking one plate and quickly clicking another now makes the second the
+  speaker, instead of ignoring the second click.
+- **Slider settings now preview continuously while you drag them**, instead of
+  only updating when you let go. This affects the DM-screen and Cast Bar tab
+  position/padding sliders as well as the new text-stroke thickness.
+
 ### Changed
 
 - **The Settings window is organised into sections.** Bivouac's settings used to
   be one flat list of ~20 rows, most of them Cast Bar. They are now grouped under
-  **Landing Page**, **DM Screen**, **Cast Bar**, **Cast Bar — Text** and
-  **Cast Bar — Stats**, in that order, and world settings carry a small
+  **Appearance**, **Landing Page**, **DM Screen**, **Cast Bar**, **Cast Bar —
+  Text** and **Cast Bar — Stats**, in that order, and world settings carry a small
   **GM · everyone** badge so it's clear at a glance which ones change the table
   for every player and which only change your own display. Searching still works
   — sections whose settings are all filtered out hide themselves.

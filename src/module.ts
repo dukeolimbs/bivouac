@@ -10,7 +10,7 @@
  * web views. See docs/landing-page-design-spec.md.
  */
 
-import { FLAGS, GRID, MODULE_ID, SETTINGS, log } from "./constants";
+import { CAST_DBLCLICK, FLAGS, GRID, MODULE_ID, SETTINGS, TEXT_STROKE, log } from "./constants";
 import {
   activeLandingScene,
   clearLayoutHistory,
@@ -25,7 +25,7 @@ import {
 import { worldLayer } from "./world-layer";
 import { dmScreen } from "./dm-screen";
 import { castBar, castBar2, castBars, onRaiseHandMessage } from "./cast-bar";
-import { availableFonts, ensureGoogleFont } from "./widgets";
+import { availableFonts, ensureGoogleFont, setTextStrokeVars } from "./widgets";
 import { pickWidgetType } from "./widget-config";
 import { decorateSettingsForm, teardownSettingsForm } from "./settings-ui";
 
@@ -39,6 +39,36 @@ Hooks.once("init", () => {
    * section headings around these same rows. Add a new visible setting to both.
    * Hidden (`config: false`) state settings live in their own block further down.
    */
+
+  /* -------------------------------------------- Appearance -------------- */
+
+  // Bivouac's text nearly always sits over artwork — plate portraits, tile art,
+  // the map itself — so a thin dark stroke keeps it legible against anything.
+  // Applied to short labels over art (see the `--bivouac-text-stroke` block in
+  // module.css); prose and panel text opt in per-tile instead, where a stroke
+  // would hurt more than it helps at reading sizes.
+  game.settings.register(MODULE_ID, SETTINGS.textStroke, {
+    name: "BIVOUAC.Settings.TextStroke.Name",
+    hint: "BIVOUAC.Settings.TextStroke.Hint",
+    scope: "world",
+    config: true,
+    type: Boolean,
+    default: true,
+    onChange: () => applyTextStroke(),
+  });
+
+  // Width in px. Slider bounds live in `TEXT_STROKE` so the registration, both
+  // apply paths and the live preview share one source of truth.
+  game.settings.register(MODULE_ID, SETTINGS.textStrokeWidth, {
+    name: "BIVOUAC.Settings.TextStrokeWidth.Name",
+    hint: "BIVOUAC.Settings.TextStrokeWidth.Hint",
+    scope: "world",
+    config: true,
+    type: Number,
+    range: { min: TEXT_STROKE.min, max: TEXT_STROKE.max, step: TEXT_STROKE.step },
+    default: TEXT_STROKE.default,
+    onChange: () => applyTextStroke(),
+  });
 
   /* -------------------------------------------- Landing Page ------------- */
 
@@ -202,6 +232,20 @@ Hooks.once("init", () => {
     type: Boolean,
     default: true,
     onChange: () => castBars.forEach((b) => b.refresh()),
+  });
+
+  // How close two plate clicks must be to read as a double (open the sheet)
+  // rather than two singles (toggle Speaking Mode on, then off). Per client,
+  // because it's a motor-speed preference. Defaults BELOW the OS double-click
+  // threshold — see `CAST_DBLCLICK` for why we can't just use the OS one.
+  game.settings.register(MODULE_ID, SETTINGS.castDoubleClickMs, {
+    name: "BIVOUAC.Settings.CastDoubleClickMs.Name",
+    hint: "BIVOUAC.Settings.CastDoubleClickMs.Hint",
+    scope: "client",
+    config: true,
+    type: Number,
+    range: { min: CAST_DBLCLICK.min, max: CAST_DBLCLICK.max, step: CAST_DBLCLICK.step },
+    default: CAST_DBLCLICK.default,
   });
 
   // Position of the Cast Bar toggle tab along its docked edge (%).
@@ -543,6 +587,7 @@ Hooks.once("ready", () => {
   wireRaiseHand();
   applyTabSettings();
   applyCastFont();
+  applyTextStroke();
   log("Ready");
 });
 
@@ -641,6 +686,15 @@ function applyCastFont(): void {
   root.setProperty("--bivouac-castbar-font-scale", `${Number.isFinite(size) ? size : 1}`);
 }
 
+/** Push the text-stroke setting into `--bivouac-text-stroke` (a width; `0` when
+ *  off, which makes every `-webkit-text-stroke` that reads it a no-op). Tiles can
+ *  override the var on themselves — see `applyTextStroke` in `widgets.ts`. */
+function applyTextStroke(): void {
+  const on = game.settings.get(MODULE_ID, SETTINGS.textStroke) !== false;
+  const w = Number(game.settings.get(MODULE_ID, SETTINGS.textStrokeWidth) ?? TEXT_STROKE.default);
+  setTextStrokeVars(document.documentElement, on, Number.isFinite(w) ? w : TEXT_STROKE.default);
+}
+
 /** Push the DM-tab settings into their CSS vars and reposition the tab. */
 function applyTabSettings(): void {
   const root = document.documentElement.style;
@@ -651,23 +705,54 @@ function applyTabSettings(): void {
   dmScreen.refreshTab();
 }
 
-/** Live-preview the DM-tab settings as the user drags the sliders in the
- *  Settings window — a setting's `onChange` only fires on Save, so we read the
+/** The control Foundry rendered for one of our settings, in the Settings form. */
+function settingInput(root: HTMLElement, key: string): HTMLElement | null {
+  return root.querySelector(`[name="${MODULE_ID}.${key}"]`);
+}
+
+/** Read a setting control's value **as it is right now, mid-drag**.
+ *
+ *  A setting with `range: {min, max, step}` is rendered as Foundry's
+ *  `<range-picker>`, whose own `.value` is only updated on `change` — i.e. when
+ *  the drag ENDS — and whose internal change handler calls `stopPropagation()`,
+ *  so that update never reaches a listener on the form. Reading the host would
+ *  therefore return the pre-drag value on every frame and the preview would sit
+ *  still until release. The picker is light DOM and keeps its inner number input
+ *  in step on every drag frame (and it's what the user types into), so read that
+ *  instead; plain inputs have no inner control and fall through to themselves. */
+function liveValue(root: HTMLElement, key: string): number {
+  const host = settingInput(root, key);
+  if (!host) return NaN;
+  const inner = host.querySelector<HTMLInputElement>('input[type="number"], input[type="range"]');
+  const raw = (inner ?? (host as HTMLInputElement)).value;
+  return raw == null || raw === "" ? NaN : Number(raw);
+}
+
+/** Live-preview the settings that are only judgeable by eye — the DM/Cast Bar
+ *  tab placement and the text-stroke width — as the user drags their sliders in
+ *  the Settings window. A setting's `onChange` only fires on Save, so we read the
  *  form's *current* values and apply them (without persisting). */
-function previewTabSettings(root: HTMLElement): void {
+function previewSettings(root: HTMLElement): void {
   const style = document.documentElement.style;
-  const pad = root.querySelector(`[name="${MODULE_ID}.${SETTINGS.dmTabPad}"]`) as { value?: string } | null;
-  const top = root.querySelector(`[name="${MODULE_ID}.${SETTINGS.dmTabTop}"]`) as { value?: string } | null;
-  if (pad?.value != null && pad.value !== "") style.setProperty("--bivouac-dmtab-pad", `${Number(pad.value)}px`);
-  if (top?.value != null && top.value !== "") style.setProperty("--bivouac-dmtab-top", `${Number(top.value)}%`);
+  const pad = liveValue(root, SETTINGS.dmTabPad);
+  const top = liveValue(root, SETTINGS.dmTabTop);
+  if (Number.isFinite(pad)) style.setProperty("--bivouac-dmtab-pad", `${pad}px`);
+  if (Number.isFinite(top)) style.setProperty("--bivouac-dmtab-top", `${top}%`);
   dmScreen.refreshTab();
 
   // …and the Cast Bar tab (shared pos/pad settings) — preview both bars' tabs.
-  const cPos = root.querySelector(`[name="${MODULE_ID}.${SETTINGS.castBarTabPos}"]`) as { value?: string } | null;
-  const cPad = root.querySelector(`[name="${MODULE_ID}.${SETTINGS.castBarTabPad}"]`) as { value?: string } | null;
-  const pos = cPos?.value != null && cPos.value !== "" ? Number(cPos.value) : NaN;
-  const padPx = cPad?.value != null && cPad.value !== "" ? Number(cPad.value) : NaN;
+  const pos = liveValue(root, SETTINGS.castBarTabPos);
+  const padPx = liveValue(root, SETTINGS.castBarTabPad);
   if (Number.isFinite(pos) || Number.isFinite(padPx)) castBars.forEach((b) => b.previewTab(pos, padPx));
+
+  // …and the text stroke, so its width can be judged against real plates and
+  // tiles (the whole point of the slider) instead of by save-and-look.
+  const sOn = settingInput(root, SETTINGS.textStroke) as HTMLInputElement | null;
+  const w = liveValue(root, SETTINGS.textStrokeWidth);
+  if (sOn || Number.isFinite(w)) {
+    const on = sOn ? sOn.checked !== false : true;
+    setTextStrokeVars(document.documentElement, on, Number.isFinite(w) ? w : TEXT_STROKE.default);
+  }
 }
 
 // Group our settings into labelled sections (see `settings-ui.ts`), and while
@@ -678,11 +763,12 @@ Hooks.on("renderSettingsConfig", (_app: unknown, html: unknown) => {
   const root = html instanceof HTMLElement ? html : (html as { [0]?: HTMLElement } | null)?.[0];
   if (!root) return;
   decorateSettingsForm(root);
-  root.addEventListener("input", () => previewTabSettings(root));
+  root.addEventListener("input", () => previewSettings(root));
 });
 Hooks.on("closeSettingsConfig", () => {
   teardownSettingsForm();
   applyTabSettings();
+  applyTextStroke(); // revert the stroke preview to saved
   castBars.forEach((b) => b.applyTabPos()); // revert cast-bar tab preview to saved
 });
 

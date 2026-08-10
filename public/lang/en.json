@@ -107,6 +107,11 @@
       "TargetUuidPlaceholder": "Actor.xx…  /  JournalEntry.xx…  /  Macro.xx…",
       "TextColor": "Text colour",
       "TextColorCustom": "Custom",
+      "TextStroke": "Text stroke",
+      "TextStrokeInherit": "Follow the module setting",
+      "TextStrokeOn": "On — including body text",
+      "TextStrokeOff": "Off for this tile",
+      "TextStrokeHint": "The dark outline that keeps text readable over artwork. \"On\" also outlines this tile's body text (note prose, journal pages, table results), which the module setting deliberately leaves alone.",
       "TableTextSize": "Text size",
       "MacroShowIcon": "Show icon",
       "MacroIconSize": "Icon size (px)",
@@ -217,6 +222,7 @@
     },
     "Settings": {
       "Groups": {
+        "Appearance": "Appearance",
         "Landing": "Landing Page",
         "DmScreen": "DM Screen",
         "CastBar": "Cast Bar",
@@ -225,6 +231,14 @@
       },
       "WorldBadge": "GM · everyone",
       "WorldBadgeHint": "A world setting: the GM sets it once and it applies to every player. Settings without this badge only change your own display.",
+      "TextStroke": {
+        "Name": "Text stroke over artwork",
+        "Hint": "Draw a thin dark outline behind text that sits over art — tile titles, Actor and card names, meter labels and Cast Bar plate names — so it stays readable against any image. Body text (notes, journal pages, table results) and text on solid panels are left alone, because an outline muddies prose at reading sizes; a tile's own gear can switch it on for those, or off entirely."
+      },
+      "TextStrokeWidth": {
+        "Name": "Text stroke — thickness",
+        "Hint": "How heavy the outline is, in pixels — 0.5 is a hairline, 5 is the default, and the upper end is heavy enough to read as a drawn border around each letter. Drag the slider with the board or Cast Bar visible — it previews live as you drag, so you can set it by eye."
+      },
       "DmTabPad": {
         "Name": "DM screen tab — edge padding",
         "Hint": "Horizontal gap (px) the DM-screen toggle tab keeps to the left of the sidebar. Increase it to clear other UI docked there, such as a party HUD; negative values push it toward — or over — the sidebar edge."
@@ -265,6 +279,10 @@
         "Bottom": "Bottom",
         "Left": "Left",
         "Right": "Right"
+      },
+      "CastDoubleClickMs": {
+        "Name": "Cast Bar — double-click speed",
+        "Hint": "How quickly you must click a plate twice for it to count as a double-click (which opens the sheet) rather than two separate clicks (which turn Speaking Mode on, then off). Lower it if a deliberate second click keeps opening the sheet by mistake; raise it if double-clicking to open a sheet often fails. Your own setting — it doesn't affect other players."
       },
       "CastBarTabPos": {
         "Name": "Cast Bar tab — position along edge",

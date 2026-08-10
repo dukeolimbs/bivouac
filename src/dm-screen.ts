@@ -6,6 +6,7 @@ import {
   applyCardOp,
   applyFrameStyle,
   applyTextColor,
+  applyTextStroke,
   attachInteractions,
   backgroundOf,
   clampMeterValue,
@@ -446,6 +447,7 @@ class DMScreen {
     applyFrameStyle(el, widget);
     applyBackground(el, widget);
     applyTextColor(el, widget);
+    applyTextStroke(el, widget);
 
     // Chrome (grip · title · gear · trash) only in edit mode — a clean board at play.
     if (edit) {

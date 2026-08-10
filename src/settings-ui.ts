@@ -27,6 +27,10 @@ type SettingGroup = {
  */
 export const SETTING_GROUPS: readonly SettingGroup[] = [
   {
+    label: "BIVOUAC.Settings.Groups.Appearance",
+    keys: [SETTINGS.textStroke, SETTINGS.textStrokeWidth],
+  },
+  {
     label: "BIVOUAC.Settings.Groups.Landing",
     keys: [SETTINGS.controlRole, SETTINGS.maxWidgetSize, SETTINGS.lodMinWebviews],
   },
@@ -43,6 +47,7 @@ export const SETTING_GROUPS: readonly SettingGroup[] = [
       SETTINGS.castHideInCombat,
       SETTINGS.castBarTabPos,
       SETTINGS.castBarTabPad,
+      SETTINGS.castDoubleClickMs,
     ],
   },
   {

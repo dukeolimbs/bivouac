@@ -27,6 +27,14 @@
   --bivouac-casttab-pos: 50%; /* position of the Cast Bar toggle tab along its edge */
   --bivouac-casttab-inset: 40px; /* JS-driven: right-dock tab parks left of the sidebar edge (pre-measure fallback) */
   --bivouac-speaker: #67d074; /* green highlight for the current speaker */
+  /* Width of the legibility stroke on text over artwork; JS-driven in px from
+     the "Text stroke" settings (`0` when off). This is only the pre-apply
+     fallback — keep it in step with TEXT_STROKE.default in constants.ts. */
+  --bivouac-text-stroke: 5px;
+  /* Fully opaque on purpose: the outline is built from overlapping copies of the
+     glyph, and a translucent colour would composite denser where copies overlap
+     than at the fringe, giving the edge an uneven, muddy falloff. */
+  --bivouac-text-stroke-color: #000;
 
   --bivouac-panel-bg: rgba(16, 18, 25, 0.4);
   --bivouac-panel-bg-strong: rgba(16, 18, 25, 0.86);
@@ -713,7 +721,8 @@ body {
   justify-content: center;
   /* 52% of the BAR's own height, times the number-size multiplier. */
   font-size: clamp(6px, calc(52cqh * var(--bivouac-meter-num-scale, 1)), 140px);
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.75);
+  /* Its drop shadow is set in the text-stroke block, composed with the outline —
+     `text-shadow` can't stack across rules, so it has to be declared once. */
 }
 
 /* Gauge — dial. */
@@ -1786,7 +1795,8 @@ body.bivouac-dnd-active .bivouac-card__body iframe {
   font-weight: 700;
   line-height: 1.1;
   color: #fff;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+  /* Its drop shadow is set in the text-stroke block, composed with the outline —
+     `text-shadow` can't stack across rules, so it has to be declared once. */
 }
 .bivouac-plate__stat i {
   width: 1.1em;
@@ -2139,6 +2149,102 @@ body.bivouac-dnd-active .bivouac-card__body iframe {
 }
 .bivouac-casttab-right.bivouac-castbar-tab--open {
   transform: translateY(-50%) translateX(12px);
+}
+
+/* ------------------------------------------------------------ text stroke */
+/* Bivouac's text nearly always sits over artwork, so legibility used to depend
+   on a gradient band or drop shadow added per element. An outline works against
+   any art.
+
+   NOT `-webkit-text-stroke`: Chromium strokes HTML text with MITRE joins and
+   exposes no `stroke-linejoin`, so every acute corner in a glyph — which display
+   and serif faces are full of — shoots out a spike that grows with the width.
+   Instead we ring the glyph with copies of itself (`text-shadow`, zero blur) at
+   12 points around a circle. The union of those copies is the glyph's outline
+   offset by the radius, with inherently ROUND joins and no spikes at any width.
+
+   24 points, chosen by rendering 12 / 16 / 24 / 32 in Chromium at the WIDEST
+   setting and comparing. Don't reduce it on the theory that a sagitta
+   calculation allows fewer: what actually sets the floor is the glyph's THINNEST
+   feature, not curvature. Where a serif is thinner than the gap between adjacent
+   copies (2r·sin(π/n)) the copies stop overlapping and the outline goes ragged —
+   which is exactly what 12 and 16 do at r=5px. 32 was indistinguishable from 24.
+   Blur is 0 throughout, so these are cheap solid copies, not gaussian passes.
+
+   The radius is HALF the setting, because the setting is a stroke *width* in the
+   CSS sense (`-webkit-text-stroke` centres its width on the glyph edge, so half
+   of it lands outside). Keeping that meaning means an existing saved value looks
+   the same weight as before, just without the spikes.
+
+   `text-shadow` inherits, so setting it on a container covers its descendants —
+   including injected journal/enriched HTML.
+
+   Applied to SHORT LABELS OVER ART only. Prose at reading sizes (note text,
+   journal HTML, table result text) and text on solid panels (hints, empty
+   states, DM card bodies) are deliberately excluded — an outline muddies them —
+   but a tile can opt its whole body in via `.bivouac-stroke-on` (see the
+   per-tile `config.textStroke` setting). Both cases share this one declaration:
+   the `var()`s must live in the `text-shadow` property itself, not in a
+   precomputed custom property, or a per-tile override of the width would not
+   re-resolve (an inherited custom property carries its parent's substituted
+   value, not the child's). */
+.bivouac-widget__title,
+.bivouac-card__title, /* the DM-screen equivalent — cards take background images too */
+.bivouac-actorcard__name,
+.bivouac-doctile__name,
+.bivouac-table__header,
+.bivouac-table__name,
+.bivouac-meter__label,
+.bivouac-meter__num,
+.bivouac-cards__name,
+.bivouac-placeholder__label,
+.bivouac-plate__name,
+.bivouac-plate__stat,
+.bivouac-stroke-on {
+  --bivouac-tsr: calc(var(--bivouac-text-stroke, 0px) / 2);
+  --bivouac-ring:
+    var(--bivouac-tsr) 0 0 var(--bivouac-text-stroke-color, #000),
+    calc(var(--bivouac-tsr) * 0.9659) calc(var(--bivouac-tsr) * 0.2588) 0 var(--bivouac-text-stroke-color, #000),
+    calc(var(--bivouac-tsr) * 0.866) calc(var(--bivouac-tsr) * 0.5) 0 var(--bivouac-text-stroke-color, #000),
+    calc(var(--bivouac-tsr) * 0.7071) calc(var(--bivouac-tsr) * 0.7071) 0 var(--bivouac-text-stroke-color, #000),
+    calc(var(--bivouac-tsr) * 0.5) calc(var(--bivouac-tsr) * 0.866) 0 var(--bivouac-text-stroke-color, #000),
+    calc(var(--bivouac-tsr) * 0.2588) calc(var(--bivouac-tsr) * 0.9659) 0 var(--bivouac-text-stroke-color, #000),
+    0 var(--bivouac-tsr) 0 var(--bivouac-text-stroke-color, #000),
+    calc(var(--bivouac-tsr) * -0.2588) calc(var(--bivouac-tsr) * 0.9659) 0 var(--bivouac-text-stroke-color, #000),
+    calc(var(--bivouac-tsr) * -0.5) calc(var(--bivouac-tsr) * 0.866) 0 var(--bivouac-text-stroke-color, #000),
+    calc(var(--bivouac-tsr) * -0.7071) calc(var(--bivouac-tsr) * 0.7071) 0 var(--bivouac-text-stroke-color, #000),
+    calc(var(--bivouac-tsr) * -0.866) calc(var(--bivouac-tsr) * 0.5) 0 var(--bivouac-text-stroke-color, #000),
+    calc(var(--bivouac-tsr) * -0.9659) calc(var(--bivouac-tsr) * 0.2588) 0 var(--bivouac-text-stroke-color, #000),
+    calc(var(--bivouac-tsr) * -1) 0 0 var(--bivouac-text-stroke-color, #000),
+    calc(var(--bivouac-tsr) * -0.9659) calc(var(--bivouac-tsr) * -0.2588) 0 var(--bivouac-text-stroke-color, #000),
+    calc(var(--bivouac-tsr) * -0.866) calc(var(--bivouac-tsr) * -0.5) 0 var(--bivouac-text-stroke-color, #000),
+    calc(var(--bivouac-tsr) * -0.7071) calc(var(--bivouac-tsr) * -0.7071) 0 var(--bivouac-text-stroke-color, #000),
+    calc(var(--bivouac-tsr) * -0.5) calc(var(--bivouac-tsr) * -0.866) 0 var(--bivouac-text-stroke-color, #000),
+    calc(var(--bivouac-tsr) * -0.2588) calc(var(--bivouac-tsr) * -0.9659) 0 var(--bivouac-text-stroke-color, #000),
+    0 calc(var(--bivouac-tsr) * -1) 0 var(--bivouac-text-stroke-color, #000),
+    calc(var(--bivouac-tsr) * 0.2588) calc(var(--bivouac-tsr) * -0.9659) 0 var(--bivouac-text-stroke-color, #000),
+    calc(var(--bivouac-tsr) * 0.5) calc(var(--bivouac-tsr) * -0.866) 0 var(--bivouac-text-stroke-color, #000),
+    calc(var(--bivouac-tsr) * 0.7071) calc(var(--bivouac-tsr) * -0.7071) 0 var(--bivouac-text-stroke-color, #000),
+    calc(var(--bivouac-tsr) * 0.866) calc(var(--bivouac-tsr) * -0.5) 0 var(--bivouac-text-stroke-color, #000),
+    calc(var(--bivouac-tsr) * 0.9659) calc(var(--bivouac-tsr) * -0.2588) 0 var(--bivouac-text-stroke-color, #000);
+  text-shadow: var(--bivouac-ring);
+}
+
+/* Two of the elements above already carried a drop shadow for legibility, and
+   `text-shadow` does NOT stack across rules — the winning rule replaces the
+   other outright. The meter number's own rule is `.bivouac-meter__bar
+   .bivouac-meter__num` (higher specificity), so it would have silently beaten
+   the outline; the plate stat's has equal specificity and would have lost its
+   shadow to it. Compose both explicitly instead: ring first, then the original
+   shadow. When the outline is switched off its copies are transparent, so what
+   remains is exactly the shadow these had before the feature existed.
+   `--bivouac-ring` resolves correctly here because it is declared on these same
+   elements by the rule above, not inherited from an ancestor. */
+.bivouac-meter__bar .bivouac-meter__num {
+  text-shadow: var(--bivouac-ring), 0 1px 3px rgba(0, 0, 0, 0.75);
+}
+.bivouac-plate__stat {
+  text-shadow: var(--bivouac-ring), 0 1px 2px rgba(0, 0, 0, 0.9);
 }
 
 /* --------------------------------------------------------- settings window */

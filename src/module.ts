@@ -24,7 +24,14 @@ import {
 } from "./layout";
 import { worldLayer } from "./world-layer";
 import { dmScreen } from "./dm-screen";
-import { castBar, castBar2, castBars, onRaiseHandMessage } from "./cast-bar";
+import {
+  castBar,
+  castBar2,
+  castBars,
+  castPlateAction,
+  castToggleVisible,
+  onRaiseHandMessage,
+} from "./cast-bar";
 import { availableFonts, ensureGoogleFont, setTextStrokeVars } from "./widgets";
 import { pickWidgetType } from "./widget-config";
 import { decorateSettingsForm, teardownSettingsForm } from "./settings-ui";
@@ -430,6 +437,46 @@ Hooks.once("init", () => {
       return true;
     },
   });
+
+  // Cast Bar accelerators. Every one of these already exists as a button — the
+  // bar's × and the four hover controls on a plate — but hunting a small button
+  // with the pointer mid-conversation is the fiddly part, so these do the same
+  // thing to whatever the pointer is already over.
+  //
+  // They all return FALSE when they didn't act (no plate hovered, or no
+  // permission), so the key falls straight through to Foundry or another module.
+  // That's what makes plain-ish defaults safe: the binding is inert unless you're
+  // actually hovering a plate. Shift+<letter> because core takes most unmodified
+  // letters (A C D E F Q R S T U W) and Electron treats Alt as a menu key.
+  const castKey = (
+    id: string,
+    key: string,
+    onDown: () => boolean,
+    editable = true,
+  ): void => {
+    game.keybindings.register(MODULE_ID, id, {
+      name: `BIVOUAC.Keybindings.${id[0].toUpperCase()}${id.slice(1)}`,
+      editable: editable ? [{ key, modifiers: ["Shift"] }] : [],
+      // NOT `restricted` (which would mean GM-only): the buttons these stand in
+      // for are shown to whoever the `controlRole` setting allows, which can
+      // include trusted players. `canControl()` inside each handler is the real
+      // gate, so a user who may not act simply falls through to Foundry.
+      restricted: false,
+      precedence: CONST.KEYBINDING_PRECEDENCE.NORMAL,
+      onDown,
+    });
+  };
+
+  castKey("castToggleBar", "KeyB", () => castToggleVisible());
+  castKey("castSpeaker", "KeyS", () => castPlateAction("speaker"));
+  castKey("castStats", "KeyT", () => castPlateAction("stats"));
+  castKey("castHidePlate", "KeyH", () => castPlateAction("hidden"));
+  castKey("castExitPlate", "KeyE", () => castPlateAction("exited"));
+  castKey("castToggleName", "KeyN", () => castPlateAction("name"));
+  // Removing a plate is the one destructive action here and there is no confirm
+  // on it, so it ships UNBOUND — a hotkey that deletes on a single press is far
+  // too easy to fire by accident. Assign it in Configure Controls if wanted.
+  castKey("castRemovePlate", "", () => castPlateAction("remove"), false);
 
   // Ctrl+Z / Ctrl+Y undo & redo of the landing layout. Foundry's own undo only
   // covers canvas placeables, not our scene-flag layout, so we run our own

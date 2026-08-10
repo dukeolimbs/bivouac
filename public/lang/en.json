@@ -217,6 +217,13 @@
     },
     "Keybindings": {
       "CloseDMScreen": "Close the DM screen",
+      "CastToggleBar": "Cast Bar: show / hide",
+      "CastSpeaker": "Cast Bar: set the hovered character as speaker",
+      "CastStats": "Cast Bar: show / hide the hovered character's stats",
+      "CastHidePlate": "Cast Bar: hide / show the hovered character from players",
+      "CastExitPlate": "Cast Bar: the hovered character leaves / rejoins the scene",
+      "CastToggleName": "Cast Bar: show / hide the hovered character's name",
+      "CastRemovePlate": "Cast Bar: remove the hovered character (unbound by default)",
       "Undo": "Undo landing layout change",
       "Redo": "Redo landing layout change"
     },

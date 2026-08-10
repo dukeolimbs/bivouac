@@ -21,6 +21,16 @@ All notable changes to Bivouac are documented here. This project follows
   the module setting, force it **on** (including that tile's body text), or turn
   it **off**.
 
+- **Keyboard shortcuts for the Cast Bar.** Running a scene meant hunting small
+  hover buttons on each plate mid-conversation. The same actions now have keys
+  that act on **whichever plate the pointer is over**: set the speaker, show or
+  hide stats, hide a character from players, have them leave or rejoin the
+  scene, and show or hide their name — plus one to show/hide the bar itself.
+  Defaults are Shift+B/S/T/H/E/N, all reassignable in Configure Controls, and
+  each does nothing (leaving the key to Foundry) unless you're actually hovering
+  a plate. **Remove character** ships unbound on purpose — it's destructive and
+  has no confirmation.
+
 - **Cast Bar plate shape.** Plates were always 3:4 portraits, which suits some
   character art badly. A **plate shape** setting now offers **Portrait (3:4)**,
   **Tarot (2:3)** for tall full-body illustrations, **Square (1:1)** for token

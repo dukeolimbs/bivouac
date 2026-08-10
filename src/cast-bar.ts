@@ -152,6 +152,45 @@ interface CastBarConfig {
   optional: boolean;
 }
 
+/** The plate actions a keybinding can fire — the same set as the hover control
+ *  bar, so the keys are an accelerator for buttons that already exist. */
+export type PlateAction = "speaker" | "name" | "exited" | "hidden" | "stats" | "remove";
+
+/** What the pointer is currently over. Keybindings for "the hovered plate" only
+ *  make sense against live pointer state, and this has to be module-level because
+ *  there are two bar instances and the bindings are registered once.
+ *
+ *  Held as ids rather than instances, so nothing here can pin a stale object:
+ *  both are resolved on use, and a plate id that has since gone simply no-ops
+ *  (every action re-reads the roster). */
+let hoveredPlate: { barId: string; plateId: string } | null = null;
+let hoveredBarId: string | null = null;
+
+function barById(id: string | null): CastBar | null {
+  return castBars.find((b) => b.id === id) ?? null;
+}
+
+/** Fire a plate action on whatever the pointer is over. Returns whether it acted,
+ *  so the keybinding can consume the key ONLY when it did something — otherwise
+ *  the key falls through to Foundry (or another module) untouched. */
+export function castPlateAction(action: PlateAction): boolean {
+  const bar = hoveredPlate ? barById(hoveredPlate.barId) : null;
+  if (!bar || !hoveredPlate || !canControl()) return false;
+  void bar.plateAction(hoveredPlate.plateId, action);
+  return true;
+}
+
+/** Show/hide the Cast Bar: the hovered bar if the pointer is over one, otherwise
+ *  every enabled bar (so the key still works with the pointer anywhere). */
+export function castToggleVisible(): boolean {
+  if (!canControl()) return false;
+  const hovered = barById(hoveredBarId);
+  const bars = hovered ? [hovered] : castBars.filter((b) => b.enabled);
+  if (!bars.length) return false;
+  bars.forEach((b) => void b.toggleVisible());
+  return true;
+}
+
 /** Quick-scale bounds + step for the hover +/- control (× the base Actor size). */
 const SCALE_MIN = 0.25;
 const SCALE_MAX = 1.5;
@@ -193,6 +232,20 @@ class CastBar {
       const bar = document.createElement("aside");
       bar.id = this.#cfg.elId;
       bar.className = "bivouac-castbar";
+      // Which bar the pointer is over, so a bar-level keybinding can target the
+      // one being looked at when two are running.
+      bar.addEventListener("pointerenter", () => {
+        hoveredBarId = this.id;
+      });
+      bar.addEventListener("pointerleave", () => {
+        if (hoveredBarId === this.id) hoveredBarId = null;
+        // Also clear the plate: a plate that was re-rendered (a speaker change
+        // rebuilds them) never fires its own pointerleave, because the element
+        // the pointer was over no longer exists. Leaving the bar is the reliable
+        // moment to know nothing is hovered. `pointerleave` doesn't fire when
+        // moving BETWEEN plates inside the bar, so this can't clear a live hover.
+        if (hoveredPlate?.barId === this.id) hoveredPlate = null;
+      });
 
       const strip = document.createElement("div");
       strip.className = "bivouac-castbar__strip";
@@ -225,7 +278,7 @@ class CastBar {
         close.title = game.i18n.localize("BIVOUAC.CastBar.Close");
         close.innerHTML = `<i class="fa-solid fa-eye"></i>`;
         // Toggle (not just hide) so it also works to un-hide while editing.
-        close.addEventListener("click", () => void this.#toggleVisible());
+        close.addEventListener("click", () => void this.toggleVisible());
         bar.appendChild(close);
         this.#closeBtn = close;
       }
@@ -265,7 +318,7 @@ class CastBar {
       tab.className = "bivouac-castbar-tab bivouac-casttab-bottom"; // edge fixed by applyDock()
       tab.title = game.i18n.localize("BIVOUAC.CastBar.Toggle");
       tab.innerHTML = `<i class="fa-solid fa-masks-theater"></i>`;
-      tab.addEventListener("click", () => void this.#toggleVisible());
+      tab.addEventListener("click", () => void this.toggleVisible());
       iface.appendChild(tab);
       this.#tab = tab;
     }
@@ -542,10 +595,6 @@ class CastBar {
     await writeCastBar(scene, this.#cfg.flag, data);
   }
 
-  async #toggleVisible(): Promise<void> {
-    await this.#setVisible(!this.#read().visible);
-  }
-
   async #setVisible(v: boolean): Promise<void> {
     if (!canControl()) return;
     const d = this.#read();
@@ -663,6 +712,42 @@ class CastBar {
       };
       picker.render(true);
     });
+  }
+
+  /** This bar's element id — also its identity in the hover tracking above. */
+  get id(): string {
+    return this.#cfg.elId;
+  }
+
+  get enabled(): boolean {
+    return this.#enabled;
+  }
+
+  /** Show/hide this bar for everyone (the tab, the × and the keybinding all
+   *  land here). Public so `castToggleVisible` can reach it. */
+  async toggleVisible(): Promise<void> {
+    await this.#setVisible(!this.#read().visible);
+  }
+
+  /** Apply one of the hover-control actions to a plate by id. A single public
+   *  entry point rather than a wrapper per action, so the keybindings in
+   *  `module.ts` can reach the private mutators without the class growing a
+   *  method for each. Every one of these is permission-gated inside. */
+  async plateAction(id: string, action: PlateAction): Promise<void> {
+    switch (action) {
+      case "speaker":
+        return this.#setSpeaker(id);
+      case "name":
+        return this.#toggleName(id);
+      case "remove":
+        return this.#remove(id);
+      case "exited":
+        return this.#mutate(id, (p) => (p.exited = !p.exited));
+      case "hidden":
+        return this.#mutate(id, (p) => (p.hidden = !p.hidden));
+      case "stats":
+        return this.#mutate(id, (p) => (p.stats = !p.stats));
+    }
   }
 
   async #remove(id: string): Promise<void> {
@@ -949,6 +1034,14 @@ class CastBar {
         .then((r) => fill((r as Record<string, unknown> | null) ?? null))
         .catch(() => fill(null));
     }
+
+    // Track which plate the pointer is over, so the keybindings have a target.
+    el.addEventListener("pointerenter", () => {
+      hoveredPlate = { barId: this.id, plateId: plate.id };
+    });
+    el.addEventListener("pointerleave", () => {
+      if (hoveredPlate?.plateId === plate.id) hoveredPlate = null;
+    });
 
     // Clicks on a plate: one toggles the speaker (controllers), two open the
     // sheet (anyone who may view it).

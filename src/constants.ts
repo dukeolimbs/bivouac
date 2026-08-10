@@ -49,7 +49,11 @@ export const SETTINGS = {
   castBar2Dock: "castBar2Dock",
   /** Client setting: Cast Bar cross-axis size in px (drag-set; player-resizable). */
   castBarSize: "castBarSize",
-  /** World settings: enable each Cast Bar stat globally (AC / perception / HP / investigation). */
+  /** World setting: which system adapter supplies the Cast Bar stats ("auto" = detect). */
+  castSystem: "castSystem",
+  /** World settings: enable each Cast Bar stat globally. The active system adapter
+   *  owns the full list (see systems.ts); these four are the dnd5e ones, kept at
+   *  their original keys so existing worlds do not lose their choices. */
   castStatAC: "castStatAC",
   castStatPP: "castStatPP",
   castStatHP: "castStatHP",

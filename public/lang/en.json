@@ -43,11 +43,22 @@
         "Label": "Note",
         "Empty": "Empty note — configure this note."
       },
-      "Meter": { "Label": "Meter" },
-      "Actor": { "Label": "Actor" },
-      "Journal": { "Label": "Journal" },
-      "Table": { "Label": "Rollable table", "Roll": "Roll" },
-      "Macro": { "Label": "Macro" },
+      "Meter": {
+        "Label": "Meter"
+      },
+      "Actor": {
+        "Label": "Actor"
+      },
+      "Journal": {
+        "Label": "Journal"
+      },
+      "Table": {
+        "Label": "Rollable table",
+        "Roll": "Roll"
+      },
+      "Macro": {
+        "Label": "Macro"
+      },
       "Cards": {
         "Label": "Card collection",
         "Empty": "Drop actors or items here to add cards.",
@@ -352,7 +363,46 @@
       "CastBarSize": {
         "Name": "Cast Bar — Actor size",
         "Hint": "How large the floating character Actors are, in pixels. Per-user — size them to taste."
+      },
+      "CastSystem": {
+        "Name": "Game system for Cast Bar stats",
+        "Hint": "Which system's character data the plate stats are read from. Detected from your world by default — only change this to force a different set, or to turn stats off entirely with \"Generic\". Changing it reloads Foundry, because the list of stat toggles below depends on it.",
+        "Auto": "Detect automatically (recommended)",
+        "Dnd5e": "D&D 5e — AC, Passive Perception, HP, Passive Investigation",
+        "Daggerheart": "Daggerheart — Hit Points, Stress, Hope, Evasion, Armor",
+        "Generic": "Generic — no stats"
+      },
+      "CastStatDhHp": {
+        "Name": "Cast Bar stat — Hit Points",
+        "Hint": "Show marked Hit Points on Cast Bar plates, as marked/total. In Daggerheart damage is marked upward, so a rising number means a character is closer to going down."
+      },
+      "CastStatDhStress": {
+        "Name": "Cast Bar stat — Stress",
+        "Hint": "Show marked Stress on Cast Bar plates, as marked/total. Like Hit Points, this counts upward — at full Stress a character becomes Vulnerable."
+      },
+      "CastStatDhHope": {
+        "Name": "Cast Bar stat — Hope",
+        "Hint": "Show a character's current Hope on Cast Bar plates. Adversaries have no Hope, so the row is skipped for them."
+      },
+      "CastStatDhEvasion": {
+        "Name": "Cast Bar stat — Evasion",
+        "Hint": "Show Evasion — the number an attack must beat — on Cast Bar plates. For adversaries this reads their Difficulty instead, which serves the same purpose."
+      },
+      "CastStatDhArmor": {
+        "Name": "Cast Bar stat — Armor",
+        "Hint": "Show remaining Armor slots on Cast Bar plates, as current/total. Comes from the equipped armor, so a character with none simply has no row."
       }
+    },
+    "Stats": {
+      "HP": "Hit Points",
+      "AC": "Armor Class",
+      "PP": "Passive Perception",
+      "Inv": "Passive Investigation",
+      "DhHP": "Hit Points (marked)",
+      "DhStress": "Stress (marked)",
+      "DhHope": "Hope",
+      "DhEvasion": "Evasion / Difficulty",
+      "DhArmor": "Armor slots"
     }
   }
 }

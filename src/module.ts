@@ -35,6 +35,7 @@ import {
 import { availableFonts, ensureGoogleFont, setTextStrokeVars } from "./widgets";
 import { pickWidgetType } from "./widget-config";
 import { decorateSettingsForm, teardownSettingsForm } from "./settings-ui";
+import { ADAPTERS, activeAdapter, statSettingKey } from "./systems";
 
 Hooks.once("init", () => {
   log("Initializing");
@@ -344,18 +345,34 @@ Hooks.once("init", () => {
 
   /* -------------------------------------------- Cast Bar — stats -------- */
 
-  // Which stats a plate may overlay (AC / passive perception / current HP /
-  // passive investigation). GM/world toggles, all on by default; each plate still
-  // starts with its stats hidden (toggle per-plate from the bar's hover controls).
-  for (const [key, label] of [
-    [SETTINGS.castStatAC, "AC"],
-    [SETTINGS.castStatPP, "PP"],
-    [SETTINGS.castStatHP, "HP"],
-    [SETTINGS.castStatInv, "Inv"],
-  ] as const) {
-    game.settings.register(MODULE_ID, key, {
-      name: `BIVOUAC.Settings.CastStat${label}.Name`,
-      hint: `BIVOUAC.Settings.CastStat${label}.Hint`,
+  // Which game system's data the stats are read from. Auto-detects from
+  // `game.system.id` — the world already knows what it's running, so a manual
+  // picker would only be one more thing to get wrong. The setting is the OVERRIDE:
+  // force the generic (no stats), or point a reskinned system at an adapter that
+  // fits it. Requires a reload because the per-stat toggles below are registered
+  // from whatever this resolves to.
+  game.settings.register(MODULE_ID, SETTINGS.castSystem, {
+    name: "BIVOUAC.Settings.CastSystem.Name",
+    hint: "BIVOUAC.Settings.CastSystem.Hint",
+    scope: "world",
+    config: true,
+    type: String,
+    choices: {
+      auto: "BIVOUAC.Settings.CastSystem.Auto",
+      ...Object.fromEntries(ADAPTERS.map((a) => [a.id, a.label])),
+    },
+    default: "auto",
+    requiresReload: true,
+  });
+
+  // One toggle per stat the ACTIVE adapter exposes, rather than a fixed dnd5e
+  // four — under Daggerheart those four would be meaningless (it has no AC and no
+  // passive skills at all). All on by default; each plate still starts with its
+  // stats hidden, toggled per-plate from the bar's hover controls.
+  for (const stat of activeAdapter().stats) {
+    game.settings.register(MODULE_ID, stat.setting, {
+      name: statSettingKey(stat, "Name"),
+      hint: statSettingKey(stat, "Hint"),
       scope: "world",
       config: true,
       type: Boolean,

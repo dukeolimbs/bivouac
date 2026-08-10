@@ -14,6 +14,7 @@ import {
   type CastBarData,
   type Plate,
 } from "./constants";
+import { activeAdapter, type StatValue } from "./systems";
 import { readCastBar, writeCastBar } from "./layout";
 import { canView, docImg } from "./widgets";
 import { isDocDrag, parseDrop } from "./drop";
@@ -37,19 +38,6 @@ function castDoubleClickMs(): number {
   if (!Number.isFinite(v)) return CAST_DBLCLICK.default;
   return Math.min(CAST_DBLCLICK.max, Math.max(CAST_DBLCLICK.min, v));
 }
-
-/** The Actor stats the Cast Bar can overlay, in display order — icons + colours
- *  mirror Monk's Tokenbar. Each is gated by its own GM setting. */
-const STATS: {
-  key: "ac" | "pp" | "hp" | "inv";
-  icon: string;
-  setting: string;
-}[] = [
-  { key: "hp", icon: "fa-heart", setting: SETTINGS.castStatHP },
-  { key: "ac", icon: "fa-shield-halved", setting: SETTINGS.castStatAC },
-  { key: "pp", icon: "fa-eye", setting: SETTINGS.castStatPP },
-  { key: "inv", icon: "fa-mask", setting: SETTINGS.castStatInv },
-];
 
 /** Raise My Hand (`raise-my-hand`) is socket-only with no readable roster, so we
  *  track raises/lowers ourselves from its channel (`{type:RAISE|LOWER, playerID}`).
@@ -114,25 +102,6 @@ function raisedHandUserIds(): Set<string> {
     }
   }
   return out;
-}
-
-/** Read the dnd5e stat values off an actor (null when absent / a non-dnd5e system,
- *  so that stat row is simply skipped). */
-function readStats(
-  doc: Record<string, unknown> | null,
-): Record<string, number | null> {
-  const sys = (doc?.system ?? {}) as {
-    attributes?: { ac?: { value?: unknown }; hp?: { value?: unknown } };
-    skills?: { prc?: { passive?: unknown }; inv?: { passive?: unknown } };
-  };
-  const num = (v: unknown): number | null =>
-    typeof v === "number" && Number.isFinite(v) ? v : null;
-  return {
-    ac: num(sys.attributes?.ac?.value),
-    pp: num(sys.skills?.prc?.passive),
-    hp: num(sys.attributes?.hp?.value),
-    inv: num(sys.skills?.inv?.passive),
-  };
 }
 
 /** Per-instance wiring so multiple Cast Bars (e.g. party + NPCs) can coexist: each
@@ -918,17 +887,28 @@ class CastBar {
   ): void {
     el.querySelector(".bivouac-plate__stats")?.remove();
     if (!plate.stats || !doc) return;
-    const vals = readStats(doc);
-    const rows = STATS.filter(
-      (s) => !!game.settings.get(MODULE_ID, s.setting) && vals[s.key] != null,
-    );
+    // Whatever the active system adapter exposes — not a fixed dnd5e four. A stat
+    // whose `read` returns null doesn't apply to this actor (wrong actor type, or
+    // absent), so its row is simply skipped.
+    const rows = activeAdapter()
+      .stats.map((stat) => ({ stat, val: stat.read(doc) }))
+      .filter((r) => r.val !== null && !!game.settings.get(MODULE_ID, r.stat.setting));
     if (!rows.length) return;
     const box = document.createElement("div");
     box.className = "bivouac-plate__stats";
-    for (const s of rows) {
+    for (const { stat, val } of rows) {
+      const v = val as StatValue;
       const row = document.createElement("div");
-      row.className = `bivouac-plate__stat bivouac-plate__stat--${s.key}`;
-      row.innerHTML = `<i class="fa-solid ${s.icon}"></i><span>${vals[s.key]}</span>`;
+      row.className = `bivouac-plate__stat bivouac-plate__stat--${stat.key}`;
+      // Pools show `value/max`, so a Daggerheart plate reads "3/6" rather than a
+      // bare "3" that gives no sense of scale — and `reverse` marks the ones where
+      // a rising number is bad (damage and stress are MARKED upward), so the CSS
+      // can colour them without re-deriving that per system.
+      if (v.reverse) row.classList.add("bivouac-plate__stat--reverse");
+      const text = typeof v.max === "number" ? `${v.value}/${v.max}` : `${v.value}`;
+      row.innerHTML = `<i class="fa-solid ${stat.icon}"></i><span></span>`;
+      row.querySelector("span")!.textContent = text;
+      row.dataset.tooltip = game.i18n.localize(stat.label);
       box.appendChild(row);
     }
     el.appendChild(box);

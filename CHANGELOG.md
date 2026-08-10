@@ -38,6 +38,17 @@ All notable changes to Bivouac are documented here. This project follows
   a plate. **Remove character** ships unbound on purpose — it's destructive and
   has no confirmation.
 
+- **Daggerheart support for the Cast Bar stats.** Stats used to be hard-coded
+  D&D 5e, so on any other system the overlay was meaningless. Bivouac now
+  detects your game system and reads the right numbers: on **Daggerheart** that's
+  **Hit Points** and **Stress** (shown as marked/total, since Daggerheart marks
+  damage upward rather than counting down), **Hope**, **Evasion** — or an
+  adversary's **Difficulty** — and **Armor slots**. The stat toggles in Settings
+  now list whatever your system actually has, and a "Game system" setting lets
+  you override the detection or turn stats off entirely with "Generic".
+  D&D 5e is unchanged, except HP now reads `current/max`. Stats a character
+  doesn't have are simply left out rather than shown as zero.
+
 - **Cast Bar plate shape.** Plates were always 3:4 portraits, which suits some
   character art badly. A **plate shape** setting now offers **Portrait (3:4)**,
   **Tarot (2:3)** for tall full-body illustrations, **Square (1:1)** for token

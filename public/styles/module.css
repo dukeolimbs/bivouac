@@ -1820,6 +1820,25 @@ body.bivouac-dnd-active .bivouac-card__body iframe {
 .bivouac-plate__stat--inv i {
   color: #d9a94a; /* Passive Investigation — gold */
 }
+/* Daggerheart. Its Hit Points and Stress are MARKED upward (see the adapter in
+   systems.ts), so they're rendered as marked/total and carry `--reverse`. Keep
+   the red for HP so the colour still reads as "the damage stat" across systems,
+   even though the number now climbs rather than falls. */
+.bivouac-plate__stat--dhHp i {
+  color: #e0555a;
+}
+.bivouac-plate__stat--dhStress i {
+  color: #c77dd6; /* Stress — violet, distinct from the HP red beside it */
+}
+.bivouac-plate__stat--dhHope i {
+  color: #f2c14a; /* Hope — the system's own gold */
+}
+.bivouac-plate__stat--dhEvasion i {
+  color: #6fb6d9; /* Evasion / Difficulty — the number to beat */
+}
+.bivouac-plate__stat--dhArmor i {
+  color: #b7bec6; /* Armor — same steel as 5e's AC; both are "what protects you" */
+}
 /* Active state for the "toggle stats" hover control. */
 .bivouac-plate__ctrl--active,
 .bivouac-plate__ctrl--active:hover {

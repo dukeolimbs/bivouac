@@ -527,6 +527,7 @@ export async function openWidgetConfig(widget: Widget, onSave: SaveFn, onLive?: 
   try {
     const result = await foundry.applications.api.DialogV2.prompt({
       window: { title: t("BIVOUAC.Edit.ConfigTitle"), icon: "fa-solid fa-gear", resizable: true },
+      classes: ["bivouac-dialog"],
       position: { width: 480 },
       content: buildForm(widget),
       ok: {
@@ -551,6 +552,12 @@ export async function pickWidgetType(): Promise<WidgetType | null> {
   const defs = widgetTypes();
   const result = await foundry.applications.api.DialogV2.wait({
     window: { title: t("BIVOUAC.Edit.AddTitle"), icon: "fa-solid fa-plus" },
+    // `--picker` lays the buttons out as a wrapping grid of equal cells instead
+    // of Foundry's single squeezed row — see the dialog block in module.css.
+    // The width is what makes the grid wrap into tidy rows rather than one long
+    // line; it fits three cells comfortably.
+    classes: ["bivouac-dialog", "bivouac-dialog--picker"],
+    position: { width: 560 },
     content: `<p class="bivouac-pick-hint">${esc(t("BIVOUAC.Edit.AddHint"))}</p>`,
     buttons: defs.map((d) => ({ action: d.type, label: t(d.label), icon: d.icon })),
     rejectClose: false,

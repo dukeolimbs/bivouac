@@ -2252,6 +2252,47 @@ body.bivouac-dnd-active .bivouac-card__body iframe {
   text-shadow: var(--bivouac-ring), 0 1px 2px rgba(0, 0, 0, 0.9);
 }
 
+/* --------------------------------------------------------------- dialogs */
+/* Scoped to `.bivouac-dialog`, added via each DialogV2's `classes`, so this
+   never restyles Foundry's or another module's dialogs.
+
+   The problem: Foundry's `.standard-form .form-footer > button { flex: 1 }` is
+   `flex-basis: 0`, so every button takes an equal share of one row no matter how
+   long its label is. With the nine tile types that squeezed each button below its
+   text and broke the labels across two lines ("Web / view", "Rollable / table")
+   while stretching the window wide — and because the buttons only shrank, the
+   footer's `flex-wrap` never actually engaged. */
+.bivouac-dialog .form-footer > button {
+  flex: 0 1 auto; /* size to the label, not to an equal share of the row */
+  min-width: max-content; /* …and never shrink below it, so text can't wrap */
+  justify-content: center;
+}
+
+/* Choice dialogs (the tile picker, the plate-image picker) lay their buttons out
+   as a wrapping grid of equal cells: rows fill up and then wrap, instead of one
+   ever-narrower row. `auto-fit` means the count follows the dialog width, so the
+   same rule suits three buttons and nine. The 10rem floor comfortably fits the
+   longest label ("Rollable table") plus its icon. */
+.bivouac-dialog--picker .form-footer {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: var(--spacer-8, 0.5rem);
+}
+.bivouac-dialog--picker .form-footer > button {
+  min-width: 0; /* the grid cell sets the width here; max-content would overflow it */
+  margin: 0;
+  padding-block: 0.5rem;
+  white-space: nowrap;
+}
+/* Give the icons a fixed column so labels start at the same x in every cell —
+   the captures showed icons of visibly different weights and offsets. */
+.bivouac-dialog--picker .form-footer > button > i {
+  width: 1.25em;
+  text-align: center;
+}
+/* (`.bivouac-pick-hint` — the prompt line above the buttons — is already styled
+   further up, with the config hints.) */
+
 /* --------------------------------------------------------- settings window */
 /* Our settings rows are regrouped into <fieldset> sections at render time (see
    settings-ui.ts). Foundry's own `.standard-form fieldset` rules already give

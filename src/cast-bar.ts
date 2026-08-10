@@ -665,6 +665,8 @@ class CastBar {
         title: loc("BIVOUAC.CastBar.ImageTitle"),
         icon: "fa-solid fa-image",
       },
+      classes: ["bivouac-dialog", "bivouac-dialog--picker"],
+      position: { width: 560 }, // same as the tile picker, so both land on a 3-across grid
       content: `<p class="bivouac-pick-hint">${loc("BIVOUAC.CastBar.ImagePrompt")}</p>`,
       buttons: [
         {

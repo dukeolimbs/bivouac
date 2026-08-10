@@ -402,6 +402,7 @@ class DMScreen {
       `<p class="bivouac-config__hint">${loc("BIVOUAC.Settings.DmDock.Hint")}</p></div>`;
     const result = await foundry.applications.api.DialogV2.prompt({
       window: { title: loc("BIVOUAC.DMScreen.Settings"), icon: "fa-solid fa-gear" },
+      classes: ["bivouac-dialog"],
       position: { width: 420 },
       content,
       ok: {

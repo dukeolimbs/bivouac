@@ -854,6 +854,7 @@ async function toggleLandingScene(): Promise<void> {
   if (clearing) {
     const ok = await foundry.applications.api.DialogV2.confirm({
       window: { title: game.i18n.localize("BIVOUAC.Confirm.ClearLandingTitle") },
+      classes: ["bivouac-dialog"],
       content: `<p>${game.i18n.localize("BIVOUAC.Confirm.ClearLandingBody")}</p>`,
       modal: true,
     });

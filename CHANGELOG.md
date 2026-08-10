@@ -21,6 +21,13 @@ All notable changes to Bivouac are documented here. This project follows
   the module setting, force it **on** (including that tile's body text), or turn
   it **off**.
 
+- **The choice dialogs fit their labels.** "Add a tile" put its nine buttons in
+  one squeezed row, breaking labels across two lines ("Web / view", "Rollable /
+  table") and stretching the window. Choices now lay out as a wrapping grid —
+  three across, one line each — and the same applies to the plate-image picker.
+  Buttons in Bivouac's other dialogs also size to their text instead of being
+  squashed to an equal share of the row.
+
 - **Keyboard shortcuts for the Cast Bar.** Running a scene meant hunting small
   hover buttons on each plate mid-conversation. The same actions now have keys
   that act on **whichever plate the pointer is over**: set the speaker, show or

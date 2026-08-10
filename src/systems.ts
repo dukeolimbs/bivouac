@@ -225,3 +225,21 @@ export function activeAdapter(): SystemAdapter {
 export function statSettingKey(stat: StatDef, part: "Name" | "Hint"): string {
   return `BIVOUAC.Settings.${stat.setting[0].toUpperCase()}${stat.setting.slice(1)}.${part}`;
 }
+
+/** The stats to actually show for a document: those the active adapter can read
+ *  off it AND that the GM has enabled. Shared by the Cast Bar plate overlay and
+ *  the Mini Sheet tile — the DATA is common, the markup is each renderer's own. */
+export function visibleStats(doc: Record<string, unknown>): { stat: StatDef; val: StatValue }[] {
+  const out: { stat: StatDef; val: StatValue }[] = [];
+  for (const stat of activeAdapter().stats) {
+    const val = stat.read(doc);
+    if (val && game.settings.get(MODULE_ID, stat.setting)) out.push({ stat, val });
+  }
+  return out;
+}
+
+/** How a stat reads on screen: a pool shows `value/max`, everything else the
+ *  bare number. Kept here so both renderers format identically. */
+export function formatStat(val: StatValue): string {
+  return typeof val.max === "number" ? `${val.value}/${val.max}` : `${val.value}`;
+}

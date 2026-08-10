@@ -2271,6 +2271,145 @@ body.bivouac-dnd-active .bivouac-card__body iframe {
   text-shadow: var(--bivouac-ring), 0 1px 2px rgba(0, 0, 0, 0.9);
 }
 
+/* ----------------------------------------------------------- mini sheet */
+/* Portrait + name + adapter stats on top, pinned features below. Everything is
+   sized in `cqmin`/`cqw` so the tile stays readable from a 3x4 up to a large
+   board tile — the same container-query approach the meter tile uses. */
+.bivouac-mini {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  gap: 2cqmin;
+  padding: 3cqmin;
+  container-type: size;
+  color: var(--bivouac-text-color, inherit);
+  overflow: hidden;
+}
+.bivouac-mini__head {
+  display: flex;
+  align-items: center;
+  gap: 3cqmin;
+  flex: 0 0 auto;
+  min-height: 0;
+}
+.bivouac-mini__img {
+  width: clamp(28px, 22cqmin, 128px);
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 6px;
+  flex: 0 0 auto;
+}
+.bivouac-mini__ident {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1cqmin;
+}
+.bivouac-mini__name {
+  font-weight: 600;
+  font-size: clamp(10px, min(7cqw, 12cqh), 32px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bivouac-mini__stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 2.5cqmin;
+  font-size: clamp(8px, min(5cqw, 9cqh), 20px);
+  opacity: 0.95;
+}
+.bivouac-mini__stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  white-space: nowrap;
+}
+/* Pins scroll rather than pushing the portrait off the tile — a character can
+   have more abilities than the tile is tall, and the identity block is the part
+   that must always stay visible. */
+.bivouac-mini__pins {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5cqmin;
+}
+.bivouac-mini__pins--dropok {
+  outline: 2px dashed var(--bivouac-accent);
+  outline-offset: -2px;
+  border-radius: 6px;
+}
+.bivouac-mini__empty {
+  margin: 0;
+  font-size: clamp(8px, min(4.5cqw, 8cqh), 16px);
+  opacity: 0.6;
+  text-align: center;
+  align-self: center;
+  padding: 2cqmin;
+}
+.bivouac-mini__pin {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 2cqmin;
+  flex: 0 0 auto;
+  padding: 1.5cqmin 2cqmin;
+  border: 1px solid var(--bivouac-panel-border);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.25);
+  color: inherit;
+  font: inherit;
+  font-size: clamp(8px, min(5cqw, 9cqh), 18px);
+  text-align: left;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+.bivouac-mini__pin:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--bivouac-accent);
+}
+.bivouac-mini__pin:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+.bivouac-mini__pin--missing {
+  opacity: 0.5;
+  font-style: italic;
+}
+.bivouac-mini__pin-img {
+  width: 1.6em;
+  height: 1.6em;
+  object-fit: cover;
+  border-radius: 4px;
+  flex: 0 0 auto;
+}
+.bivouac-mini__pin-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bivouac-mini__unpin {
+  margin-left: auto;
+  flex: 0 0 auto;
+  width: 1.6em;
+  height: 1.6em;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  cursor: pointer;
+  opacity: 0.75;
+}
+.bivouac-mini__unpin:hover {
+  background: #a03038;
+  opacity: 1;
+}
+
 /* --------------------------------------------------------------- dialogs */
 /* Scoped to `.bivouac-dialog`, added via each DialogV2's `classes`, so this
    never restyles Foundry's or another module's dialogs.

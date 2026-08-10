@@ -64,7 +64,10 @@
         "Empty": "Drop actors or items here to add cards.",
         "Remove": "Remove card"
       },
-      "Unknown": "Unknown tile: {type}"
+      "Unknown": "Unknown tile: {type}",
+      "MiniSheet": {
+        "Label": "Mini sheet"
+      }
     },
     "Doc": {
       "None": "No document linked.",
@@ -192,7 +195,9 @@
       "NoteFontDefault": "Default (tile font)",
       "NoteFontCustom": "Custom font (Google Fonts)",
       "NoteFontCustomPlaceholder": "e.g. Cinzel",
-      "NoteFontHint": "Pick a font Foundry already knows, or type a Google Font name to load it on demand. A custom name overrides the dropdown. Add more fonts permanently via Foundry's Manage Fonts."
+      "NoteFontHint": "Pick a font Foundry already knows, or type a Google Font name to load it on demand. A custom name overrides the dropdown. Add more fonts permanently via Foundry's Manage Fonts.",
+      "MiniSheetRole": "Who can pin features here",
+      "MiniSheetHint": "Drag an item, spell or ability from a character sheet onto the tile to pin it; click a pin during play to use it. Rolling still follows Foundry's own permissions — you can only use what you could use on the sheet."
     },
     "DMScreen": {
       "Title": "DM Screen",
@@ -403,6 +408,11 @@
       "DhHope": "Hope",
       "DhEvasion": "Evasion / Difficulty",
       "DhArmor": "Armor slots"
+    },
+    "MiniSheet": {
+      "Empty": "Drag abilities, spells or items from a character sheet here to pin them for quick rolling.",
+      "EmptyPlayer": "Nothing pinned yet.",
+      "Unpin": "Unpin"
     }
   }
 }

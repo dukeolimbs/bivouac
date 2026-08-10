@@ -13,6 +13,7 @@ import {
   type WidgetType,
 } from "./constants";
 import { isDocDrag, parseDrop } from "./drop";
+import { formatStat, visibleStats } from "./systems";
 
 export interface RenderContext {
   widget: Widget;
@@ -1471,3 +1472,164 @@ export function createWidget(type: WidgetType, gx: number, gy: number): Widget {
     config: def ? def.defaultConfig() : {},
   };
 }
+
+/* ------------------------------------------- mini character sheet ------- */
+
+/**
+ * Mini Sheet tile: portrait + name + the active system's core stats, plus an
+ * area where Items dragged off a character sheet are PINNED so they can be
+ * rolled straight from the board.
+ *
+ * Two deliberate reuses rather than new machinery:
+ *  • Stats come from `visibleStats()`, the same adapter-driven, setting-gated
+ *    list the Cast Bar plates use — so a Daggerheart sheet shows Hit Points /
+ *    Stress / Hope without this tile knowing anything about either system.
+ *  • Pins are stored in `config.cards` and mutated through the SAME bubbling
+ *    `bivouac-card-op` event the card collection uses. The host handlers in
+ *    `world-layer.ts` / `dm-screen.ts` already validate permission and persist
+ *    it, and they key off the event, not the tile type — so add / remove /
+ *    reorder all work here with no new persistence path.
+ */
+registerWidgetType({
+  type: "minisheet",
+  label: "BIVOUAC.Widgets.MiniSheet.Label",
+  icon: "fa-solid fa-id-card",
+  defaultConfig: () => ({ uuid: "", cards: [] }),
+  renderBody(ctx) {
+    const cfg = ctx.widget.config;
+    // Pinning is an arrangement action, so it takes the same gate as arranging a
+    // card collection (per-tile `editRole`, else the global control role).
+    const control = cardsCanControl(cfg);
+    const manage = control && (ctx.editMode || !game.user?.isGM);
+    const emit = (op: string, detail: Record<string, unknown>): void => {
+      box.dispatchEvent(
+        new CustomEvent("bivouac-card-op", { bubbles: true, detail: { id: ctx.widget.id, op, ...detail } }),
+      );
+    };
+    const box = el("div", "bivouac-mini");
+
+    return docBody(ctx, (doc, host) => {
+      box.replaceChildren();
+
+      // --- identity: portrait + name + stats ---------------------------------
+      const head = el("div", "bivouac-mini__head");
+      const img = document.createElement("img");
+      img.className = "bivouac-mini__img";
+      img.src = docImg(doc);
+      img.alt = String(doc.name ?? "");
+      head.appendChild(img);
+
+      const ident = el("div", "bivouac-mini__ident");
+      ident.appendChild(el("span", "bivouac-mini__name", String(doc.name ?? "")));
+
+      const stats = el("div", "bivouac-mini__stats");
+      for (const { stat, val } of visibleStats(doc)) {
+        const row = el("div", `bivouac-mini__stat bivouac-plate__stat--${stat.key}`);
+        if (val.reverse) row.classList.add("bivouac-mini__stat--reverse");
+        row.innerHTML = `<i class="fa-solid ${stat.icon}"></i><span></span>`;
+        row.querySelector("span")!.textContent = formatStat(val);
+        row.dataset.tooltip = game.i18n.localize(stat.label);
+        stats.appendChild(row);
+      }
+      if (stats.childElementCount) ident.appendChild(stats);
+      head.appendChild(ident);
+
+      // The portrait opens the full sheet — this tile is a readout, not an editor,
+      // so anything it doesn't show is one click away.
+      if (!ctx.editMode) {
+        head.classList.add("bivouac-interactive");
+        head.addEventListener("click", () => (doc.sheet as { render?: (b: boolean) => void })?.render?.(true));
+      }
+      box.appendChild(head);
+
+      // --- pinned features ---------------------------------------------------
+      const pins = el("div", "bivouac-mini__pins");
+      const list: { cid: string; uuid: string }[] = Array.isArray(cfg.cards)
+        ? (cfg.cards as { cid: string; uuid: string }[])
+        : [];
+
+      if (control) {
+        // Drop an Item onto the tile to pin it. Actors are refused here: this
+        // tile already has one, and dropping a character onto it almost certainly
+        // means "show this character", which is the config's job.
+        pins.addEventListener("dragover", (e) => {
+          if (!isDocDrag(e)) return;
+          e.preventDefault();
+          e.stopPropagation(); // else the board would take it and make a new tile
+          if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+          pins.classList.add("bivouac-mini__pins--dropok");
+        });
+        pins.addEventListener("dragleave", () => pins.classList.remove("bivouac-mini__pins--dropok"));
+        pins.addEventListener("drop", (e) => {
+          pins.classList.remove("bivouac-mini__pins--dropok");
+          const data = parseDrop(e);
+          if (!data || data.type !== "Item") return;
+          e.preventDefault();
+          e.stopPropagation();
+          emit("add", { uuid: data.uuid });
+        });
+      }
+
+      if (!list.length) {
+        pins.appendChild(
+          el("p", "bivouac-mini__empty", game.i18n.localize(control ? "BIVOUAC.MiniSheet.Empty" : "BIVOUAC.MiniSheet.EmptyPlayer")),
+        );
+      }
+
+      for (const pin of list) {
+        const btn = el("button", "bivouac-mini__pin");
+        btn.type = "button";
+        const icon = document.createElement("img");
+        icon.className = "bivouac-mini__pin-img";
+        btn.appendChild(icon);
+        const label = el("span", "bivouac-mini__pin-name", "…");
+        btn.appendChild(label);
+
+        // Resolve async so a compendium item doesn't block the tile rendering.
+        void (async () => {
+          const item = (await fromUuid(pin.uuid).catch(() => null)) as Record<string, unknown> | null;
+          if (!item) {
+            btn.classList.add("bivouac-mini__pin--missing");
+            label.textContent = game.i18n.localize("BIVOUAC.Doc.Missing");
+            return;
+          }
+          icon.src = docImg(item);
+          label.textContent = String(item.name ?? "");
+          btn.dataset.tooltip = String(item.name ?? "");
+          // Rolling is gated by FOUNDRY's permission on the item, not by our
+          // arrange role: being allowed to rearrange someone's board is not the
+          // same as being allowed to use their abilities.
+          if (!canView(item)) {
+            btn.disabled = true;
+            return;
+          }
+          btn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            // `use()` is the modern path (dnd5e, Daggerheart); `roll()` is the
+            // older one. Neither exists on a plain Item, hence the fallback chain.
+            const it = item as { use?: () => unknown; roll?: () => unknown };
+            if (typeof it.use === "function") void it.use();
+            else if (typeof it.roll === "function") void it.roll();
+            else (item.sheet as { render?: (b: boolean) => void })?.render?.(true);
+          });
+        })();
+
+        if (manage) {
+          const x = el("button", "bivouac-mini__unpin");
+          x.type = "button";
+          x.innerHTML = `<i class="fa-solid fa-xmark"></i>`;
+          x.title = game.i18n.localize("BIVOUAC.MiniSheet.Unpin");
+          x.addEventListener("click", (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            emit("remove", { cid: pin.cid });
+          });
+          btn.appendChild(x);
+        }
+        pins.appendChild(btn);
+      }
+      box.appendChild(pins);
+      host.replaceChildren(box);
+    });
+  },
+});

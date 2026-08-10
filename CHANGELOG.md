@@ -38,6 +38,15 @@ All notable changes to Bivouac are documented here. This project follows
   a plate. **Remove character** ships unbound on purpose — it's destructive and
   has no confirmation.
 
+- **Mini sheet tile.** A new tile showing a character's portrait, name and core
+  stats, with an area where you can **drag abilities, spells or items straight
+  off their sheet to pin them** — then click a pin during play to roll it,
+  without opening the sheet at all. The stats follow your game system, so a
+  Daggerheart character shows Hit Points, Stress and Hope rather than AC. It's a
+  readout, not an editor: clicking the portrait opens the real sheet. Rolling
+  follows Foundry's own permissions, so a player only ever uses what they could
+  use from the sheet itself, and the pin list scrolls when it outgrows the tile.
+
 - **Daggerheart support for the Cast Bar stats.** Stats used to be hard-coded
   D&D 5e, so on any other system the overlay was meaningless. Bivouac now
   detects your game system and reads the right numbers: on **Daggerheart** that's

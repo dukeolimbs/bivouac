@@ -195,6 +195,17 @@ function buildForm(widget: Widget): string {
         `<input type="text" name="uuid" value="${esc(widget.config.uuid ?? "")}" placeholder="${esc(t("BIVOUAC.Config.LinkedDocPlaceholder"))}">` +
           `<p class="bivouac-config__hint">${esc(t("BIVOUAC.Config.LinkedDocHint"))}</p>`));
       break;
+    case "minisheet":
+      content.push(group(t("BIVOUAC.Config.LinkedDoc"),
+        `<input type="text" name="uuid" value="${esc(widget.config.uuid ?? "")}" placeholder="${esc(t("BIVOUAC.Config.LinkedDocPlaceholder"))}">` +
+          `<p class="bivouac-config__hint">${esc(t("BIVOUAC.Config.LinkedDocHint"))}</p>`));
+      // Pinning reuses the card collection's role gate — it's the same kind of
+      // action (arranging what's on someone else's tile), so it takes the same
+      // per-tile override rather than a second, subtly different one.
+      content.push(group(t("BIVOUAC.Config.MiniSheetRole"),
+        `<select name="cardsEditRole">${roleOptions(widget.config.editRole)}</select>` +
+          `<p class="bivouac-config__hint">${esc(t("BIVOUAC.Config.MiniSheetHint"))}</p>`));
+      break;
     case "table":
       content.push(group(t("BIVOUAC.Config.LinkedDoc"),
         `<input type="text" name="uuid" value="${esc(widget.config.uuid ?? "")}" placeholder="${esc(t("BIVOUAC.Config.LinkedDocPlaceholder"))}">`));

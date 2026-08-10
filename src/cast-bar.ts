@@ -14,7 +14,7 @@ import {
   type CastBarData,
   type Plate,
 } from "./constants";
-import { activeAdapter, type StatValue } from "./systems";
+import { formatStat, visibleStats } from "./systems";
 import { readCastBar, writeCastBar } from "./layout";
 import { canView, docImg } from "./widgets";
 import { isDocDrag, parseDrop } from "./drop";
@@ -889,15 +889,12 @@ class CastBar {
     if (!plate.stats || !doc) return;
     // Whatever the active system adapter exposes — not a fixed dnd5e four. A stat
     // whose `read` returns null doesn't apply to this actor (wrong actor type, or
-    // absent), so its row is simply skipped.
-    const rows = activeAdapter()
-      .stats.map((stat) => ({ stat, val: stat.read(doc) }))
-      .filter((r) => r.val !== null && !!game.settings.get(MODULE_ID, r.stat.setting));
+    // absent), so its row is simply skipped. Shared with the Mini Sheet tile.
+    const rows = visibleStats(doc);
     if (!rows.length) return;
     const box = document.createElement("div");
     box.className = "bivouac-plate__stats";
-    for (const { stat, val } of rows) {
-      const v = val as StatValue;
+    for (const { stat, val: v } of rows) {
       const row = document.createElement("div");
       row.className = `bivouac-plate__stat bivouac-plate__stat--${stat.key}`;
       // Pools show `value/max`, so a Daggerheart plate reads "3/6" rather than a
@@ -905,7 +902,7 @@ class CastBar {
       // a rising number is bad (damage and stress are MARKED upward), so the CSS
       // can colour them without re-deriving that per system.
       if (v.reverse) row.classList.add("bivouac-plate__stat--reverse");
-      const text = typeof v.max === "number" ? `${v.value}/${v.max}` : `${v.value}`;
+      const text = formatStat(v);
       row.innerHTML = `<i class="fa-solid ${stat.icon}"></i><span></span>`;
       row.querySelector("span")!.textContent = text;
       row.dataset.tooltip = game.i18n.localize(stat.label);

@@ -460,8 +460,22 @@ class CastBar {
     // the sidebar or run off-screen — hence both reading `plateAspect()`.
     const aspect = plateAspect();
     const per = vertical ? 1 / aspect : aspect;
+    // …plus the plate's border, which `aspect-ratio` does NOT include: the
+    // ratio applies to the content box, so each plate is `per × size` of content
+    // with the border on top. Measured, not assumed — a 200px plate lays out at
+    // 204px. Left out, the strip's footprint is underestimated by `border × count`
+    // (4px a plate as it stands), which is invisible with three plates and pushes
+    // a large cast into the sidebar. Read from a live plate rather than hard-coded,
+    // so it can't drift from the CSS.
+    const first = strip.querySelector(".bivouac-plate");
+    const plateCS = first ? getComputedStyle(first) : null;
+    const border = plateCS
+      ? vertical
+        ? parseFloat(plateCS.borderTopWidth) + parseFloat(plateCS.borderBottomWidth)
+        : parseFloat(plateCS.borderLeftWidth) + parseFloat(plateCS.borderRightWidth)
+      : 0;
     const avail = this.#placeAndBand(el);
-    const maxSize = (avail - (count - 1) * gap - pad) / (count * per);
+    const maxSize = (avail - (count - 1) * gap - pad - count * border) / (count * per);
     // Auto-shrink to fit, but never below 80px UNLESS the chosen size is already
     // smaller (a deliberate quick-scale down) — then honour it.
     const floor = Math.min(80, size);

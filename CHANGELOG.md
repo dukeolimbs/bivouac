@@ -39,6 +39,11 @@ All notable changes to Bivouac are documented here. This project follows
 
 ### Fixed
 
+- **A large cast no longer runs slightly under the sidebar.** The Cast Bar's
+  auto-shrink didn't count each plate's border, so it thought the strip was
+  about 4px per character narrower than it really was — with seven characters
+  that's nearly 30px of overlap with Foundry's side UI. Plates now shrink a
+  touch sooner and stop clear of it.
 - **Clicking a Cast Bar plate again to turn Speaking Mode off no longer opens
   the actor sheet.** The browser decided what counted as a double-click (about
   half a second, and not something a module can change), so a deliberate second

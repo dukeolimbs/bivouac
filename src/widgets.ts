@@ -1605,12 +1605,24 @@ registerWidgetType({
           }
           btn.addEventListener("click", (e) => {
             e.stopPropagation();
-            // `use()` is the modern path (dnd5e, Daggerheart); `roll()` is the
-            // older one. Neither exists on a plain Item, hence the fallback chain.
-            const it = item as { use?: () => unknown; roll?: () => unknown };
-            if (typeof it.use === "function") void it.use();
-            else if (typeof it.roll === "function") void it.roll();
-            else (item.sheet as { render?: (b: boolean) => void })?.render?.(true);
+            const it = item as {
+              usable?: boolean;
+              use?: () => unknown;
+              roll?: () => unknown;
+              sheet?: { render?: (b: boolean) => void };
+            };
+            // Ask the system whether the item is actually usable before calling
+            // `use()`. Daggerheart, for one, defines `use()` to return silently
+            // when an item has no actions — which is most passive features — so
+            // calling it regardless makes the button look broken. Where the
+            // system tells us (`usable`), honour it; where it doesn't, the
+            // property is undefined and we just try.
+            const usable = typeof it.usable === "boolean" ? it.usable : true;
+            if (usable && typeof it.use === "function") void it.use();
+            else if (usable && typeof it.roll === "function") void it.roll();
+            // Nothing to roll — a passive feature, or a plain Item. Open its
+            // sheet so the click still shows you the thing you asked for.
+            else it.sheet?.render?.(true);
           });
         })();
 

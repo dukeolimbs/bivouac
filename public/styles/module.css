@@ -2327,13 +2327,17 @@ body.bivouac-dnd-active .bivouac-card__body iframe {
 }
 /* Pins scroll rather than pushing the portrait off the tile — a character can
    have more abilities than the tile is tall, and the identity block is the part
-   that must always stay visible. */
+   that must always stay visible.
+   `safe center` so leftover space is split above and below rather than pooling
+   under the last pin (which reads as an empty tile) — and `safe` specifically,
+   because plain `center` clips the FIRST item once the list overflows. */
 .bivouac-mini__pins {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
+  justify-content: safe center;
   gap: 1.5cqmin;
 }
 .bivouac-mini__pins--dropok {
@@ -2354,7 +2358,14 @@ body.bivouac-dnd-active .bivouac-card__body iframe {
   display: flex;
   align-items: center;
   gap: 2cqmin;
-  flex: 0 0 auto;
+  /* Grow to share the free height so a handful of pins FILL the tile instead of
+     hugging the top with dead space beneath. Bounded at both ends: a floor so a
+     long list stays tappable (past which the container scrolls), and a ceiling so
+     one or two pins don't stretch into slabs. Sized in `em`, which is already
+     tile-relative here since the font-size is a container query. */
+  flex: 1 1 auto;
+  min-height: 2.2em;
+  max-height: 5em;
   padding: 1.5cqmin 2cqmin;
   border: 1px solid var(--bivouac-panel-border);
   border-radius: 6px;

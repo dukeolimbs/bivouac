@@ -77,6 +77,15 @@ All notable changes to Bivouac are documented here. This project follows
   about 4px per character narrower than it really was — with seven characters
   that's nearly 30px of overlap with Foundry's side UI. Plates now shrink a
   touch sooner and stop clear of it.
+- **Double-clicking a plate to open a sheet no longer changes who's speaking.**
+  If the double-click was slower than the double-click window, the first click
+  had already committed — quietly clearing the current speaker for everyone at
+  the table. A double-click now always leaves the speaker exactly as it was,
+  undoing the change if it already went through.
+- **Mini sheet: pinned abilities fill the tile** instead of hugging the top with
+  empty space beneath, and **passive features respond to a click.** Abilities
+  with nothing to roll (most passive features in Daggerheart) used to do
+  nothing at all; they now open the item so you can read it.
 - **Clicking a Cast Bar plate again to turn Speaking Mode off no longer opens
   the actor sheet.** The browser decided what counted as a double-click (about
   half a second, and not something a module can change), so a deliberate second

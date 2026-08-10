@@ -180,7 +180,7 @@ class CastBar {
   #dragId: string | null = null;
   #clickTimer: number | null = null;
   /** Last plate click, for our own double-click detection (see castDoubleClickMs). */
-  #lastClick: { id: string; at: number } | null = null;
+  #lastClick: { id: string; at: number; prevSpeaker: string | null } | null = null;
   #fitFrames = 0;
   #fitting = false;
   #cfg: CastBarConfig;
@@ -743,6 +743,16 @@ class CastBar {
     await this.#write(d);
   }
 
+  /** Set the speaker to an EXACT value (null = nobody).  toggles,
+   *  which is right for a click but wrong for undoing one. */
+  async #setSpeakerTo(id: string | null): Promise<void> {
+    if (!canControl()) return;
+    const d = this.#read();
+    if (d.speakerId === id) return; // already there — don't write for nothing
+    d.speakerId = id;
+    await this.#write(d);
+  }
+
   async #setSpeaker(id: string): Promise<void> {
     if (!canControl()) return;
     const d = this.#read();
@@ -1058,19 +1068,30 @@ class CastBar {
       const isDouble = this.#lastClick?.id === plate.id && now - this.#lastClick.at <= dblWindow;
 
       if (isDouble) {
+        const prev = this.#lastClick?.prevSpeaker ?? null;
         this.#lastClick = null; // so a third click starts a fresh pair
-        // Drop the pending speaker write and put the highlight back where the
-        // scene says it is — the second click meant "open this", not "toggle".
+        // The second click meant "open this", not "toggle" — so the speaker must
+        // end up exactly as it was before the pair started. Two cases:
         if (this.#clickTimer) {
+          // Still debounced: drop the write and undo the optimistic highlight.
           window.clearTimeout(this.#clickTimer);
           this.#clickTimer = null;
-          this.#applySpeakerHighlight(d.speakerId);
+          this.#applySpeakerHighlight(prev);
+        } else if (controller) {
+          // The debounce already elapsed, so the first click WROTE. Put it back.
+          // Without this, double-clicking one plate silently clears whoever was
+          // speaking — the change is broadcast to every player, so "it only
+          // toggled" is not a small thing.
+          void this.#setSpeakerTo(prev);
         }
         if (doc && canView(doc)) (doc.sheet as { render?: (b: boolean) => void })?.render?.(true);
         return;
       }
 
-      this.#lastClick = { id: plate.id, at: now };
+      // Remember who was speaking BEFORE this pair, read live rather than from
+      // the render-time snapshot, so the undo above restores the truth even if
+      // the speaker changed since this plate was drawn.
+      this.#lastClick = { id: plate.id, at: now, prevSpeaker: controller ? (this.#read().speakerId ?? null) : null };
       if (!controller) return; // players get the sheet on a double, nothing on a single
 
       // Toggle the speaker. The highlight moves IMMEDIATELY (optimistic) so it

@@ -35,6 +35,27 @@ type DockMode = (typeof DOCK_MODES)[number];
  *  top/bottom dock, so a row holds a few). */
 const MAX_ROW = 5;
 
+/** How wide the "join this row" edge band is, in px, before it gets capped at a
+ *  third of the card (see `#zoneFor`). Sized for a comfortable pointer target
+ *  rather than a precise one — joining a row is the common intent when dragging
+ *  next to a card, so it should be the easier gesture of the two. */
+const EDGE_BAND = 70;
+
+/** True when the pointer is over a drop target a TILE declares for itself — today
+ *  the Mini Sheet's pin area, which marks itself `data-bivouac-nested-drop`.
+ *
+ *  The card-level drop has to stand aside for those. A nested target that misses
+ *  (because the strip collapsed to no height, or because it bailed out on a
+ *  payload it doesn't want) would otherwise fall through to the card, which calls
+ *  `#onDocDropAt` and creates a new card — so a failed pin doesn't do nothing, it
+ *  litters the drawer. Checking the attribute rather than relying on the tile to
+ *  call `stopPropagation()` keeps that guarantee on the tile's early-exit paths
+ *  too, and protects any in-tile drop zone added later. */
+function overNestedDrop(e: DragEvent): boolean {
+  const t = e.target;
+  return t instanceof Element && !!t.closest("[data-bivouac-nested-drop]");
+}
+
 class DMScreen {
   #el: HTMLElement | null = null;
   #tab: HTMLElement | null = null;
@@ -496,6 +517,21 @@ class DMScreen {
     // row — a full-width line across the row. So dragging an Actor onto a card
     // lands it beside/above/below that card, not just at the bottom.
     el.addEventListener("dragover", (e) => {
+      // A tile inside this card owns the drop (a Mini Sheet's pin area), so the
+      // card must stand aside — otherwise it shadows the nested target and the
+      // drop makes a NEW CARD instead of pinning, which adds clutter rather than
+      // simply doing nothing. Clear any marks first so a zone indicator from the
+      // last dragover doesn't linger while the pointer sits over the tile.
+      //
+      // ONLY for drops from OUTSIDE (`!#dragId`). A tile's own drop target has
+      // nothing to do with rearranging the drawer, and a Mini Sheet's fills the
+      // whole card body — so applying this to an internal drag left the card's
+      // thin header as the only place a reorder registered, which made dropping
+      // beside a card need pixel precision.
+      if (!this.#dragId && overNestedDrop(e)) {
+        this.#clearDropMarks();
+        return;
+      }
       const external = !this.#dragId && !!game.user?.isGM && isDocDrag(e);
       if (!this.#dragId && !external) return;
       e.preventDefault();
@@ -508,6 +544,7 @@ class DMScreen {
     });
     el.addEventListener("dragleave", () => this.#clearDropMarks());
     el.addEventListener("drop", (e) => {
+      if (!this.#dragId && overNestedDrop(e)) return; // the tile's own handler has it
       const zone = el.dataset.dropZone ?? "bottom";
       this.#clearDropMarks();
       if (this.#dragId) {
@@ -592,13 +629,19 @@ class DMScreen {
 
   #zoneFor(e: DragEvent, el: HTMLElement, targetId: string): "left" | "right" | "top" | "bottom" {
     const rect = el.getBoundingClientRect();
-    const fx = (e.clientX - rect.left) / rect.width;
-    const fy = (e.clientY - rect.top) / rect.height;
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
     if (this.#rowJoinable(targetId)) {
-      if (fx < 0.28) return "left";
-      if (fx > 0.72) return "right";
+      // A pixel band, not a fraction of the width. A fraction is fine on a
+      // full-width card and mean on a narrow one — with five to a row, 28% of the
+      // width is a couple of dozen pixels, which is what made "put this beside
+      // that one" a test of aim. The band is a third of the card at most, so a
+      // small card still keeps a middle for top/bottom.
+      const band = Math.min(rect.width / 3, EDGE_BAND);
+      if (x < band) return "left";
+      if (x > rect.width - band) return "right";
     }
-    return fy < 0.5 ? "top" : "bottom";
+    return y < rect.height / 2 ? "top" : "bottom";
   }
 
   #toolButton(icon: string, titleKey: string, onClick: () => void): HTMLButtonElement {

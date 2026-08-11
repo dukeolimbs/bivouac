@@ -12,6 +12,7 @@
 
 import { MODULE_ID, SETTINGS, log } from "./constants";
 import { activeAdapter } from "./systems";
+import { openCustomStatsEditor } from "./custom-stats";
 
 /** A titled section of the module's settings, in display order. */
 type SettingGroup = {
@@ -49,6 +50,7 @@ export function settingGroups(): readonly SettingGroup[] {
       label: "BIVOUAC.Settings.Groups.CastBar",
       keys: [
         SETTINGS.castBarDock,
+        SETTINGS.castBarDockForced,
         SETTINGS.castBar2Dock,
         SETTINGS.castBarSize,
         SETTINGS.castPlateShape,
@@ -110,6 +112,49 @@ function markWorldScope(row: HTMLElement, key: string): void {
   label.append(badge);
 }
 
+/** A client row whose value a GM has overridden for the whole table: disable the
+ *  control and say so. A live-looking dropdown that silently does nothing is the
+ *  worse failure — you change it, nothing moves, and there's no way to tell that
+ *  from a bug. Applies to the GM as well, since a forced edge governs their bar
+ *  too (they change the override itself). */
+function markOverridden(row: HTMLElement, key: string): void {
+  if (key !== SETTINGS.castBarDock) return;
+  const forced = String(game.settings.get(MODULE_ID, SETTINGS.castBarDockForced) ?? "off");
+  if (forced === "off") return;
+
+  for (const control of row.querySelectorAll<HTMLElement>("select, input, button")) {
+    control.setAttribute("disabled", "disabled");
+  }
+  const label = row.querySelector(":scope > label, :scope > span.label");
+  if (!label || label.querySelector(".bivouac-overridden")) return;
+  const badge = document.createElement("span");
+  badge.className = "bivouac-scope bivouac-overridden";
+  badge.textContent = game.i18n.localize("BIVOUAC.Settings.ForcedBadge");
+  badge.dataset.tooltip = game.i18n.localize("BIVOUAC.Settings.ForcedBadgeHint");
+  label.append(badge);
+}
+
+/** The "Custom stat rows…" launcher, shaped like a Foundry settings menu row so
+ *  it doesn't read as a foreign control in the middle of the form. */
+function customStatsButton(): HTMLElement {
+  const row = document.createElement("div");
+  row.className = "form-group bivouac-cstats-launch";
+  const label = document.createElement("label");
+  label.textContent = game.i18n.localize("BIVOUAC.CustomStats.MenuName");
+  const fields = document.createElement("div");
+  fields.className = "form-fields";
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.innerHTML = `<i class="fa-solid fa-sliders"></i> ${game.i18n.localize("BIVOUAC.CustomStats.MenuLabel")}`;
+  btn.addEventListener("click", () => void openCustomStatsEditor());
+  fields.appendChild(btn);
+  const hint = document.createElement("p");
+  hint.className = "hint";
+  hint.textContent = game.i18n.localize("BIVOUAC.CustomStats.MenuHint");
+  row.append(label, fields, hint);
+  return row;
+}
+
 /** Hide a section whose every row has been filtered out by the search box —
  *  otherwise a search match in one section leaves the others as bare headings.
  *  Only writes on an actual change, so it can't re-trigger its own observer. */
@@ -140,6 +185,7 @@ export function decorateSettingsForm(root: HTMLElement): void {
       const row = rowFor(root, key);
       if (!row) continue; // not rendered (e.g. a world setting seen by a player)
       markWorldScope(row, key);
+      markOverridden(row, key);
       rows.push(row);
     }
     if (rows.length) planned.push({ label: group.label, rows }); // else: GM-only section, and we're a player
@@ -165,6 +211,15 @@ export function decorateSettingsForm(root: HTMLElement): void {
     const legend = document.createElement("legend");
     legend.textContent = game.i18n.localize(label);
     section.append(legend, ...rows); // moves the rows out of the flat list
+    // The custom-stat editor sits in the Stats section, next to the per-stat
+    // toggles it adds to. A button here rather than a `registerMenu`: a row is
+    // five fields with live path validation, and this module already builds every
+    // other form as a DialogV2 — an ApplicationV2 menu class would be a second
+    // dialog idiom to keep working across v13/v14 for no gain. GM-only, because
+    // the rows are world data.
+    if (label === "BIVOUAC.Settings.Groups.CastBarStats" && game.user?.isGM) {
+      section.append(customStatsButton());
+    }
     anchor.before(section);
   }
   anchor.remove();

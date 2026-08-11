@@ -124,6 +124,7 @@
       "TextStroke": "Text stroke",
       "TextStrokeInherit": "Follow the module setting",
       "TextStrokeOn": "On — including body text",
+      "TextStrokeBlur": "On — soft glow, including body text",
       "TextStrokeOff": "Off for this tile",
       "TextStrokeHint": "The dark outline that keeps text readable over artwork. \"On\" also outlines this tile's body text (note prose, journal pages, table results), which the module setting deliberately leaves alone.",
       "TableTextSize": "Text size",
@@ -213,6 +214,7 @@
       "Close": "Hide the Cast Bar",
       "Reveal": "Show the Cast Bar to players",
       "ScaleUp": "Larger",
+      "MoveBar": "Move the bar to the next edge",
       "ScaleDown": "Smaller",
       "Reorder": "Drag to reorder",
       "Empty": "Drag characters (from the sidebar or a compendium) here to add Actors.",
@@ -225,11 +227,42 @@
       "NameToggle": "Click to show/hide this name from players",
       "StatsShow": "Show stats (AC · Perception · HP · Investigation)",
       "StatsHide": "Hide stats",
+      "CondsShow": "Show conditions (you only)",
+      "CondsPublic": "Showing to you — click to show players too",
+      "CondsHide": "Showing to everyone — click to hide",
       "ImageTitle": "Plate image",
       "ImagePrompt": "Which image should this Actor's plate use?",
       "ImageProfile": "Profile",
       "ImageToken": "Token",
       "ImageCustom": "Custom image…"
+    },
+    "StatBlock": {
+      "CR": "CR",
+      "Level": "Level",
+      "Resistances": "Resistances",
+      "Immunities": "Immunities",
+      "Vulnerabilities": "Vulnerabilities",
+      "ConditionImmunities": "Condition immunities",
+      "Save": "Saving throw"
+    },
+    "CustomStats": {
+      "Title": "Custom stat rows",
+      "MenuName": "Custom stat rows",
+      "MenuLabel": "Configure rows…",
+      "MenuHint": "Point a stat row at any value in your system's actor data — Spell Save DC, Initiative, a resource your system tracks — and it appears alongside the built-in rows on Cast Bar plates and Mini Sheet tiles.",
+      "Hint": "One row per stat. The path is relative to the actor's system data, so enter attributes.spelldc rather than system.attributes.spelldc. Leave the max path empty unless the value is a pool you want shown as \"value/max\".",
+      "Probing": "Checking paths against: {name}",
+      "NoProbe": "Select a token (or set your player character) to check paths against a real actor as you type.",
+      "Name": "Label",
+      "Icon": "Icon",
+      "Path": "Path",
+      "MaxPath": "Max path (optional)",
+      "Reverse": "Higher is worse",
+      "ReverseHint": "Tick when a rising number is bad — damage or stress counted upward toward a limit, rather than a resource counting down.",
+      "Delete": "Remove this row",
+      "Add": "Add a row",
+      "NoValue": "no value",
+      "ReloadNeeded": "Custom stat rows saved. Reload the world for the changes to appear in Settings."
     },
     "Keybindings": {
       "CloseDMScreen": "Close the DM screen",
@@ -240,6 +273,8 @@
       "CastExitPlate": "Cast Bar: the hovered character leaves / rejoins the scene",
       "CastToggleName": "Cast Bar: show / hide the hovered character's name",
       "CastRemovePlate": "Cast Bar: remove the hovered character (unbound by default)",
+      "ToggleLanding": "Landing Page: set / remove on the current scene (unbound by default)",
+      "ToggleLandingHint": "Does exactly what the map button in the Bivouac scene controls does, without selecting that control group — which would also switch you into edit mode. Removing a scene's Landing Page still asks first.",
       "Undo": "Undo landing layout change",
       "Redo": "Redo landing layout change"
     },
@@ -254,9 +289,17 @@
       },
       "WorldBadge": "GM · everyone",
       "WorldBadgeHint": "A world setting: the GM sets it once and it applies to every player. Settings without this badge only change your own display.",
+      "ForcedBadge": "Set by the GM",
+      "ForcedBadgeHint": "The GM has fixed this for the whole table, so your own choice is ignored while that's in force. It's remembered and comes back if the GM turns the override off.",
       "TextStroke": {
         "Name": "Text stroke over artwork",
         "Hint": "Draw a thin dark outline behind text that sits over art — tile titles, Actor and card names, meter labels and Cast Bar plate names — so it stays readable against any image. Body text (notes, journal pages, table results) and text on solid panels are left alone, because an outline muddies prose at reading sizes; a tile's own gear can switch it on for those, or off entirely."
+      },
+      "TextOutlineMode": {
+        "Name": "Text outline style",
+        "Hint": "A hard stroke suits bold display faces; a soft outer glow reads cleaner over busy or light artwork and does not fight thin serifs. The thickness slider below means the same thing in both.",
+        "Stroke": "Stroke — a hard outline",
+        "Blur": "Glow — a soft halo"
       },
       "TextStrokeWidth": {
         "Name": "Text stroke — thickness",
@@ -302,6 +345,11 @@
         "Bottom": "Bottom",
         "Left": "Left",
         "Right": "Right"
+      },
+      "CastBarDockForced": {
+        "Name": "Cast Bar position — force for everyone",
+        "Hint": "Pin the Cast Bar to one edge for the whole table, so every screen matches the scene you framed. While this is set, nobody (including you) can move the bar, and the \"Cast Bar position\" setting above is ignored — each player's own choice is kept and returns when you set this back to Off.",
+        "Off": "Off — each player chooses"
       },
       "CastPlateShape": {
         "Name": "Cast Bar — plate shape",
@@ -419,7 +467,11 @@
     "MiniSheet": {
       "Empty": "Drag abilities, spells or items from a character sheet here to pin them for quick rolling.",
       "EmptyPlayer": "Nothing pinned yet.",
-      "Unpin": "Unpin"
+      "Unpin": "Unpin",
+      "Pinned": "Pinned",
+      "ColRoll": "Roll",
+      "ColFormula": "Formula",
+      "ColUses": "Uses"
     },
     "Drop": {
       "ActorTitle": "Add character to the board",

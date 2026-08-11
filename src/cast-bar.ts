@@ -16,7 +16,7 @@ import {
 } from "./constants";
 import { formatStat, visibleStats } from "./systems";
 import { readCastBar, writeCastBar } from "./layout";
-import { canView, docImg } from "./widgets";
+import { canView, docImg, sceneActor } from "./widgets";
 import { isDocDrag, parseDrop } from "./drop";
 import { worldLayer } from "./world-layer";
 
@@ -165,6 +165,11 @@ const SCALE_MIN = 0.25;
 const SCALE_MAX = 1.5;
 const SCALE_STEP = 0.1;
 
+/** How many condition icons a plate draws before collapsing the rest into "+n".
+ *  The plate face is already shared with the stats overlay, the name banner and
+ *  the raised-hand badge, and it shrinks under `#fit()`. */
+const CONDITION_CAP = 6;
+
 /** Extra horizontal inset (px) for the vertical docks, ON TOP of the base edge
  *  clearance (left → scene-controls toolbar, right → sidebar). Tweak to taste. */
 const LEFT_DOCK_PAD = -35; // left bar's gap from the scene-controls toolbar
@@ -175,6 +180,8 @@ class CastBar {
   #strip: HTMLElement | null = null;
   #tab: HTMLButtonElement | null = null;
   #closeBtn: HTMLButtonElement | null = null;
+  /** Hover control that cycles the bar's edge; hidden under a forced dock. */
+  #dockBtn: HTMLButtonElement | null = null;
   #dock: Dock = "bottom";
   /** Plate id being drag-reordered, or null. */
   #dragId: string | null = null;
@@ -270,7 +277,25 @@ class CastBar {
       };
       scaleBtn("fa-minus", "BIVOUAC.CastBar.ScaleDown", -SCALE_STEP);
       scaleBtn("fa-plus", "BIVOUAC.CastBar.ScaleUp", SCALE_STEP);
+      // Move the bar from the bar itself. Where the strip sits is a look-and-feel
+      // judgement made WHILE LOOKING at the scene, and it currently costs a round
+      // trip through the Settings window — conspicuous next to the chrome that's
+      // already here. It CYCLES rather than opening a four-way pad: one glyph, no
+      // popover, and four clicks gets you anywhere.
+      //
+      // Controller-gated, which matters most on bar 2: its dock is a WORLD setting
+      // (bar 1's is per-client), so the same button is a personal tweak on one bar
+      // and a change-for-everyone on the other. It also disables itself under a
+      // forced dock, or it would silently do nothing.
+      const dockBtn = document.createElement("button");
+      dockBtn.type = "button";
+      dockBtn.className = "bivouac-castbar__dockbtn";
+      dockBtn.innerHTML = `<i class="fa-solid fa-arrows-up-down-left-right"></i>`;
+      dockBtn.addEventListener("click", () => void this.#cycleDock());
+      scaleBox.appendChild(dockBtn);
+      this.#dockBtn = dockBtn;
       bar.appendChild(scaleBox);
+      this.#syncDockBtn();
 
       iface.appendChild(bar);
       this.#el = bar;
@@ -304,9 +329,53 @@ class CastBar {
 
   /* ------------------------------------------------ dock / size --------- */
 
+  /** Whether a GM has pinned this bar's edge for everyone. Only the primary bar
+   *  has an override — the second bar's own dock is already world-scoped, so it
+   *  is forced by construction. Returns the forced edge, or null. */
+  #forcedDock(): Dock | null {
+    if (this.#cfg.dockSetting !== SETTINGS.castBarDock) return null;
+    const f = String(game.settings.get(MODULE_ID, SETTINGS.castBarDockForced) ?? "off");
+    return (DOCKS as readonly string[]).includes(f) ? (f as Dock) : null;
+  }
+
+  /** True when the bar's edge is not this client's to change — used to disable the
+   *  affordances that write the setting, so they can't silently do nothing.
+   *
+   *  Deliberately applies to the GM too. A forced edge exists so everyone's screen
+   *  matches what the GM framed the scene around; if the GM's own bar drifted off
+   *  it, they'd be designing against a layout nobody else has. The GM changes the
+   *  forced value itself instead. */
+  dockLocked(): boolean {
+    return this.#forcedDock() !== null;
+  }
+
+  /** Step the bar's edge on one place. Writing the SETTING (rather than moving
+   *  the bar directly) means its `onChange` runs `applyDock()` + `applySize()`,
+   *  so placement, the fit maths and the tab all re-derive with no extra wiring —
+   *  and the Settings dropdown stays in step, since it's the same value. */
+  async #cycleDock(): Promise<void> {
+    if (this.dockLocked() || !canControl()) return;
+    const order: readonly Dock[] = ["top", "right", "bottom", "left"];
+    const cur = String(game.settings.get(MODULE_ID, this.#cfg.dockSetting) ?? "bottom");
+    const i = order.indexOf(cur as Dock);
+    await game.settings.set(MODULE_ID, this.#cfg.dockSetting, order[(i + 1) % order.length]);
+  }
+
+  /** Show the move button only to users who may actually use it. */
+  #syncDockBtn(): void {
+    const b = this.#dockBtn;
+    if (!b) return;
+    const allowed = canControl() && !this.dockLocked();
+    b.style.display = allowed ? "" : "none";
+    b.title = game.i18n.localize("BIVOUAC.CastBar.MoveBar");
+  }
+
   applyDock(): void {
+    // Resolved forced-else-client HERE, in the one place that reads the dock, so
+    // everything downstream — the fit maths, the tab edge, the empty drop-zone
+    // shape — follows from it for free.
     const m = String(
-      game.settings.get(MODULE_ID, this.#cfg.dockSetting) ?? "bottom",
+      this.#forcedDock() ?? game.settings.get(MODULE_ID, this.#cfg.dockSetting) ?? "bottom",
     );
     const valid = (DOCKS as readonly string[]).includes(m);
     // Optional (secondary) bars are disabled when their dock is "off" / invalid.
@@ -322,6 +391,9 @@ class CastBar {
     };
     set(this.#el, "bivouac-castdock");
     set(this.#tab, "bivouac-casttab");
+    // A GM turning the override on/off has to reach every client's button, and
+    // `applyDock` is what every one of those paths already runs.
+    this.#syncDockBtn();
   }
 
   #vertical(): boolean {
@@ -401,6 +473,15 @@ class CastBar {
     const strip = this.#strip;
     if (!el || !strip || !this.#enabled) return;
     this.#syncTab();
+    // PLACE THE BAR FIRST, whatever it contains. Where the bar sits is a function
+    // of Foundry's UI (sidebar / scene controls / hotbar), not of the plates, so
+    // it must not be skipped on the empty path — this used to sit below the
+    // early return, which meant an EMPTY bar never got its dock inset at all and
+    // fell back to the CSS `right: 12px`, i.e. underneath the sidebar. The
+    // edit-mode drop zone is exactly the case that is always empty, so the one
+    // thing a GM had to aim at was the one thing that was never placed.
+    // It also leaves a stale inline inset behind when the last plate is removed.
+    const avail = this.#placeAndBand(el);
     const count = strip.querySelectorAll(".bivouac-plate").length;
     if (!count) {
       el.style.removeProperty("--bivouac-castbar-fit");
@@ -443,7 +524,6 @@ class CastBar {
         ? parseFloat(plateCS.borderTopWidth) + parseFloat(plateCS.borderBottomWidth)
         : parseFloat(plateCS.borderLeftWidth) + parseFloat(plateCS.borderRightWidth)
       : 0;
-    const avail = this.#placeAndBand(el);
     const maxSize = (avail - (count - 1) * gap - pad - count * border) / (count * per);
     // Auto-shrink to fit, but never below 80px UNLESS the chosen size is already
     // smaller (a deliberate quick-scale down) — then honour it.
@@ -921,6 +1001,73 @@ class CastBar {
     el.appendChild(box);
   }
 
+  /** The actor's active conditions, as icons.
+   *
+   *  Unlike the stats this is CORE Foundry, not system data — `actor.statuses` is
+   *  a Set of status ids and `CONFIG.statusEffects` carries their art and labels —
+   *  so it needs no per-system adapter to work anywhere. We walk `statusEffects`
+   *  rather than `statuses` so the order is the world's configured order (stable
+   *  between renders) and anything unrecognised is skipped rather than drawn as a
+   *  broken icon.
+   *
+   *  Capped, with a "+n" overflow: a plate already shares its face with the stats
+   *  overlay, the name banner and the raised-hand badge, and a stunned-and-cursed
+   *  boss with nine effects would otherwise bury the portrait. */
+  #renderConditions(
+    el: HTMLElement,
+    plate: Plate,
+    doc: Record<string, unknown> | null,
+  ): void {
+    el.querySelector(".bivouac-plate__conds")?.remove();
+    if (!plate.conditions || !doc) return;
+    // Conditions on an NPC are GM information — who's poisoned or concentrating
+    // is exactly what a table plays to find out — so revealing them is a
+    // PER-PLATE decision (the hover control cycles off → GM only → everyone).
+    //
+    // Two ways a player may see them: the GM marked this plate public, or the
+    // player could already find out anyway by opening the sheet. The second
+    // clause is what stops the switch being busywork for the party's own plates —
+    // it only ever has to be used to reveal something a player couldn't otherwise
+    // know. (Core Foundry has no per-effect "hide from players" flag to honour,
+    // so the plate is the right place for this.)
+    if (!game.user?.isGM && !plate.conditionsPublic && !canView(doc)) return;
+    const statuses = doc.statuses as Set<string> | undefined;
+    if (!statuses || typeof statuses.has !== "function") return;
+    const cfg = (CONFIG?.statusEffects ?? []) as {
+      id?: string;
+      name?: string;
+      label?: string;
+      img?: string;
+      icon?: string;
+    }[];
+    const found = cfg.filter((s) => s.id && statuses.has(s.id));
+    if (!found.length) return;
+
+    const box = document.createElement("div");
+    box.className = "bivouac-plate__conds";
+    for (const s of found.slice(0, CONDITION_CAP)) {
+      const icon = document.createElement("img");
+      icon.className = "bivouac-plate__cond";
+      // `name`/`img` are the v12+ fields; `label`/`icon` are the older ones. Both
+      // are read so this doesn't break on either side of that rename.
+      icon.src = String(s.img ?? s.icon ?? "");
+      icon.alt = "";
+      icon.dataset.tooltip = game.i18n.localize(String(s.name ?? s.label ?? s.id));
+      box.appendChild(icon);
+    }
+    if (found.length > CONDITION_CAP) {
+      const more = document.createElement("span");
+      more.className = "bivouac-plate__cond-more";
+      more.textContent = `+${found.length - CONDITION_CAP}`;
+      more.dataset.tooltip = found
+        .slice(CONDITION_CAP)
+        .map((s) => game.i18n.localize(String(s.name ?? s.label ?? s.id)))
+        .join(", ");
+      box.appendChild(more);
+    }
+    el.appendChild(box);
+  }
+
   /** Show a raised-hand badge (top-right) when a player who OWNS this actor has
    *  their hand up (via an active raised-hand module). */
   /** Whether a NON-GM user who OWNS this actor currently has their hand raised. */
@@ -1023,7 +1170,17 @@ class CastBar {
         if (plate.nameHidden) name.classList.add("bivouac-plate__name--hidden"); // greyed, GM view
       }
       if (canView(doc)) el.classList.add("bivouac-plate--interactive");
-      this.#renderStats(el, plate, doc);
+      // Read the numbers and the conditions off the actor AS IT EXISTS IN THE
+      // SCENE. A plate stores an `Actor.<id>` uuid, which resolves to the sidebar
+      // prototype — but an unlinked token keeps its own actor, and everything
+      // that happens to it in play (damage, conditions) is written there. Without
+      // this the plate showed the state the actor had before it was ever placed.
+      // The name, portrait and sheet-opening deliberately stay on `doc`: those
+      // are the actor's identity, and the token's copy can carry a renamed or
+      // re-arted duplicate.
+      const live = sceneActor(doc);
+      this.#renderStats(el, plate, live);
+      this.#renderConditions(el, plate, live);
       this.#renderHand(el, doc);
     };
     // World docs (sidebar actors) resolve synchronously → no placeholder flash on
@@ -1197,6 +1354,22 @@ class CastBar {
       plate.stats ? "BIVOUAC.CastBar.StatsHide" : "BIVOUAC.CastBar.StatsShow",
       plate.stats ? "bivouac-plate__ctrl--active" : "",
       () => void this.#mutate(plate.id, (p) => (p.stats = !p.stats)),
+    );
+    // One button, THREE states — off → GM only → everyone → off. A separate
+    // "show to players" button would make seven controls on a plate that already
+    // shrinks under `#fit()`, and the two switches are never independent anyway:
+    // revealing conditions you aren't showing means nothing.
+    const condState = !plate.conditions ? 0 : plate.conditionsPublic ? 2 : 1;
+    btn(
+      "fa-hand-sparkles",
+      ["BIVOUAC.CastBar.CondsShow", "BIVOUAC.CastBar.CondsPublic", "BIVOUAC.CastBar.CondsHide"][condState],
+      ["", "bivouac-plate__ctrl--active", "bivouac-plate__ctrl--active bivouac-plate__ctrl--public"][condState],
+      () =>
+        void this.#mutate(plate.id, (p) => {
+          // off → GM only → everyone → off
+          p.conditions = condState !== 2;
+          p.conditionsPublic = condState === 1;
+        }),
     );
     btn(
       "fa-xmark",

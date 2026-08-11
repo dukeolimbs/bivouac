@@ -258,7 +258,17 @@ src/
   world-layer.ts    The board: DOM-over-canvas surface, screen-space layout, drag/resize
   dm-screen.ts      The GM DM-screen drawer (dock edges, resize, row grid, drop targets)
   cast-bar.ts       The Cast Bar(s): docked plate strip, states, stats, scale/fit, raise-hand
-  widgets.ts        Tile registry + renderers (webview/image/note/actor/journal/table/macro/cards)
+  widgets/          Tiles. `index.ts` is the only file the rest of the module imports from:
+    index.ts          Public surface (re-exports) + the tile-type import order
+    registry.ts       Tile type registry + createWidget factory
+    types/*.ts        One file per tile type, each self-registering on import
+    meter/            model.ts (pure numbers) · input.ts (gestures) · shapes.ts (the five shapes)
+    style.ts          Frame / background / text colour / text outline
+    dom.ts, svg.ts    Element shorthands
+    doc-tile.ts       Shared scaffold for document-backed tiles
+    card-model.ts     Pure card-list ops, shared with both host surfaces
+    fonts.ts          Font dropdown + on-demand Google Fonts
+    foundry-api.ts    The version-fragile Foundry API probes, in one place
   widget-config.ts  Per-tile configuration dialog + live preview
   drop.ts           Parse Foundry document drags → tiles
   layout.ts         Persistence (scene flags = board, user flags = DM screen) + undo/redo

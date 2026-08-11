@@ -32,7 +32,7 @@ import {
   castToggleVisible,
   onRaiseHandMessage,
 } from "./cast-bar";
-import { availableFonts, ensureGoogleFont, setTextStrokeVars } from "./widgets";
+import { availableFonts, ensureGoogleFont, setTextStrokeVars, textOutlineMode } from "./widgets";
 import { pickWidgetType } from "./widget-config";
 import { decorateSettingsForm, teardownSettingsForm } from "./settings-ui";
 import { ADAPTERS, activeAdapter, statSettingKey } from "./systems";
@@ -65,8 +65,28 @@ Hooks.once("init", () => {
     onChange: () => applyTextStroke(),
   });
 
+  // Outline SHAPE. Same mechanism, different numbers — a hard outline suits the
+  // chunky display faces the plates use, while a soft dark halo reads cleaner
+  // over busy or light artwork and doesn't fight thin serifs. Stroke stays the
+  // default, so nothing changes for an existing world.
+  game.settings.register(MODULE_ID, SETTINGS.textOutlineMode, {
+    name: "BIVOUAC.Settings.TextOutlineMode.Name",
+    hint: "BIVOUAC.Settings.TextOutlineMode.Hint",
+    scope: "world",
+    config: true,
+    type: String,
+    choices: {
+      stroke: "BIVOUAC.Settings.TextOutlineMode.Stroke",
+      blur: "BIVOUAC.Settings.TextOutlineMode.Blur",
+    },
+    default: "stroke",
+    onChange: () => applyTextStroke(),
+  });
+
   // Width in px. Slider bounds live in `TEXT_STROKE` so the registration, both
-  // apply paths and the live preview share one source of truth.
+  // apply paths and the live preview share one source of truth. The number means
+  // the same thing in both modes: blur mode scales it (see `OUTLINE_BLUR`)
+  // rather than reusing it raw, which would look far softer at the same setting.
   game.settings.register(MODULE_ID, SETTINGS.textStrokeWidth, {
     name: "BIVOUAC.Settings.TextStrokeWidth.Name",
     hint: "BIVOUAC.Settings.TextStrokeWidth.Hint",
@@ -206,6 +226,37 @@ Hooks.once("init", () => {
       right: "BIVOUAC.Settings.CastBarDock.Right",
     },
     default: "right",
+    onChange: () => {
+      castBar.applyDock();
+      castBar.applySize();
+    },
+  });
+
+  // GM override for the primary bar's edge. The GM frames a scene around where
+  // the strip sits — what it covers, where the art's focal point is — and by
+  // default every player places it somewhere else, so nobody's screen matches
+  // what was set up.
+  //
+  // A SEPARATE world setting rather than flipping `castBarDock`'s scope: changing
+  // an existing setting's scope silently discards every client's saved choice, so
+  // turning the override back off would leave everyone somewhere they never
+  // picked. This way the client value is preserved underneath and returns intact.
+  // (The second bar has been world-scoped all along, so this really just makes
+  // bar 1 able to behave like bar 2.)
+  game.settings.register(MODULE_ID, SETTINGS.castBarDockForced, {
+    name: "BIVOUAC.Settings.CastBarDockForced.Name",
+    hint: "BIVOUAC.Settings.CastBarDockForced.Hint",
+    scope: "world",
+    config: true,
+    type: String,
+    choices: {
+      off: "BIVOUAC.Settings.CastBarDockForced.Off",
+      top: "BIVOUAC.Settings.CastBarDock.Top",
+      bottom: "BIVOUAC.Settings.CastBarDock.Bottom",
+      left: "BIVOUAC.Settings.CastBarDock.Left",
+      right: "BIVOUAC.Settings.CastBarDock.Right",
+    },
+    default: "off",
     onChange: () => {
       castBar.applyDock();
       castBar.applySize();
@@ -384,14 +435,29 @@ Hooks.once("init", () => {
     requiresReload: true,
   });
 
+  // GM-defined stat rows. Registered HERE, out of order with the other hidden
+  // settings further down, because the toggle loop immediately below reads it via
+  // `activeAdapter()` — a `config: false` setting has to exist before anything
+  // derived from it is registered. That ordering constraint is the whole reason
+  // custom rows are more than a read-side change.
+  game.settings.register(MODULE_ID, SETTINGS.customStats, {
+    scope: "world",
+    config: false,
+    type: Array,
+    default: [],
+  });
+
   // One toggle per stat the ACTIVE adapter exposes, rather than a fixed dnd5e
   // four — under Daggerheart those four would be meaningless (it has no AC and no
   // passive skills at all). All on by default; each plate still starts with its
   // stats hidden, toggled per-plate from the bar's hover controls.
+  //
+  // GM-defined rows come through the same list, but their labels are literals the
+  // GM typed rather than i18n keys, so they can't go through `statSettingKey`.
   for (const stat of activeAdapter().stats) {
     game.settings.register(MODULE_ID, stat.setting, {
-      name: statSettingKey(stat, "Name"),
-      hint: statSettingKey(stat, "Hint"),
+      name: stat.custom ? stat.label : statSettingKey(stat, "Name"),
+      hint: stat.custom ? (stat.hint ?? "") : statSettingKey(stat, "Hint"),
       scope: "world",
       config: true,
       type: Boolean,
@@ -513,6 +579,30 @@ Hooks.once("init", () => {
   // on it, so it ships UNBOUND — a hotkey that deletes on a single press is far
   // too easy to fire by accident. Assign it in Configure Controls if wanted.
   castKey("castRemovePlate", "", () => castPlateAction("remove"), false);
+
+  // Toggle the Landing Page on the current scene. The scene-control button
+  // already does this, but reaching it means selecting the Bivouac control group
+  // — which turns EDIT MODE on as a side effect (the group's `onChange` drives
+  // `setEditMode`). The key does the one thing without that.
+  //
+  // Ships UNBOUND, like `castRemovePlate`: every unmodified letter worth having
+  // is taken by core, and this is a world change that hides a scene's board.
+  //
+  // The existing confirm is NOT bypassed — `toggleLandingScene()` prompts when
+  // it's removing a designation, and a hotkey that silently un-lands a scene is
+  // exactly the accident the tracker already flagged for "remove hovered plate".
+  game.keybindings.register(MODULE_ID, "toggleLanding", {
+    name: "BIVOUAC.Keybindings.ToggleLanding",
+    hint: "BIVOUAC.Keybindings.ToggleLandingHint",
+    editable: [],
+    restricted: true, // a GM-level scene change
+    precedence: CONST.KEYBINDING_PRECEDENCE.NORMAL,
+    onDown: () => {
+      if (!canvas?.scene) return false; // nothing to toggle — let the key through
+      void toggleLandingScene();
+      return true;
+    },
+  });
 
   // Ctrl+Z / Ctrl+Y undo & redo of the landing layout. Foundry's own undo only
   // covers canvas placeables, not our scene-flag layout, so we run our own
@@ -658,6 +748,27 @@ for (const kind of ["Actor", "Item", "JournalEntry", "JournalEntryPage", "Rollab
   Hooks.on(`delete${kind}`, (doc: { uuid?: string; parent?: { uuid?: string } }) => refreshDocTiles(doc));
 }
 
+// Conditions change through ActiveEffects, which are NOT covered by the loop
+// above — an effect is created/deleted on the actor rather than the actor itself
+// being updated, so without these the plate's condition icons would go stale at
+// exactly the moment they matter (someone gets stunned mid-combat). `create` is
+// needed as well as update/delete: applying a condition is a create.
+//
+// The effect's `parent` is the Actor, so this routes through the same
+// `refreshDocTiles` path as everything else and picks up the Mini Sheet too.
+for (const hook of ["createActiveEffect", "updateActiveEffect", "deleteActiveEffect"]) {
+  Hooks.on(hook, (effect: { parent?: { uuid?: string; isToken?: boolean; id?: string } }) => {
+    const parent = effect?.parent;
+    refreshDocTiles(parent as { uuid?: string });
+    // An effect applied to a TOKEN is written to that token's synthetic actor,
+    // whose uuid is `Scene.x.Token.y.Actor.z` — it never matches the plain
+    // `Actor.<id>` a plate or tile stores, so the line above would refresh
+    // nothing and the icons would sit stale. A synthetic actor keeps its source
+    // actor's id, so that is what to re-broadcast under.
+    if (parent?.isToken && parent.id) refreshDocTiles({ uuid: `Actor.${parent.id}` });
+  });
+}
+
 // The cast bar can hide while a combat runs (per the setting) — re-evaluate the
 // bars whenever combat state changes (start / end / round / turn).
 for (const hook of ["combatStart", "createCombat", "deleteCombat", "updateCombat"]) {
@@ -797,7 +908,7 @@ function applyCastFont(): void {
 function applyTextStroke(): void {
   const on = game.settings.get(MODULE_ID, SETTINGS.textStroke) !== false;
   const w = Number(game.settings.get(MODULE_ID, SETTINGS.textStrokeWidth) ?? TEXT_STROKE.default);
-  setTextStrokeVars(document.documentElement, on, Number.isFinite(w) ? w : TEXT_STROKE.default);
+  setTextStrokeVars(document.documentElement, on, Number.isFinite(w) ? w : TEXT_STROKE.default, textOutlineMode());
 }
 
 /** Push the DM-tab settings into their CSS vars and reposition the tab. */
@@ -854,9 +965,15 @@ function previewSettings(root: HTMLElement): void {
   // tiles (the whole point of the slider) instead of by save-and-look.
   const sOn = settingInput(root, SETTINGS.textStroke) as HTMLInputElement | null;
   const w = liveValue(root, SETTINGS.textStrokeWidth);
-  if (sOn || Number.isFinite(w)) {
+  // The mode previews too — switching stroke↔blur is the change you most want to
+  // see against real art before committing, and reading it from the form (rather
+  // than the saved setting) is what makes the width slider preview in the right
+  // shape as you drag it.
+  const sMode = settingInput(root, SETTINGS.textOutlineMode) as HTMLSelectElement | null;
+  if (sOn || sMode || Number.isFinite(w)) {
     const on = sOn ? sOn.checked !== false : true;
-    setTextStrokeVars(document.documentElement, on, Number.isFinite(w) ? w : TEXT_STROKE.default);
+    const mode = sMode?.value === "blur" ? "blur" : sMode ? "stroke" : textOutlineMode();
+    setTextStrokeVars(document.documentElement, on, Number.isFinite(w) ? w : TEXT_STROKE.default, mode);
   }
 }
 

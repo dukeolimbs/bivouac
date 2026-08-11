@@ -41,6 +41,10 @@ export const SETTINGS = {
   controlRole: "controlRole",
   /** Client setting: which edge the Cast Bar docks to (bottom/top/left/right). */
   castBarDock: "castBarDock",
+  castBarDockForced: "castBarDockForced",
+  /** GM-defined stat rows (array of CustomStatRow). Hidden — edited through its
+   *  own form, since a row is five fields and there can be several. */
+  customStats: "customStats",
   /** Client setting: position of the Cast Bar toggle tab along its edge (%). */
   castBarTabPos: "castBarTabPos",
   /** Client setting: horizontal pad the right-dock Cast Bar tab keeps from the sidebar. */
@@ -76,6 +80,7 @@ export const SETTINGS = {
   castPlateShape: "castPlateShape",
   /** World setting: draw a thin dark stroke behind text that sits over artwork. */
   textStroke: "textStroke",
+  textOutlineMode: "textOutlineMode",
   /** World setting: that stroke's width, in px. */
   textStrokeWidth: "textStrokeWidth",
 } as const;
@@ -209,6 +214,16 @@ export interface Plate {
   /** Show the Actor's stat overlay (AC / passive perception / HP / investigation)
    *  on this plate. Off by default; toggled per-plate from the hover controls. */
   stats?: boolean;
+  /** Show the Actor's active conditions (status effects) on this plate. Off by
+   *  default; a per-plate toggle exactly like `stats`. */
+  conditions?: boolean;
+  /** Also reveal those conditions to players who could NOT otherwise know them.
+   *  Conditions on an NPC are GM information — whether the boss is frightened is
+   *  usually something a table plays to find out — so showing them is a per-plate
+   *  decision rather than all-or-nothing. Has no effect unless `conditions` is on,
+   *  and none for an actor the player can already inspect (their own character's
+   *  conditions are theirs regardless). */
+  conditionsPublic?: boolean;
 }
 
 /** Cast Bar state for one Scene. */

@@ -233,20 +233,44 @@ body {
   pointer-events: none;
 }
 
-/* Header — hidden for players; shown only in edit mode. */
+/* Header — hidden for players; shown only in edit mode.
+
+   OUT OF FLOW on purpose. As an in-flow row it took its own height (~24px) out of
+   the body, which is the flex-column's only other child — so in edit mode every
+   tile's content was shorter and pushed down relative to how players see it, and
+   framing an image or lining up a row was guesswork that only resolved on leaving
+   edit mode. Absolute positioning keeps the body at full height in BOTH modes, so
+   the board is actually WYSIWYG.
+
+   The cost is that the header now overlays the top of the content instead of
+   compressing it. That's the deliberate trade — "same geometry in both modes" was
+   the requirement — and the scrim + fade below are what make it liveable. It is
+   still the drag surface, so dragging is unaffected. */
 .bivouac-widget__header {
   display: none;
 }
 #bivouac-overlay.bivouac-edit .bivouac-widget__header {
   display: flex;
+  position: absolute;
+  inset: 0 0 auto 0;
   align-items: center;
   gap: 4px;
   padding: 3px 6px;
   font-size: 12px;
   cursor: grab;
-  background: rgba(0, 0, 0, 0.3);
-  border-bottom: 1px solid var(--bivouac-panel-border);
+  /* A scrim that fades out, not a solid bar with a rule under it: an overlaid
+     header with a border-bottom draws a hard line across the tile's content. */
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0));
   z-index: 3;
+  opacity: 0.35;
+  transition: opacity 120ms ease;
+}
+/* Full strength once you're actually addressing the tile, so the chrome is out of
+   the way while you judge the layout but solid when you reach for it. */
+#bivouac-overlay.bivouac-edit .bivouac-widget:hover .bivouac-widget__header,
+#bivouac-overlay.bivouac-edit .bivouac-widget.bivouac-selected .bivouac-widget__header,
+#bivouac-overlay.bivouac-edit .bivouac-widget.bivouac-dragging .bivouac-widget__header {
+  opacity: 1;
 }
 .bivouac-widget.bivouac-dragging .bivouac-widget__header {
   cursor: grabbing;
@@ -644,6 +668,54 @@ body {
 /* Text sizes take the smaller of a width- and a height-derived size rather than
    plain cqmin: on a one-square-high, many-squares-wide tile cqmin is the tiny
    height, which made the type unreadably small. */
+/* Tick targets (the ring's centre icon, the meter's name). A pointer cursor is
+   what makes the interaction discoverable rather than hidden, and text selection
+   has to go or a double tick selects the label instead. */
+.bivouac-meter__tick {
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+}
+/* A refused tick — already at min/max — bumps, so it's visibly different from one
+   that landed. Without it, clicking at the ceiling looks identical to success. */
+@keyframes bivouac-meter-bump {
+  25% {
+    transform: translateX(-2px);
+  }
+  75% {
+    transform: translateX(2px);
+  }
+}
+.bivouac-meter__tick--bump {
+  animation: bivouac-meter-bump 160ms ease-in-out;
+}
+/* The pulse itself is on the BODY, so one pair of keyframes covers all five
+   styles (bar, dial, ring, scale, pool) instead of a per-style animation — and
+   the direction is legible: up swells, down shrinks. */
+@keyframes bivouac-meter-up {
+  50% {
+    transform: scale(1.06);
+  }
+}
+@keyframes bivouac-meter-down {
+  50% {
+    transform: scale(0.94);
+  }
+}
+.bivouac-meter--up .bivouac-meter__body {
+  animation: bivouac-meter-up 220ms ease-out;
+}
+.bivouac-meter--down .bivouac-meter__body {
+  animation: bivouac-meter-down 220ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .bivouac-meter--up .bivouac-meter__body,
+  .bivouac-meter--down .bivouac-meter__body,
+  .bivouac-meter__tick--bump {
+    animation: none;
+  }
+}
+
 .bivouac-meter__label {
   flex: 0 0 auto;
   padding: 4cqmin 4cqmin 0;
@@ -804,6 +876,12 @@ body {
   gap: 2cqmin;
   pointer-events: none; /* clicks pass through to the segments */
 }
+/* …except the icon, which is a tick target on a live ring. The overlay above
+   spans the whole ring box, so taking the pointer there would swallow every
+   segment click — only the glyph itself opts back in. */
+.bivouac-meter--live .bivouac-meter__icon.bivouac-meter__tick {
+  pointer-events: auto;
+}
 .bivouac-meter__icon {
   color: var(--bivouac-meter-fill);
   font-size: clamp(6px, 30cqmin, 140px);
@@ -838,25 +916,51 @@ body {
   border-radius: 999px;
   background: var(--bivouac-meter-track);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+  /* Handle position along the track, 0..1, published by the renderer. Both the
+     handle and the value badge derive their placement from it — see below. */
+  --bivouac-meter-pos: 0;
+  --bivouac-handle-w: clamp(12px, min(13cqw, 30cqh), 52px);
 }
+/* The handle's travel is INSET by its own width, so at either end it sits flush
+   inside the track rather than half-overhanging it. `left` walks 0 → 100% of the
+   track while the transform pulls back 0 → 100% of the HANDLE, which is exactly
+   that inset and needs no measurement.
+
+   This is what fixes the reported bug on a one-row scale, where the number lives
+   inside the handle (the pill in the container branch below): at max, the pill —
+   and the number in it — used to run off the tile edge and get clipped by
+   `.bivouac-widget__body`'s `overflow: hidden`, so a value of 100 read as a
+   perfectly plausible 10. It misinformed rather than just looking unfinished, and
+   it failed exactly at the maximum. The branch overrides the pill's width but not
+   this positioning, so it inherits the fix. */
 .bivouac-meter__handle {
   position: absolute;
   top: 50%;
-  left: 0;
-  width: clamp(12px, min(13cqw, 30cqh), 52px);
+  left: calc(var(--bivouac-meter-pos) * 100%);
+  width: var(--bivouac-handle-w);
   aspect-ratio: 1;
-  transform: translate(-50%, -50%);
+  transform: translate(calc(var(--bivouac-meter-pos) * -100%), -50%);
   border-radius: 50%;
   background: var(--bivouac-meter-fill);
   box-shadow:
     0 2px 6px rgba(0, 0, 0, 0.55),
     inset 0 0 0 1px rgba(255, 255, 255, 0.35);
 }
+/* Same idea for the badge on a tall scale, but interpolated between the two
+   anchors rather than clamped at them: `left: 0` puts it at the handle's left
+   edge, and the transform slides it from there to `handle − badge` width as the
+   handle travels. So it's exactly centred over the handle at the midpoint, its
+   left edge meets the track's at 0, its right edge meets the track's at max, and
+   it deviates smoothly in between — always fully on the tile, at any digit count
+   or number-size setting. (Both ends matter: a badge that overhangs at 100
+   overhangs at 0 too; the capture only showed the right.) */
 .bivouac-meter__bubble {
   position: absolute;
   bottom: 125%;
-  left: 50%;
-  transform: translateX(-50%);
+  left: 0;
+  transform: translateX(
+    calc(var(--bivouac-meter-pos) * (var(--bivouac-handle-w) - 100%))
+  );
   padding: 0.15em 0.5em;
   border-radius: 0.4em;
   background: var(--bivouac-meter-track);
@@ -1474,17 +1578,28 @@ body.bivouac-dnd-active .bivouac-card__body iframe {
 .bivouac-drawer__btn--active {
   color: var(--bivouac-accent);
 }
+/* Same fix as the landing tile's header, and for the same reason — this header is
+   built only in edit mode and appended above the body, so turning edit mode on
+   shortened every DM card's content. Out of flow, the body keeps full height in
+   both modes. Kept consistent with the board deliberately: the two surfaces had
+   the same bug, and fixing one would leave them disagreeing. */
 .bivouac-card__header {
-  position: relative;
-  z-index: 1; /* above the .bivouac-bg-image ::after layer */
+  position: absolute;
+  inset: 0 0 auto 0;
+  z-index: 2; /* above the body (z 1) it now overlays */
   display: flex;
   align-items: center;
   gap: 4px;
   padding: 5px 8px;
   font-weight: 600;
   font-size: 13px;
-  background: rgba(0, 0, 0, 0.22);
-  border-bottom: 1px solid var(--bivouac-panel-border);
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0));
+  opacity: 0.4;
+  transition: opacity 120ms ease;
+}
+.bivouac-card:hover .bivouac-card__header,
+.bivouac-card--dragging .bivouac-card__header {
+  opacity: 1;
 }
 .bivouac-card__grip {
   cursor: grab;
@@ -1625,6 +1740,15 @@ body.bivouac-dnd-active .bivouac-card__body iframe {
   gap: var(--bivouac-gap);
   align-items: center;
   max-width: 94vw;
+  /* Size of the edit-mode drop zone on the strip's DRIVEN axis — the same plate
+     size the plates themselves use, so the empty target previews where they'll
+     land instead of matching a constant. Floored so a quick-scaled-down bar still
+     leaves something you can actually drop onto (and so the zone keeps the plate's
+     portrait orientation rather than inverting at small sizes). */
+  --bivouac-cast-empty: max(
+    96px,
+    var(--bivouac-castbar-fit, var(--bivouac-castbar-size))
+  );
   /* overflow:auto enables horizontal scroll when there are many plates, but it
      also clips each plate's drop-shadow / speaker glow at its edge. The padding
      gives those effects room INSIDE the scroll box so nothing is cut off — and
@@ -1646,12 +1770,37 @@ body.bivouac-dnd-active .bivouac-card__body iframe {
   border-radius: 12px;
   background: rgba(0, 0, 0, 0.3);
 }
+/* Left/right docks: the empty target has to extend DOWN the strip, not across it —
+   it should preview the column the plates are about to form. The base rule above
+   is landscape (200×80), which is the wrong axis here, and `min-width` in
+   particular would keep forcing a wide box however small the plates are.
+
+   Two separate things make an empty side-docked bar read as a wide box, and both
+   need fixing — the shape only looks right once the prompt itself is capped:
+     1. the landscape minimums, replaced below with the plate-derived ones, and
+     2. the prompt's own width. A vertical strip sets `max-width: none` (it scrolls
+        on the other axis), so `CastBar.Empty` — a full sentence — lays out on ONE
+        line and stretches the zone sideways past the plates it's standing in for. */
+.bivouac-castdock-left.bivouac-castbar--editing .bivouac-castbar__strip,
+.bivouac-castdock-right.bivouac-castbar--editing .bivouac-castbar__strip {
+  min-width: 0; /* the prompt's width (below) sets the cross axis */
+  min-height: calc(var(--bivouac-cast-empty) / var(--bivouac-plate-aspect, 0.75));
+}
 .bivouac-castbar__empty {
   margin: auto;
   padding: 6px 12px;
   color: var(--bivouac-muted);
   text-align: center;
   font-size: 13px;
+}
+/* One plate wide, so the sentence wraps into the column instead of defining it.
+   Horizontal padding is 0 (not 12px) so `width` means the same under either box
+   model; `anywhere` keeps a long word inside the zone at small plate sizes. */
+.bivouac-castdock-left .bivouac-castbar__empty,
+.bivouac-castdock-right .bivouac-castbar__empty {
+  width: var(--bivouac-cast-empty);
+  padding: 6px 0;
+  overflow-wrap: anywhere;
 }
 
 /* A Plate — portrait fills, name banner along the bottom. In a horizontal strip
@@ -1844,9 +1993,56 @@ body.bivouac-dnd-active .bivouac-card__body iframe {
 .bivouac-plate__ctrl--active:hover {
   color: var(--bivouac-accent);
 }
+/* The third state of the conditions control: showing to PLAYERS as well as you.
+   It needs to be distinguishable from plain "on" at a glance — you're deciding
+   whether the table can see that your boss is frightened — so it takes the
+   speaker green rather than the accent, and a ring so it reads even to someone
+   who can't separate the two hues. */
+.bivouac-plate__ctrl--public,
+.bivouac-plate__ctrl--public:hover {
+  color: var(--bivouac-speaker);
+  box-shadow: inset 0 0 0 1px var(--bivouac-speaker);
+}
 
 /* Raised-hand overlay — a large gold hand centred on the plate (a player who owns
    this actor has their hand up, via an active raised-hand module). */
+/* Conditions take the plate's other free corner: the stats overlay owns top-left,
+   the name banner the bottom, and the raised hand is a centred glyph over
+   everything — so top-right is the only spot that collides with nothing. Sized
+   off `--bivouac-castbar-fit` like every other overlay, so it shrinks with the
+   plate under `#fit()` instead of swamping a small one. */
+.bivouac-plate__conds {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  pointer-events: none;
+}
+.bivouac-plate__cond {
+  width: clamp(10px, calc(var(--bivouac-castbar-fit, var(--bivouac-castbar-size)) * 0.1), 22px);
+  height: auto;
+  aspect-ratio: 1;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.55);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+  /* The tooltip is the only way to name an icon this small, so the icons alone
+     must take the pointer even though the strip itself doesn't. */
+  pointer-events: auto;
+}
+.bivouac-plate__cond-more {
+  padding: 0 3px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+  font-size: clamp(8px, calc(var(--bivouac-castbar-fit, var(--bivouac-castbar-size)) * 0.06), 13px);
+  font-weight: 700;
+  pointer-events: auto;
+}
+
 .bivouac-plate__hand {
   position: absolute;
   inset: 0;
@@ -2083,6 +2279,25 @@ body.bivouac-dnd-active .bivouac-card__body iframe {
 .bivouac-castbar__scalebtn:hover {
   color: var(--bivouac-accent);
 }
+/* "Move the bar" — same pill as the scale controls, so the hover cluster reads as
+   one toolbar rather than a third floating thing on the strip. */
+.bivouac-castbar__dockbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--bivouac-panel-border);
+  border-radius: 50%;
+  background: var(--bivouac-panel-bg-strong);
+  color: var(--bivouac-text);
+  cursor: pointer;
+  font-size: 10px;
+}
+.bivouac-castbar__dockbtn:hover {
+  color: var(--bivouac-accent);
+}
 
 /* GM-only toggle tab — a glassy pill on the docked edge, mirroring the DM tab. */
 .bivouac-castbar-tab {
@@ -2225,32 +2440,43 @@ body.bivouac-dnd-active .bivouac-card__body iframe {
 .bivouac-plate__name,
 .bivouac-plate__stat,
 .bivouac-stroke-on {
-  --bivouac-tsr: calc(var(--bivouac-text-stroke, 0px) / 2);
+  /* Ring radius. `--bivouac-text-ring-scale` is 1 for a hard stroke and small in
+     blur mode: a halo wants its copies pulled in toward the glyph, because a
+     full-radius ring that is ALSO blurred reads as a fat smudge rather than a
+     glow. Half the width keeps the CSS meaning of a stroke (centred on the edge,
+     half outside), so a value tuned as a stroke keeps its weight. */
+  --bivouac-tsr: calc(var(--bivouac-text-stroke, 0px) / 2 * var(--bivouac-text-ring-scale, 1));
+  /* Per-copy blur radius: 0 in stroke mode, so the output is byte-identical to
+     what shipped. Non-zero turns the same 24 copies into a soft outer glow —
+     which is why the blur mode is a var here rather than a second rendering
+     path. 24 blurred copies is more than a halo strictly needs, but it costs
+     exactly what the stroke already costs and keeps ONE declaration. */
+  --bivouac-tsb: var(--bivouac-text-blur, 0px);
   --bivouac-ring:
-    var(--bivouac-tsr) 0 0 var(--bivouac-text-stroke-color, #000),
-    calc(var(--bivouac-tsr) * 0.9659) calc(var(--bivouac-tsr) * 0.2588) 0 var(--bivouac-text-stroke-color, #000),
-    calc(var(--bivouac-tsr) * 0.866) calc(var(--bivouac-tsr) * 0.5) 0 var(--bivouac-text-stroke-color, #000),
-    calc(var(--bivouac-tsr) * 0.7071) calc(var(--bivouac-tsr) * 0.7071) 0 var(--bivouac-text-stroke-color, #000),
-    calc(var(--bivouac-tsr) * 0.5) calc(var(--bivouac-tsr) * 0.866) 0 var(--bivouac-text-stroke-color, #000),
-    calc(var(--bivouac-tsr) * 0.2588) calc(var(--bivouac-tsr) * 0.9659) 0 var(--bivouac-text-stroke-color, #000),
-    0 var(--bivouac-tsr) 0 var(--bivouac-text-stroke-color, #000),
-    calc(var(--bivouac-tsr) * -0.2588) calc(var(--bivouac-tsr) * 0.9659) 0 var(--bivouac-text-stroke-color, #000),
-    calc(var(--bivouac-tsr) * -0.5) calc(var(--bivouac-tsr) * 0.866) 0 var(--bivouac-text-stroke-color, #000),
-    calc(var(--bivouac-tsr) * -0.7071) calc(var(--bivouac-tsr) * 0.7071) 0 var(--bivouac-text-stroke-color, #000),
-    calc(var(--bivouac-tsr) * -0.866) calc(var(--bivouac-tsr) * 0.5) 0 var(--bivouac-text-stroke-color, #000),
-    calc(var(--bivouac-tsr) * -0.9659) calc(var(--bivouac-tsr) * 0.2588) 0 var(--bivouac-text-stroke-color, #000),
-    calc(var(--bivouac-tsr) * -1) 0 0 var(--bivouac-text-stroke-color, #000),
-    calc(var(--bivouac-tsr) * -0.9659) calc(var(--bivouac-tsr) * -0.2588) 0 var(--bivouac-text-stroke-color, #000),
-    calc(var(--bivouac-tsr) * -0.866) calc(var(--bivouac-tsr) * -0.5) 0 var(--bivouac-text-stroke-color, #000),
-    calc(var(--bivouac-tsr) * -0.7071) calc(var(--bivouac-tsr) * -0.7071) 0 var(--bivouac-text-stroke-color, #000),
-    calc(var(--bivouac-tsr) * -0.5) calc(var(--bivouac-tsr) * -0.866) 0 var(--bivouac-text-stroke-color, #000),
-    calc(var(--bivouac-tsr) * -0.2588) calc(var(--bivouac-tsr) * -0.9659) 0 var(--bivouac-text-stroke-color, #000),
-    0 calc(var(--bivouac-tsr) * -1) 0 var(--bivouac-text-stroke-color, #000),
-    calc(var(--bivouac-tsr) * 0.2588) calc(var(--bivouac-tsr) * -0.9659) 0 var(--bivouac-text-stroke-color, #000),
-    calc(var(--bivouac-tsr) * 0.5) calc(var(--bivouac-tsr) * -0.866) 0 var(--bivouac-text-stroke-color, #000),
-    calc(var(--bivouac-tsr) * 0.7071) calc(var(--bivouac-tsr) * -0.7071) 0 var(--bivouac-text-stroke-color, #000),
-    calc(var(--bivouac-tsr) * 0.866) calc(var(--bivouac-tsr) * -0.5) 0 var(--bivouac-text-stroke-color, #000),
-    calc(var(--bivouac-tsr) * 0.9659) calc(var(--bivouac-tsr) * -0.2588) 0 var(--bivouac-text-stroke-color, #000);
+    var(--bivouac-tsr) 0 var(--bivouac-tsb) var(--bivouac-text-stroke-color, #000),
+    calc(var(--bivouac-tsr) * 0.9659) calc(var(--bivouac-tsr) * 0.2588) var(--bivouac-tsb) var(--bivouac-text-stroke-color, #000),
+    calc(var(--bivouac-tsr) * 0.866) calc(var(--bivouac-tsr) * 0.5) var(--bivouac-tsb) var(--bivouac-text-stroke-color, #000),
+    calc(var(--bivouac-tsr) * 0.7071) calc(var(--bivouac-tsr) * 0.7071) var(--bivouac-tsb) var(--bivouac-text-stroke-color, #000),
+    calc(var(--bivouac-tsr) * 0.5) calc(var(--bivouac-tsr) * 0.866) var(--bivouac-tsb) var(--bivouac-text-stroke-color, #000),
+    calc(var(--bivouac-tsr) * 0.2588) calc(var(--bivouac-tsr) * 0.9659) var(--bivouac-tsb) var(--bivouac-text-stroke-color, #000),
+    0 var(--bivouac-tsr) var(--bivouac-tsb) var(--bivouac-text-stroke-color, #000),
+    calc(var(--bivouac-tsr) * -0.2588) calc(var(--bivouac-tsr) * 0.9659) var(--bivouac-tsb) var(--bivouac-text-stroke-color, #000),
+    calc(var(--bivouac-tsr) * -0.5) calc(var(--bivouac-tsr) * 0.866) var(--bivouac-tsb) var(--bivouac-text-stroke-color, #000),
+    calc(var(--bivouac-tsr) * -0.7071) calc(var(--bivouac-tsr) * 0.7071) var(--bivouac-tsb) var(--bivouac-text-stroke-color, #000),
+    calc(var(--bivouac-tsr) * -0.866) calc(var(--bivouac-tsr) * 0.5) var(--bivouac-tsb) var(--bivouac-text-stroke-color, #000),
+    calc(var(--bivouac-tsr) * -0.9659) calc(var(--bivouac-tsr) * 0.2588) var(--bivouac-tsb) var(--bivouac-text-stroke-color, #000),
+    calc(var(--bivouac-tsr) * -1) 0 var(--bivouac-tsb) var(--bivouac-text-stroke-color, #000),
+    calc(var(--bivouac-tsr) * -0.9659) calc(var(--bivouac-tsr) * -0.2588) var(--bivouac-tsb) var(--bivouac-text-stroke-color, #000),
+    calc(var(--bivouac-tsr) * -0.866) calc(var(--bivouac-tsr) * -0.5) var(--bivouac-tsb) var(--bivouac-text-stroke-color, #000),
+    calc(var(--bivouac-tsr) * -0.7071) calc(var(--bivouac-tsr) * -0.7071) var(--bivouac-tsb) var(--bivouac-text-stroke-color, #000),
+    calc(var(--bivouac-tsr) * -0.5) calc(var(--bivouac-tsr) * -0.866) var(--bivouac-tsb) var(--bivouac-text-stroke-color, #000),
+    calc(var(--bivouac-tsr) * -0.2588) calc(var(--bivouac-tsr) * -0.9659) var(--bivouac-tsb) var(--bivouac-text-stroke-color, #000),
+    0 calc(var(--bivouac-tsr) * -1) var(--bivouac-tsb) var(--bivouac-text-stroke-color, #000),
+    calc(var(--bivouac-tsr) * 0.2588) calc(var(--bivouac-tsr) * -0.9659) var(--bivouac-tsb) var(--bivouac-text-stroke-color, #000),
+    calc(var(--bivouac-tsr) * 0.5) calc(var(--bivouac-tsr) * -0.866) var(--bivouac-tsb) var(--bivouac-text-stroke-color, #000),
+    calc(var(--bivouac-tsr) * 0.7071) calc(var(--bivouac-tsr) * -0.7071) var(--bivouac-tsb) var(--bivouac-text-stroke-color, #000),
+    calc(var(--bivouac-tsr) * 0.866) calc(var(--bivouac-tsr) * -0.5) var(--bivouac-tsb) var(--bivouac-text-stroke-color, #000),
+    calc(var(--bivouac-tsr) * 0.9659) calc(var(--bivouac-tsr) * -0.2588) var(--bivouac-tsb) var(--bivouac-text-stroke-color, #000);
   text-shadow: var(--bivouac-ring);
 }
 
@@ -2263,12 +2489,18 @@ body.bivouac-dnd-active .bivouac-card__body iframe {
    shadow. When the outline is switched off its copies are transparent, so what
    remains is exactly the shadow these had before the feature existed.
    `--bivouac-ring` resolves correctly here because it is declared on these same
-   elements by the rule above, not inherited from an ancestor. */
+   elements by the rule above, not inherited from an ancestor.
+
+   The composed shadow's ALPHA is a var so blur mode can switch it off: a drop
+   shadow under an outer glow is two blurs stacked, which reads as a smudge and
+   is the exact failure the blur mode exists to avoid. It stays at full strength
+   in stroke mode (and when the outline is off entirely), so nothing about the
+   shipped look changes. */
 .bivouac-meter__bar .bivouac-meter__num {
-  text-shadow: var(--bivouac-ring), 0 1px 3px rgba(0, 0, 0, 0.75);
+  text-shadow: var(--bivouac-ring), 0 1px 3px rgba(0, 0, 0, calc(0.75 * var(--bivouac-text-shadow-a, 1)));
 }
 .bivouac-plate__stat {
-  text-shadow: var(--bivouac-ring), 0 1px 2px rgba(0, 0, 0, 0.9);
+  text-shadow: var(--bivouac-ring), 0 1px 2px rgba(0, 0, 0, calc(0.9 * var(--bivouac-text-shadow-a, 1)));
 }
 
 /* ----------------------------------------------------------- mini sheet */
@@ -2279,8 +2511,8 @@ body.bivouac-dnd-active .bivouac-card__body iframe {
   display: flex;
   flex-direction: column;
   height: 100%;
-  gap: 2cqmin;
-  padding: 3cqmin;
+  gap: 1.2cqmin;
+  padding: 2.4cqmin;
   container-type: size;
   color: var(--bivouac-text-color, inherit);
   overflow: hidden;
@@ -2325,22 +2557,192 @@ body.bivouac-dnd-active .bivouac-card__body iframe {
   gap: 0.35em;
   white-space: nowrap;
 }
+
+/* ---- statblock: the at-a-glance readout --------------------------------- */
+/* Every block below is HIDDEN BY DEFAULT and switched on by the size tiers at
+   the end of this section. That's the density model: the renderer always builds
+   everything, and the tile shows as much as it has room for, so resizing needs
+   no re-render and a 4x5 board tile falls back to portrait + core stats + pins
+   rather than becoming an unreadable peephole.
+
+   Order of sacrifice as the tile shrinks: traits go first (pure reference), then
+   the ability strip, then the facts band. The identity head and the pin list
+   never go — they are what the tile is for. */
+
+/* Facts band — level/CR, proficiency, speed, senses. Chips rather than a
+   sentence, so it wraps predictably and each fact stays readable on its own. */
+.bivouac-mini__facts {
+  display: none;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.15em 0.9em;
+  font-size: clamp(8px, min(4.2cqw, 7.5cqh), 14px);
+  opacity: 0.85;
+}
+.bivouac-mini__fact {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  min-width: 0;
+}
+.bivouac-mini__fact > i {
+  opacity: 0.6;
+}
+.bivouac-mini__fact > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Ability strip — one column per ability, laid out by `auto-fit` so it stays a
+   single row on a wide tile and wraps to two on a narrow one, rather than
+   squeezing six columns past legibility. */
+.bivouac-mini__abilities {
+  display: none;
+  flex: 0 0 auto;
+  grid-template-columns: repeat(auto-fit, minmax(3.2em, 1fr));
+  gap: 1cqmin;
+  font-size: clamp(8px, min(4.4cqw, 8cqh), 15px);
+}
+/* Three rows, not four: the score and the save share the bottom line. Stacking
+   all four cost ~12px per cell of the tile's height, and that height comes
+   straight out of the pin list underneath — which is the part you actually
+   interact with. Laid out with grid areas so the saving is CSS-only; the cell's
+   children stay in reading order in the markup. */
+.bivouac-mini__abil {
+  display: grid;
+  grid-template-columns: auto auto;
+  grid-template-areas:
+    "key key"
+    "mod mod"
+    "score save";
+  justify-content: center;
+  align-items: center;
+  column-gap: 0.35em;
+  padding: 0.15em 0.25em;
+  border: 1px solid var(--bivouac-panel-border);
+  border-radius: 5px;
+  background: rgba(0, 0, 0, 0.25);
+  line-height: 1.05;
+}
+.bivouac-mini__abil-key {
+  grid-area: key;
+}
+.bivouac-mini__abil-mod {
+  grid-area: mod;
+}
+.bivouac-mini__abil-score {
+  grid-area: score;
+}
+.bivouac-mini__abil-save {
+  grid-area: save;
+}
+/* A proficient save is the one thing on this strip a GM scans for, so it gets a
+   real accent rather than a subtle tint. */
+.bivouac-mini__abil--prof {
+  border-color: color-mix(in srgb, var(--bivouac-accent) 60%, transparent);
+}
+.bivouac-mini__abil-key {
+  font-size: 0.8em;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.65;
+}
+/* The MODIFIER is what you roll, so it's the biggest thing in the cell. */
+.bivouac-mini__abil-mod {
+  font-size: 1.25em;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.bivouac-mini__abil-score {
+  font-size: 0.8em;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.55;
+}
+.bivouac-mini__abil-save {
+  padding: 0 0.35em;
+  border-radius: 0.6em;
+  background: rgba(0, 0, 0, 0.4);
+  font-size: 0.78em;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.8;
+}
+.bivouac-mini__abil--prof .bivouac-mini__abil-save {
+  background: color-mix(in srgb, var(--bivouac-accent) 30%, rgba(0, 0, 0, 0.4));
+  opacity: 1;
+}
+
+/* Trait rows — resistances / immunities / vulnerabilities / condition
+   immunities. Label and values on one line, values wrapping under themselves. */
+.bivouac-mini__trait {
+  display: none;
+  flex: 0 0 auto;
+  gap: 0.5em;
+  font-size: clamp(8px, min(4cqw, 7cqh), 13px);
+  line-height: 1.15;
+}
+.bivouac-mini__trait-label {
+  flex: 0 0 auto;
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 0.85em;
+  letter-spacing: 0.03em;
+  opacity: 0.55;
+}
+.bivouac-mini__trait-values {
+  min-width: 0;
+  opacity: 0.9;
+}
+
+/* ---- density tiers ------------------------------------------------------ */
+/* `.bivouac-mini` is the query container (`container-type: size`), so these are
+   the TILE's dimensions, not the viewport's. Thresholds are the point at which
+   each block still reads rather than merely fits. */
+@container (min-height: 200px) {
+  .bivouac-mini__facts {
+    display: flex;
+  }
+}
+/* 320px, not the 260px it fits in: the strip has to leave room for the PIN LIST
+   too, and at 260 it squeezed the list to a single row — measured, less than the
+   next tier down gets. A block earns its place only when the tile can carry it
+   and still be a usable list. */
+@container (min-height: 320px) and (min-width: 230px) {
+  .bivouac-mini__abilities {
+    display: grid;
+  }
+}
+/* 400px, not the 340px they fit in — the same lesson as the ability strip, and
+   measured the same way: at 340 the trait rows appeared and left the pin list
+   1.5 rows, which is a scrollbar rather than a list. Reference detail is the
+   first thing that should go when the tile is short. */
+@container (min-height: 400px) {
+  .bivouac-mini__trait {
+    display: flex;
+  }
+}
 /* Pins scroll rather than pushing the portrait off the tile — a character can
    have more abilities than the tile is tall, and the identity block is the part
    that must always stay visible.
-   `safe center` so leftover space is split above and below rather than pooling
-   under the last pin (which reads as an empty tile) — and `safe` specifically,
-   because plain `center` clips the FIRST item once the list overflows. */
+   Rows are uniform and content-sized now (see `.bivouac-mini__pin-row`), so the
+   list starts at the TOP rather than centring itself. Centring was there to stop
+   grown rows pooling their slack under the last pin; with fixed-height rows it
+   would instead float a short list in the middle of the tile, away from the
+   portrait it belongs to. A list reads from the top. */
 .bivouac-mini__pins {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  justify-content: safe center;
-  gap: 1.5cqmin;
+  justify-content: flex-start;
+  gap: 1cqmin;
 }
-.bivouac-mini__pins--dropok {
+/* The whole tile is the pin drop target (see the minisheet renderer) — the pins
+   strip alone can collapse to nothing in a short DM card, leaving no target. */
+.bivouac-mini--dropok {
   outline: 2px dashed var(--bivouac-accent);
   outline-offset: -2px;
   border-radius: 6px;
@@ -2353,31 +2755,55 @@ body.bivouac-dnd-active .bivouac-card__body iframe {
   align-self: center;
   padding: 2cqmin;
 }
+/* The pin row: the clickable pin and its unpin ✕ as SIBLINGS. They can't nest —
+   a <button> inside a <button> resolves the activation to the ancestor, so the ✕
+   fired the pin. The row carries the height sizing the pin used to. */
+/* THE ROW IS THE VISUAL BOX — border, background and padding live here, not on
+   the pin button inside it. Two reasons:
+   · the unpin ✕ is a sibling of the pin (it cannot nest inside it), so if the
+     button carried the border the ✕ would float in the gap OUTSIDE the box
+     instead of reading as part of the row;
+   · it gives a table row, which is what this list wants to be.
+
+   Height is UNIFORM and content-sized (`flex: 0 0 auto`, no max-height). The
+   previous rule grew rows to share the tile's free height, which meant the same
+   ability was a 90px slab on a two-pin tile and a 40px strip on an eight-pin one
+   — measured. A list of abilities should look the same whatever its length;
+   dead space below a short list is ordinary and far less distracting than rows
+   that change size as you pin more. */
+.bivouac-mini__pin-row {
+  display: flex;
+  align-items: center;
+  gap: 2cqmin;
+  flex: 0 0 auto;
+  padding: 1cqmin 2cqmin;
+  border: 1px solid var(--bivouac-panel-border);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.25);
+  font-size: clamp(8px, min(5cqw, 9cqh), 18px);
+  transition:
+    background 120ms ease,
+    border-color 120ms ease;
+}
 .bivouac-mini__pin {
   position: relative;
   display: flex;
   align-items: center;
   gap: 2cqmin;
-  /* Grow to share the free height so a handful of pins FILL the tile instead of
-     hugging the top with dead space beneath. Bounded at both ends: a floor so a
-     long list stays tappable (past which the container scrolls), and a ceiling so
-     one or two pins don't stretch into slabs. Sized in `em`, which is already
-     tile-relative here since the font-size is a container query. */
   flex: 1 1 auto;
-  min-height: 2.2em;
-  max-height: 5em;
-  padding: 1.5cqmin 2cqmin;
-  border: 1px solid var(--bivouac-panel-border);
-  border-radius: 6px;
-  background: rgba(0, 0, 0, 0.25);
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: none;
   color: inherit;
   font: inherit;
-  font-size: clamp(8px, min(5cqw, 9cqh), 18px);
   text-align: left;
   cursor: pointer;
-  transition: background 120ms ease, border-color 120ms ease;
 }
-.bivouac-mini__pin:hover:not(:disabled) {
+/* Hover highlights the ROW, since that's the box now. `:has()` keeps it honest:
+   a pin you may not use is disabled, and its row shouldn't light up as if it
+   were clickable. */
+.bivouac-mini__pin-row:hover:not(:has(.bivouac-mini__pin:disabled)) {
   background: rgba(255, 255, 255, 0.1);
   border-color: var(--bivouac-accent);
 }
@@ -2396,14 +2822,138 @@ body.bivouac-dnd-active .bivouac-card__body iframe {
   border-radius: 4px;
   flex: 0 0 auto;
 }
+/* The text column takes the slack, which is what puts the number chips and the
+   unpin ✕ hard right. It has to be one growing column rather than an `auto`
+   margin on each of them: two auto margins SPLIT the free space, which would
+   leave the chips stranded mid-row instead of grouped at the edge. */
+.bivouac-mini__pin-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  line-height: 1.15;
+}
 .bivouac-mini__pin-name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.bivouac-mini__unpin {
-  margin-left: auto;
+/* The wordy reference fields (activation • range) — the sheet's own subtitle
+   line. Muted and smaller, so the name still reads first. */
+.bivouac-mini__pin-sub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.75em;
+  opacity: 0.6;
+}
+/* The numbers, as an item table's Roll / Formula / Uses columns — on the row
+   rather than hidden in a tooltip, because "should I click this" is the question
+   the tile exists to answer at a glance.
+
+   FIXED COLUMNS, shared by the rows and the header above them, so the numbers
+   line up down the list and a GM can read straight down one column. The header
+   and every row declare the same template from this one variable — they must
+   agree or the labels sit over the wrong values. */
+.bivouac-mini__pins-head,
+.bivouac-mini__pin-row {
+  --bivouac-pin-cols: 2.8em 5em 2.8em;
+}
+.bivouac-mini__pin-meta {
   flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: var(--bivouac-pin-cols);
+  gap: 0.4em;
+  align-items: center;
+  text-align: right;
+}
+.bivouac-mini__pin-cell {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.85em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0.9;
+}
+.bivouac-mini__pin-cell--atk {
+  font-weight: 700;
+}
+
+/* The column header. Its job is to label the columns, so it borrows the row's
+   grid rather than approximating it — including a spacer standing in for the
+   unpin ✕, or every label would sit one button's width to the right of the
+   values it names. */
+.bivouac-mini__pins-head {
+  display: flex;
+  align-items: center;
+  gap: 2cqmin;
+  flex: 0 0 auto;
+  /* +1px for the row's border, which the header doesn't have — without it every
+     label sits a pixel left of its column. */
+  padding: 0.15em calc(2cqmin + 1px);
+  border-bottom: 1px solid var(--bivouac-panel-border);
+  font-size: clamp(8px, min(5cqw, 9cqh), 18px);
+}
+.bivouac-mini__pins-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bivouac-mini__pins-head .bivouac-mini__pins-title,
+.bivouac-mini__pins-head .bivouac-mini__pin-meta > span {
+  font-size: 0.72em;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  opacity: 0.5;
+}
+.bivouac-mini__pins-spacer {
+  flex: 0 0 auto;
+  width: 1.6em;
+}
+/* Too narrow for a table: the fixed columns are ~10.6em, and holding them on a
+   small tile would squeeze the NAME — the thing you actually pick a pin by — to
+   nothing. Below this the columns size to their content and the header goes,
+   since there are no longer columns for it to label.
+
+   This must sit AFTER the rules above, not with the other density tiers earlier
+   in the file: it competes with `.bivouac-mini__pins-head { display: flex }` at
+   equal specificity, so source order is what decides it. Placed with its
+   siblings it silently lost, and the header stayed visible on a 240px tile. */
+@container (max-width: 260px) {
+  .bivouac-mini__pins-head {
+    display: none;
+  }
+  .bivouac-mini__pin-row {
+    --bivouac-pin-cols: auto auto auto;
+  }
+}
+/* Depleted reads as spent, but the button stays live — whether a 0-use ability
+   may still fire is the system's call, not ours. */
+.bivouac-mini__pin-uses--out {
+  opacity: 0.45;
+  text-decoration: line-through;
+}
+/* Revealed on hover of its own pin rather than shown always. Pins are now
+   manageable in play as well as edit mode (a GM could never reach this in the DM
+   screen otherwise), so an always-on ✕ would sit on every row of a tile that is
+   mostly used for clicking those rows. Hover keeps it discoverable without
+   turning the readout into a row of delete buttons. */
+.bivouac-mini__unpin {
+  /* A row sibling now, so it needs no `margin-left: auto` — the pin beside it
+     grows and pushes it to the edge. `align-self: center` keeps it centred
+     against a row that stretches. */
+  flex: 0 0 auto;
+  align-self: center;
+  /* `font: inherit` is load-bearing, not tidiness: a <button> does NOT inherit
+     font-size, so without it the `em` sizing below resolved against the UA
+     default (~13px) instead of the tile's own scale. The ✕ was a fixed ~21px at
+     every tile size, and — measured — it sat 7.5px narrower than the header
+     spacer standing in for it, which threw every column label out of line. */
+  font: inherit;
   width: 1.6em;
   height: 1.6em;
   display: grid;
@@ -2414,11 +2964,79 @@ body.bivouac-dnd-active .bivouac-card__body iframe {
   background: rgba(0, 0, 0, 0.45);
   color: #fff;
   cursor: pointer;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+/* Revealed on hover of the ROW (the ✕ is a sibling of the pin now, so hovering
+   the pin has to reach it via their shared parent). `:focus-within` keeps it
+   keyboard-reachable — tabbing to the ✕ must show it, or it can be focused while
+   invisible. */
+.bivouac-mini__pin-row:hover .bivouac-mini__unpin,
+.bivouac-mini__pin-row:focus-within .bivouac-mini__unpin {
   opacity: 0.75;
 }
-.bivouac-mini__unpin:hover {
+.bivouac-mini__unpin:hover,
+.bivouac-mini__unpin:focus-visible {
   background: #a03038;
   opacity: 1;
+}
+
+/* ------------------------------------------------- custom stat rows ----- */
+/* A row is five fields, so it lays out as a grid with a shared header rather
+   than five labelled inputs stacked per row — with several rows that would be
+   unreadable. The columns are sized so the two PATH fields get the room (they're
+   the long, fiddly ones) and the label/icon stay compact. */
+.bivouac-cstats__head,
+.bivouac-cstat {
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr 1.6fr 1.4fr auto auto auto;
+  gap: 6px;
+  align-items: center;
+}
+.bivouac-cstats__head {
+  margin-top: 6px;
+  padding: 0 2px;
+  font-size: 11px;
+  font-weight: 600;
+  opacity: 0.7;
+}
+.bivouac-cstat {
+  margin-bottom: 4px;
+}
+.bivouac-cstat input[type="text"] {
+  min-width: 0; /* grid children default to min-content — without this the long
+                   placeholder text would widen the columns past the dialog */
+}
+.bivouac-cstat__rev {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  font-size: 11px;
+}
+/* The live path check. This is what makes typing `attributes.spelldc` survivable
+   for a non-technical GM: "= 14" or "no value" as you type, instead of saving and
+   hunting for why a row never appears. */
+.bivouac-cstat__probe {
+  min-width: 5.5em;
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  text-align: right;
+  white-space: nowrap;
+}
+.bivouac-cstat__probe--ok {
+  color: #67d074;
+}
+.bivouac-cstat__probe--bad {
+  opacity: 0.55;
+}
+.bivouac-cstat__del {
+  width: 26px;
+  padding: 0;
+  line-height: 1;
+}
+.bivouac-cstats__add {
+  margin-top: 6px;
 }
 
 /* --------------------------------------------------------------- dialogs */

@@ -85,12 +85,14 @@ function buildForm(widget: Widget): string {
   // plain checkbox couldn't express "follow the world default".
   {
     const ts = String(widget.config.textStroke ?? "");
+    const known = ["on", "blur", "off"];
     const opt = (v: string, label: string): string =>
-      `<option value="${v}"${ts === v || (v === "" && ts !== "on" && ts !== "off") ? " selected" : ""}>${esc(t(label))}</option>`;
+      `<option value="${v}"${ts === v || (v === "" && !known.includes(ts)) ? " selected" : ""}>${esc(t(label))}</option>`;
     general.push(group(t("BIVOUAC.Config.TextStroke"),
       `<select name="textStroke">
          ${opt("", "BIVOUAC.Config.TextStrokeInherit")}
          ${opt("on", "BIVOUAC.Config.TextStrokeOn")}
+         ${opt("blur", "BIVOUAC.Config.TextStrokeBlur")}
          ${opt("off", "BIVOUAC.Config.TextStrokeOff")}
        </select>` +
         `<p class="bivouac-config__hint">${esc(t("BIVOUAC.Config.TextStrokeHint"))}</p>`));
@@ -339,7 +341,8 @@ function applyForm(widget: Widget, data: Record<string, string>): Widget {
     data.textColorOn === "on" && /^#[0-9a-fA-F]{6}$/.test(data.textColor ?? "") ? data.textColor : "";
 
   // Per-tile text-stroke override; "" = follow the world setting.
-  updated.config.textStroke = data.textStroke === "on" || data.textStroke === "off" ? data.textStroke : "";
+  updated.config.textStroke =
+    data.textStroke === "on" || data.textStroke === "blur" || data.textStroke === "off" ? data.textStroke : "";
 
   // Frame (border) axis.
   updated.config.frame = (["none", "subtle", "framed"].includes(data.frame) ? data.frame : "subtle") as WidgetFrame;

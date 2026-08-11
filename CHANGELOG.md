@@ -3,7 +3,7 @@
 All notable changes to Bivouac are documented here. This project follows
 [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [1.2.0] — 2026-08-11
 
 ### Added
 
@@ -218,4 +218,6 @@ scenes.
 - Foundry VTT **v13** minimum, **verified on v14**. System-agnostic, except the
   Cast Bar stat overlay, which reads D&D 5e data.
 
+[1.2.0]: https://github.com/dukeolimbs/bivouac/releases/tag/v1.2.0
+[1.1.0]: https://github.com/dukeolimbs/bivouac/releases/tag/v1.1.0
 [1.0.0]: https://github.com/dukeolimbs/bivouac/releases/tag/v1.0.0

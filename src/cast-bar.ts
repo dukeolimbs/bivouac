@@ -8,7 +8,6 @@ import {
   FLAGS,
   MODULE_ID,
   SETTINGS,
-  CAST_DBLCLICK,
   canControl,
   plateAspect,
   type CastBarData,
@@ -27,17 +26,6 @@ type Dock = (typeof DOCKS)[number];
  *  quick-scale of a small base size is still honoured. */
 const SIZE_MIN = 24;
 const SIZE_MAX = 520;
-
-/** How close (ms) two plate clicks must be to count as a double — and, being the
- *  same number, how long a single click's speaker write waits so a double can
- *  pre-empt it (single = set speaker; double = open sheet — they share the plate
- *  body). Per client; see `CAST_DBLCLICK` for why we don't use native
- *  `dblclick`. */
-function castDoubleClickMs(): number {
-  const v = Number(game.settings.get(MODULE_ID, SETTINGS.castDoubleClickMs) ?? CAST_DBLCLICK.default);
-  if (!Number.isFinite(v)) return CAST_DBLCLICK.default;
-  return Math.min(CAST_DBLCLICK.max, Math.max(CAST_DBLCLICK.min, v));
-}
 
 /** Raise My Hand (`raise-my-hand`) is socket-only with no readable roster, so we
  *  track raises/lowers ourselves from its channel (`{type:RAISE|LOWER, playerID}`).
@@ -73,9 +61,33 @@ export function onRaiseHandMessage(msg: unknown): void {
   }
 }
 
-/** User ids whose hand is currently raised (socket-tracked + own hand + the
- *  players-list ✋ marker for hands raised before we connected) + a generic
- *  truthy-"hand"-flag fallback for other raised-hand modules. */
+/** Is this element actually being shown? Presence in the DOM is NOT the same as
+ *  a raised hand: a players-list indicator is commonly rendered for EVERY row and
+ *  revealed by CSS only for the user whose hand is up, so reading presence alone
+ *  put a hand on every plate the moment anyone raised. An element hidden by
+ *  `display:none` has no client rects; one hidden by `visibility`/`opacity` does,
+ *  so both are checked. */
+function isShown(el: Element): boolean {
+  if (!el.getClientRects().length) return false;
+  const st = window.getComputedStyle(el);
+  return st.visibility !== "hidden" && st.display !== "none" && Number(st.opacity || "1") > 0.01;
+}
+
+/** User ids whose hand is currently raised.
+ *
+ *  Ordered most to least trustworthy:
+ *   1. the socket feed (`raisedHands`) — an explicit per-user raise/lower;
+ *   2. our own hand, which the socket never echoes back to us;
+ *   3. the players-list ✋ marker, for hands raised before we connected — counted
+ *      only when the marker is actually VISIBLE (see `isShown`);
+ *   4. a user flag from an active module, for other raised-hand modules — counted
+ *      only when the value is literally `true`.
+ *
+ *  3 and 4 are guesses about modules we don't control, so both are deliberately
+ *  narrow. Their previous forms ("an element matched" / "a truthy key containing
+ *  hand") could each mark the WHOLE table as raised from a single raise, or from
+ *  an unrelated preference flag like `handColour`. A guess that can't tell one
+ *  player from all of them is worse than no guess. */
 function raisedHandUserIds(): Set<string> {
   const out = new Set<string>(raisedHands);
   if (game.handRaiser?.isRaised && game.user?.id) out.add(game.user.id);
@@ -84,6 +96,7 @@ function raisedHandUserIds(): Set<string> {
   document
     .querySelectorAll(".raise-my-hand-indicator, .raised-hand")
     .forEach((span) => {
+      if (!isShown(span)) return;
       const uid = (span.closest("[data-user-id]") as HTMLElement | null)
         ?.dataset.userId;
       if (uid) out.add(uid);
@@ -95,7 +108,11 @@ function raisedHandUserIds(): Set<string> {
   for (const u of users) {
     for (const [mod, data] of Object.entries(u.flags ?? {})) {
       if (!data || !game.modules?.get?.(mod)?.active) continue;
-      if (Object.entries(data).some(([k, v]) => v && /hand/i.test(k))) {
+      // `v === true`, not merely truthy: a raise is a boolean state, whereas the
+      // hand-ish keys that are NOT a state (handColour, raisedHandIcon, a sound
+      // path) hold strings — which are truthy, and matched every user that had
+      // ever configured the module.
+      if (Object.entries(data).some(([k, v]) => v === true && /hand/i.test(k))) {
         if (u.id) out.add(u.id);
         break;
       }
@@ -185,9 +202,6 @@ class CastBar {
   #dock: Dock = "bottom";
   /** Plate id being drag-reordered, or null. */
   #dragId: string | null = null;
-  #clickTimer: number | null = null;
-  /** Last plate click, for our own double-click detection (see castDoubleClickMs). */
-  #lastClick: { id: string; at: number; prevSpeaker: string | null } | null = null;
   #fitFrames = 0;
   #fitting = false;
   #cfg: CastBarConfig;
@@ -225,17 +239,13 @@ class CastBar {
 
       const strip = document.createElement("div");
       strip.className = "bivouac-castbar__strip";
-      // Drop an Actor/Item onto the bar → add a Plate. Only in Bivouac Edit Mode
-      // (the campground control group active), matching how board tiles are added.
+      // Drop an Actor/Item onto the bar → add a Plate. Available to any controller
+      // whenever the bar is open, NOT only in Bivouac Edit Mode: adding someone to
+      // a scene is a thing you do mid-conversation, and requiring edit mode meant
+      // routing every addition through the Landing Page controls first.
       // Skipped while an internal reorder is in flight (it has its own handling).
       strip.addEventListener("dragover", (e) => {
-        if (
-          this.#dragId ||
-          !canControl() ||
-          !worldLayer.editMode ||
-          !isDocDrag(e)
-        )
-          return;
+        if (this.#dragId || !canControl() || !isDocDrag(e)) return;
         e.preventDefault();
         if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
       });
@@ -666,7 +676,7 @@ class CastBar {
   }
 
   async #onDrop(event: DragEvent): Promise<void> {
-    if (!canControl() || !worldLayer.editMode) return;
+    if (!canControl()) return;
     const data = parseDrop(event);
     if (!data || (data.type !== "Actor" && data.type !== "Item")) return;
     event.preventDefault();
@@ -820,16 +830,6 @@ class CastBar {
     const d = this.#read();
     d.plates = d.plates.filter((p) => p.id !== id);
     if (d.speakerId === id) d.speakerId = null;
-    await this.#write(d);
-  }
-
-  /** Set the speaker to an EXACT value (null = nobody).  toggles,
-   *  which is right for a click but wrong for undoing one. */
-  async #setSpeakerTo(id: string | null): Promise<void> {
-    if (!canControl()) return;
-    const d = this.#read();
-    if (d.speakerId === id) return; // already there — don't write for nothing
-    d.speakerId = id;
     await this.#write(d);
   }
 
@@ -1120,7 +1120,7 @@ class CastBar {
   }
 
   /** Toggle the speaker highlight in the DOM without a full re-render — used for
-   *  instant, optimistic feedback on click (and to revert on double-click). */
+   *  instant, optimistic feedback on click, ahead of the scene-flag write. */
   #applySpeakerHighlight(id: string | null): void {
     this.#strip
       ?.querySelectorAll<HTMLElement>(".bivouac-plate")
@@ -1203,73 +1203,38 @@ class CastBar {
       if (hoveredPlate?.plateId === plate.id) hoveredPlate = null;
     });
 
-    // Clicks on a plate: one toggles the speaker (controllers), two open the
-    // sheet (anyone who may view it).
+    // One action per mouse button, one click each: LEFT opens the sheet (anyone
+    // who may view it), RIGHT toggles the speaker (controllers).
     //
-    // We count the clicks OURSELVES rather than listening for `dblclick`. What
-    // the browser calls a double-click is decided by the OS (~500ms on Windows)
-    // and is neither readable nor settable from JS — so a deliberate second click
-    // to switch Speaking Mode back off was being swallowed as a double-click,
-    // which opened a sheet nobody asked for AND cancelled the speaker change.
-    // With our own (shorter, configurable) window, a considered re-click reads as
-    // two singles and only a genuinely quick double opens the sheet.
+    // Both used to live on the left button — single click set the speaker, double
+    // opened the sheet — so every click had to be held back to see whether a
+    // second was coming. A considered re-click meant to turn Speaking Mode back
+    // OFF got swallowed as a double-click: it opened a sheet nobody asked for and
+    // cancelled the speaker change, which then had to be undone after the fact,
+    // and that undo was broadcast to every player. Giving each action its own
+    // button removes the whole problem rather than tuning it: there is nothing to
+    // time, nothing to debounce and nothing to revert.
     el.addEventListener("click", (e) => {
       const target = e.target as HTMLElement;
       // The controls always have their own handlers; the name only has one for
       // controllers, so for a player the name is just part of the plate.
       if (target.closest(".bivouac-plate__controls")) return;
       if (controller && target.closest(".bivouac-plate__name")) return;
+      if (doc && canView(doc)) (doc.sheet as { render?: (b: boolean) => void })?.render?.(true);
+    });
 
-      const dblWindow = castDoubleClickMs();
-      const now = Date.now();
-      const isDouble = this.#lastClick?.id === plate.id && now - this.#lastClick.at <= dblWindow;
-
-      if (isDouble) {
-        const prev = this.#lastClick?.prevSpeaker ?? null;
-        this.#lastClick = null; // so a third click starts a fresh pair
-        // The second click meant "open this", not "toggle" — so the speaker must
-        // end up exactly as it was before the pair started. Two cases:
-        if (this.#clickTimer) {
-          // Still debounced: drop the write and undo the optimistic highlight.
-          window.clearTimeout(this.#clickTimer);
-          this.#clickTimer = null;
-          this.#applySpeakerHighlight(prev);
-        } else if (controller) {
-          // The debounce already elapsed, so the first click WROTE. Put it back.
-          // Without this, double-clicking one plate silently clears whoever was
-          // speaking — the change is broadcast to every player, so "it only
-          // toggled" is not a small thing.
-          void this.#setSpeakerTo(prev);
-        }
-        if (doc && canView(doc)) (doc.sheet as { render?: (b: boolean) => void })?.render?.(true);
-        return;
-      }
-
-      // Remember who was speaking BEFORE this pair, read live rather than from
-      // the render-time snapshot, so the undo above restores the truth even if
-      // the speaker changed since this plate was drawn.
-      this.#lastClick = { id: plate.id, at: now, prevSpeaker: controller ? (this.#read().speakerId ?? null) : null };
-      if (!controller) return; // players get the sheet on a double, nothing on a single
-
-      // Toggle the speaker. The highlight moves IMMEDIATELY (optimistic) so it
-      // feels instant, while the write waits out the double-click window — the
-      // two delays are the same number for exactly this reason.
-      //
-      // Any timer still pending here belongs to a DIFFERENT plate (a second click
-      // on this one was handled as a double above), so it's stale — the speaker is
-      // single-valued and the user has moved on. Drop it and let this click win,
-      // rather than ignoring the click, which is what the old fixed-delay code did
-      // and which would only feel deader the longer the window is set.
-      if (this.#clickTimer) {
-        window.clearTimeout(this.#clickTimer);
-        this.#clickTimer = null;
-      }
+    // Right-click toggles the speaker. `preventDefault` runs only when we
+    // actually act on the click, so a player — who has no speaker control — keeps
+    // their normal browser menu instead of having it silently swallowed.
+    el.addEventListener("contextmenu", (e) => {
+      const target = e.target as HTMLElement;
+      if (!controller || target.closest(".bivouac-plate__controls")) return;
+      e.preventDefault();
+      // The highlight moves IMMEDIATELY (optimistic) so it feels instant, then
+      // the write broadcasts it.
       const makeSpeaker = !el.classList.contains("bivouac-plate--speaker");
       this.#applySpeakerHighlight(makeSpeaker ? plate.id : null);
-      this.#clickTimer = window.setTimeout(() => {
-        this.#clickTimer = null;
-        void this.#setSpeaker(plate.id);
-      }, dblWindow);
+      void this.#setSpeaker(plate.id);
     });
 
     if (controller) {

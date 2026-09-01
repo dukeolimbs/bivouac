@@ -10,7 +10,7 @@
  * web views. See docs/landing-page-design-spec.md.
  */
 
-import { CAST_DBLCLICK, FLAGS, GRID, MODULE_ID, PLATE_SHAPE_DEFAULT, SETTINGS, TEXT_STROKE, log } from "./constants";
+import { FLAGS, GRID, MODULE_ID, PLATE_SHAPE_DEFAULT, SETTINGS, TEXT_STROKE, log } from "./constants";
 import {
   activeLandingScene,
   clearLayoutHistory,
@@ -337,17 +337,6 @@ Hooks.once("init", () => {
   // How close two plate clicks must be to read as a double (open the sheet)
   // rather than two singles (toggle Speaking Mode on, then off). Per client,
   // because it's a motor-speed preference. Defaults BELOW the OS double-click
-  // threshold — see `CAST_DBLCLICK` for why we can't just use the OS one.
-  game.settings.register(MODULE_ID, SETTINGS.castDoubleClickMs, {
-    name: "BIVOUAC.Settings.CastDoubleClickMs.Name",
-    hint: "BIVOUAC.Settings.CastDoubleClickMs.Hint",
-    scope: "client",
-    config: true,
-    type: Number,
-    range: { min: CAST_DBLCLICK.min, max: CAST_DBLCLICK.max, step: CAST_DBLCLICK.step },
-    default: CAST_DBLCLICK.default,
-  });
-
   // Position of the Cast Bar toggle tab along its docked edge (%).
   game.settings.register(MODULE_ID, SETTINGS.castBarTabPos, {
     name: "BIVOUAC.Settings.CastBarTabPos.Name",

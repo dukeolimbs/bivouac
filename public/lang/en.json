@@ -359,10 +359,6 @@
         "Square": "Square (1:1) — for token art",
         "Wide": "Wide (4:3) — landscape"
       },
-      "CastDoubleClickMs": {
-        "Name": "Cast Bar — double-click speed",
-        "Hint": "How quickly you must click a plate twice for it to count as a double-click (which opens the sheet) rather than two separate clicks (which turn Speaking Mode on, then off). Lower it if a deliberate second click keeps opening the sheet by mistake; raise it if double-clicking to open a sheet often fails. Your own setting — it doesn't affect other players."
-      },
       "CastBarTabPos": {
         "Name": "Cast Bar tab — position along edge",
         "Hint": "Where the Cast Bar toggle tab sits along its docked edge, as a percentage (0 = start, 50 = middle, 100 = end). For a top/bottom dock this is horizontal; for a left/right dock it's vertical."

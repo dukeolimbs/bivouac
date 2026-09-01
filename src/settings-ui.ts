@@ -55,7 +55,6 @@ export function settingGroups(): readonly SettingGroup[] {
         SETTINGS.castBarSize,
         SETTINGS.castPlateShape,
         SETTINGS.castHideInCombat,
-        SETTINGS.castDoubleClickMs,
         SETTINGS.castBarTabPos,
         SETTINGS.castBarTabPad,
       ],

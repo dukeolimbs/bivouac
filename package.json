@@ -8,6 +8,8 @@
     "build": "vite build",
     "watch": "vite build --watch",
     "typecheck": "tsc --noEmit",
+    "test": "node test/run.mjs",
+    "check": "npm run typecheck && npm run lint && npm test",
     "lint": "eslint src",
     "link": "node ../scripts/link-module.mjs .",
     "unlink": "node ../scripts/link-module.mjs . --remove",

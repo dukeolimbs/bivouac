@@ -254,7 +254,11 @@
       "MenuCondsYou": "You",
       "MenuCondsAll": "Everyone",
       "MenuAppearance": "Appearance",
-      "MenuRemove": "Remove from the bar"
+      "MenuRemove": "Remove from the bar",
+      "CombatEnter": "Add to the encounter",
+      "CombatLeave": "Remove from the encounter",
+      "CombatNoToken": "That character has no token in this scene, so there is nothing to add to the encounter. Turn on “Give plates a token in the scene” to have Bivouac keep one for every plate.",
+      "CombatFailed": "Could not change the encounter — check you are the GM."
     },
     "StatBlock": {
       "CR": "CR",
@@ -301,7 +305,8 @@
       "Undo": "Undo landing layout change",
       "Redo": "Redo landing layout change",
       "CastArt": "Cast Bar: edit the hovered character's plate art",
-      "CastMenu": "Cast Bar: open the hovered character's plate menu"
+      "CastMenu": "Cast Bar: open the hovered character's plate menu",
+      "CastCombat": "Cast Bar: add / remove the hovered character from the encounter"
     },
     "Settings": {
       "Groups": {

@@ -276,3 +276,99 @@ function statusSet(e: Eff): string[] {
 }
 const hasStatus = (e: Eff, id: string): boolean => statusSet(e).includes(id);
 const anyStatus = (e: Eff): boolean => statusSet(e).length > 0;
+
+/* ------------------------------------------------ combat ---------------- */
+
+/** As much of a TokenDocument as the combat helpers touch. */
+type CombatTok = {
+  id?: string;
+  inCombat?: boolean;
+  constructor?: unknown;
+};
+
+/**
+ * The Tokens in the CURRENT scene that belong to this actor.
+ *
+ * `getActiveTokens(linked, document)` with `document: true` gives
+ * TokenDocuments rather than placeables, and only ever looks at the scene on the
+ * canvas — which is the right scope, since combat is a property of the scene you
+ * are running.
+ *
+ * Returns every matching token, not one. Unlike `sceneActor()`, which refuses to
+ * choose when an actor has several (showing one goblin's wounds under a name that
+ * stands for five is worse than showing none), there is nothing to choose here:
+ * putting an actor's presence into a fight means all of it. That also keeps this
+ * consistent with the parked-token rule, which is one token per ACTOR rather than
+ * one per plate.
+ */
+export function sceneTokensOf(doc: unknown): CombatTok[] {
+  const actor = doc as {
+    getActiveTokens?: (linked?: boolean, document?: boolean) => CombatTok[];
+  } | null;
+  try {
+    return actor?.getActiveTokens?.(false, true) ?? [];
+  } catch {
+    return [];
+  }
+}
+
+/** Is this actor in the encounter? True when ANY of its tokens is a combatant —
+ *  the plate is one row of chrome and cannot show a half state, and "some of
+ *  these are fighting" is much more usefully reported as "in" than as "out". */
+export function inCombat(doc: unknown): boolean {
+  return sceneTokensOf(doc).some((t) => !!t.inCombat);
+}
+
+/** What `toggleCombat` did, so the caller can say so without re-deriving it. */
+export type CombatResult = "added" | "removed" | "no-token" | "failed";
+
+/**
+ * Put this actor's tokens into the encounter, or take them out.
+ *
+ * Foundry's own `TokenDocument.createCombatants` does the fiddly parts and is
+ * used rather than reimplemented: it creates the Combat when none is active,
+ * skips tokens already in it, and carries each token's `hidden` across so a
+ * hidden combatant stays hidden in the tracker.
+ *
+ * `no-token` is a real outcome and the caller must handle it. A plate holds an
+ * Actor uuid, not a token, so a plated character need not be in the scene at all
+ * — and combat is defined on tokens (a Combatant carries `tokenId` and
+ * `sceneId`). This is the case the "give plates a token in the scene" setting
+ * exists to remove.
+ */
+export async function toggleCombat(doc: unknown): Promise<CombatResult> {
+  const tokens = sceneTokensOf(doc);
+  if (!tokens.length) return "no-token";
+  const leaving = tokens.some((t) => !!t.inCombat);
+  const cls = tokenClass(tokens[0]) as {
+    createCombatants?: (t: CombatTok[]) => Promise<unknown>;
+    deleteCombatants?: (t: CombatTok[]) => Promise<unknown>;
+  } | null;
+  try {
+    if (leaving) {
+      // Only the ones actually in it, or Foundry is asked to delete combatants
+      // that do not exist.
+      const inIt = tokens.filter((t) => !!t.inCombat);
+      if (!cls?.deleteCombatants) return "failed";
+      await cls.deleteCombatants(inIt);
+      return "removed";
+    }
+    if (!cls?.createCombatants) return "failed";
+    await cls.createCombatants(tokens);
+    return "added";
+  } catch {
+    return "failed";
+  }
+}
+
+/** The TokenDocument class, for its static combatant helpers. Taken from the
+ *  instance first — that is what Foundry's own `toggleCombatant` does, and it
+ *  respects a system that has subclassed TokenDocument — with the registered
+ *  class as the fallback. */
+function tokenClass(t: CombatTok | undefined): unknown {
+  return (
+    (t?.constructor as unknown) ??
+    (foundry.utils?.getDocumentClass?.("Token") as unknown) ??
+    null
+  );
+}

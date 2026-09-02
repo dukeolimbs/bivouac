@@ -56,7 +56,14 @@ export type { MeterKind, MeterState } from "./meter/model";
 
 export { applyCardOp, refsUuid } from "./card-model";
 
-export { canView, conditionBadges, sceneActor } from "./foundry-api";
-export type { ConditionBadge } from "./foundry-api";
+export {
+  canView,
+  conditionBadges,
+  inCombat,
+  sceneActor,
+  sceneTokensOf,
+  toggleCombat,
+} from "./foundry-api";
+export type { CombatResult, ConditionBadge } from "./foundry-api";
 
 export { docImg } from "./doc-tile";

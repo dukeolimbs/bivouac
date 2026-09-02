@@ -3,6 +3,26 @@
 All notable changes to Bivouac are documented here. This project follows
 [Semantic Versioning](https://semver.org/).
 
+## [1.3.2] — 2026-09-02
+
+### Added
+
+- **Add a character to the encounter from their plate.** A control beside
+  exit-the-conversation puts that character into the initiative order, and takes
+  them out again — lit while they are in it. A conversation turning into a fight
+  is the moment you want both of those buttons, so they sit together.
+
+  It uses Foundry's own `TokenDocument.createCombatants`, so it creates the
+  encounter if none is running, skips anyone already in it, and keeps a hidden
+  token hidden in the tracker. An actor with several tokens in the scene puts all
+  of them in, which is the same "one per actor, not one per plate" rule the parked
+  tokens follow.
+
+  Combat is defined on tokens, so a plated character who is not in the scene has
+  nothing to make a combatant out of. Rather than doing nothing quietly, the plate
+  says so and names the **"Give plates a token in the scene"** setting that fixes
+  it. `Shift+F` does the same from the keyboard.
+
 ## [1.3.1] — 2026-09-02
 
 ### Changed
@@ -86,7 +106,8 @@ came out of them.
 
 ### Changed
 
-- **The plate hover controls are four, not seven.** A portrait plate at the
+- **The plate hover controls went from seven to four** (five as of 1.3.2, with
+  the combat control). A portrait plate at the
   default size has 144px of usable control bar, and seven buttons needed 161px —
   it could not fit its own contents at the default size and shape, and wrapped
   onto a second row across the portrait. What remains is what gets used

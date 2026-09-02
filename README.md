@@ -132,10 +132,14 @@ speaking?" without putting tokens on a map.
   **left-click** a plate to open the sheet, **right-click** to mark that
   character as the current speaker (they highlight green). Right-click again to
   clear it.
-- **The hover controls** (GM) — four, along the top of a plate:
+- **The hover controls** (GM) — along the top of a plate:
   - a **grip** to drag plates into a different order,
   - **exit / rejoin** the conversation — the plate dims: still in the scene, just
     not part of this exchange,
+  - **add to / remove from the encounter** — when the conversation turns into a
+    fight, put that character in the initiative order without leaving the bar.
+    Lit while they're in it. It needs a token in the scene to make a combatant
+    out of, and says so if there isn't one.
   - **conditions** — opens a palette of the world's status effects to apply and
     clear, the same job the token HUD's effects button does,
   - **⋯** — everything you set up once rather than mid-conversation (below).
@@ -172,7 +176,9 @@ speaking?" without putting tokens on a map.
   controls and sidebar. The hover cluster under the bar is **−**, **move to the
   next edge**, **+**; the move control's icon shows which edge you're on.
   Plates scale 25–150% and shrink to fit, so a big cast never overflows — and as
-  they get smaller the plate chrome thins out in steps rather than crowding.
+  they get smaller the plate chrome thins out in steps rather than crowding: the
+  conditions palette leaves the bar first, then everything but the grip and the
+  menu. Nothing becomes unreachable, because every control has a keybinding.
 - **Stat overlay** — optionally show an actor's key numbers on their plate.
   **GM-only**: a player never sees this, not even on their own character, so
   checking someone's passive Perception doesn't announce itself to the table.
@@ -182,10 +188,11 @@ speaking?" without putting tokens on a map.
 - **During combat** — optionally hide the Cast Bar automatically while a combat
   encounter is running.
 - **Keyboard** — with the pointer over a plate: `Shift+S` speaker, `Shift+E`
-  exit, `Shift+H` hide, `Shift+N` name, `Shift+T` stats, `Shift+C` conditions,
-  `Shift+A` plate art, `Shift+M` menu. `Shift+B` shows or hides the bar. Remove
-  ships unbound on purpose. All of them are inert unless you're hovering a plate,
-  so they fall through to Foundry otherwise.
+  exit, `Shift+F` fight (add / remove from the encounter), `Shift+H` hide,
+  `Shift+N` name, `Shift+T` stats, `Shift+C` conditions, `Shift+A` plate art,
+  `Shift+M` menu. `Shift+B` shows or hides the bar. Remove ships unbound on
+  purpose. All of them are inert unless you're hovering a plate, so they fall
+  through to Foundry otherwise.
 
 Bar visibility is per-scene and the GM broadcasts it to everyone.
 

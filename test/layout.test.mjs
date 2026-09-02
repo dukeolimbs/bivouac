@@ -24,12 +24,14 @@ const ctrlSize = (fit) => Math.min(22, Math.max(16, fit * 0.11));
 const ctrlH = (fit) => ctrlSize(fit) + 6;
 const gripWidth = (fit) => ctrlSize(fit) * 0.5 + 6;
 
-/** Buttons the ladder leaves per tier, excluding the grip: exit, conds, menu. */
-const BUTTONS = { full: 3, compact: 2, min: 1, none: 0 };
+/** Buttons the ladder leaves per tier, excluding the grip:
+ *  full = exit, combat, conds, menu; compact = exit, combat, menu;
+ *  min = menu. */
+const BUTTONS = { full: 4, compact: 3, min: 1, none: 0 };
 const STAT_CAP = { full: 4, compact: 1, min: 0, none: 0 };
 const COND_CAP = { full: 6, compact: 3, min: 0, none: 0 };
 
-const TIER_MIN_W = { full: 110, compact: 62, min: 40 };
+const TIER_MIN_W = { full: 110, compact: 78, min: 40 };
 const TIER_MIN_H = { full: 130, compact: 84, min: 46 };
 function tierFor(w, h) {
   for (const t of ["full", "compact", "min"])

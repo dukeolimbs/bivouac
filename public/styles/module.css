@@ -2688,7 +2688,9 @@ body.bivouac-dnd-active .bivouac-card__body iframe {
    Nothing becomes unreachable at any tier: every control the ladder removes has
    a keybinding, and the plate menu (Shift+M) holds the rest. */
 
-/* compact — the conditions palette leaves the bar; the menu stays. */
+/* compact — the conditions palette leaves the bar. Exit, combat and the menu
+   stay: the first two are the decisions you make while people are talking, and
+   the third is how you reach everything else. */
 .bivouac-castbar[data-tier="compact"] .bivouac-plate__ctrl--conds {
   display: none;
 }
@@ -2700,6 +2702,7 @@ body.bivouac-dnd-active .bivouac-card__body iframe {
 /* min — a grip to reorder and a menu to do everything else. */
 .bivouac-castbar[data-tier="min"] .bivouac-plate__ctrl--conds,
 .bivouac-castbar[data-tier="min"] .bivouac-plate__ctrl--exit,
+.bivouac-castbar[data-tier="min"] .bivouac-plate__ctrl--combat,
 .bivouac-castbar[data-tier="min"] .bivouac-plate__stats,
 .bivouac-castbar[data-tier="min"] .bivouac-plate__conds {
   display: none;

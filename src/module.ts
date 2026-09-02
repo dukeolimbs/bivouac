@@ -616,6 +616,7 @@ Hooks.once("init", () => {
   // is also the escape hatch at the smallest size tiers, where the control bar
   // thins to a grip and a menu button — or, below 50px wide, disappears.
   castKey("castMenu", "KeyM", () => castPlateAction("menu"));
+  castKey("castCombat", "KeyF", () => castPlateAction("combat"));
   // Removing a plate is the one destructive action here and there is no confirm
   // on it, so it ships UNBOUND — a hotkey that deletes on a single press is far
   // too easy to fire by accident. Assign it in Configure Controls if wanted.
@@ -836,7 +837,21 @@ for (const hook of ["createActiveEffect", "updateActiveEffect", "deleteActiveEff
 
 // The cast bar can hide while a combat runs (per the setting) — re-evaluate the
 // bars whenever combat state changes (start / end / round / turn).
-for (const hook of ["combatStart", "createCombat", "deleteCombat", "updateCombat"]) {
+//
+// The COMBATANT hooks matter for a different reason: each plate's combat control
+// is lit while its character is in the encounter, and that changes when a
+// combatant is added or removed from anywhere at all — this button, the tracker,
+// the token HUD, another GM. Without these the plate would keep claiming the
+// state it had when it was last drawn.
+for (const hook of [
+  "combatStart",
+  "createCombat",
+  "deleteCombat",
+  "updateCombat",
+  "createCombatant",
+  "deleteCombatant",
+  "updateCombatant",
+]) {
   Hooks.on(hook, () => castBars.forEach((b) => b.refresh()));
 }
 

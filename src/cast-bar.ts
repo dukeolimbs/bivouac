@@ -15,7 +15,14 @@ import {
 } from "./constants";
 import { formatStat, healthFraction, visibleStats } from "./systems";
 import { readCastBar, writeCastBar } from "./layout";
-import { canView, conditionBadges, docImg, sceneActor } from "./widgets";
+import {
+  canView,
+  conditionBadges,
+  docImg,
+  inCombat,
+  sceneActor,
+  toggleCombat,
+} from "./widgets";
 import { isDocDrag, parseDrop } from "./drop";
 import { openPlateArt, pickImageFile, pickImageSource } from "./plate-art";
 import { closePopover, openPopover, repaintPopover } from "./popover";
@@ -149,6 +156,7 @@ export type PlateAction =
   | "hidden"
   | "stats"
   | "conditions"
+  | "combat"
   | "menu"
   | "art"
   | "remove";
@@ -555,6 +563,7 @@ const STAT_CAP: Record<Tier, number> = {
  *  open/close toggle rather than fail loudly. */
 const CTRL_CONDS = "bivouac-plate__ctrl--conds";
 const CTRL_MENU = "bivouac-plate__ctrl--menu";
+const CTRL_COMBAT = "bivouac-plate__ctrl--combat";
 
 /**
  * Plate size tiers.
@@ -565,11 +574,11 @@ const CTRL_MENU = "bivouac-plate__ctrl--menu";
  * about the chrome survives that range unchanged, so the tier says how much of
  * it to draw:
  *
- *  • `full`     ≥ 150px wide — grip, exit, conditions, menu; stats and
- *                conditions overlays in full.
- *  • `compact`  ≥ 90px  — grip, exit, menu; the health stat row only;
- *                conditions capped at 3.
- *  • `min`      ≥ 50px  — grip and menu; no overlays.
+ *  • `full`     grip, exit, combat, conditions, menu; stats and conditions
+ *                overlays in full.
+ *  • `compact`  grip, exit, combat, menu; the health stat row only; conditions
+ *                capped at 3.
+ *  • `min`      grip and menu; no overlays.
  *  • `none`     < 50px  — no controls at all. At that size a plate is a
  *                thumbnail and a 16px button is a third of its width; the
  *                keybindings remain the way to act on it.
@@ -586,14 +595,14 @@ const CTRL_MENU = "bivouac-plate__ctrl--menu";
  *
  * The numbers are each tier's measured requirement plus headroom, verified
  * against every size/shape combination:
- *   full     needs 95px across (grip + 3 buttons + padding) and ~120px down
- *   compact  needs 56px across (grip + 2 buttons + padding) and ~84px down
- *   min      needs 38px across (grip + 1 button + padding) and ~46px down
+ *   full     needs 119px across (grip + 4 buttons + padding) and ~120px down
+ *   compact  needs  74px across (grip + 3 buttons + padding) and  ~84px down
+ *   min      needs  38px across (grip + 1 button  + padding) and  ~46px down
  */
 export const TIERS = ["full", "compact", "min", "none"] as const;
 export type Tier = (typeof TIERS)[number];
 
-const TIER_MIN_W = { full: 110, compact: 62, min: 40 } as const;
+const TIER_MIN_W = { full: 110, compact: 78, min: 40 } as const;
 const TIER_MIN_H = { full: 130, compact: 84, min: 46 } as const;
 
 function tierFor(widthPx: number, heightPx: number): Tier {
@@ -1227,6 +1236,8 @@ class CastBar {
       case "conditions":
         this.openConditions(id);
         return;
+      case "combat":
+        return this.#toggleCombat(id);
       case "menu":
         this.openMenu(id);
         return;
@@ -1297,6 +1308,35 @@ class CastBar {
     // condition to it would change nothing the plate is showing.
     const live = doc ? (sceneActor(doc) as Record<string, unknown>) : null;
     openConditionPalette(el, live, `${this.id}:conds:${id}`);
+  }
+
+  /**
+   * Put a plate's character into the encounter, or take them out.
+   *
+   * Acts on the SCENE actor for the same reason everything else does: combat is
+   * a property of tokens in the scene, and for an unlinked NPC the sidebar
+   * prototype is a different document.
+   *
+   * The `no-token` case is the one worth a word to the GM rather than a silent
+   * no-op. A plate holds an Actor uuid, not a token, so a plated character need
+   * not be in the scene at all — and there is nothing for Foundry to make a
+   * combatant out of. The notification names the setting that fixes it, because
+   * "nothing happened" is otherwise indistinguishable from a broken button.
+   */
+  async #toggleCombat(id: string): Promise<void> {
+    if (!canControl()) return;
+    const el = this.#plateEl(id);
+    const uuid = el?.dataset.uuid;
+    if (!uuid) return;
+    const doc = fromUuidSync(uuid) as Record<string, unknown> | null;
+    if (!doc) return;
+    const result = await toggleCombat(sceneActor(doc));
+    if (result === "no-token")
+      ui.notifications?.warn(game.i18n.localize("BIVOUAC.CastBar.CombatNoToken"));
+    else if (result === "failed")
+      ui.notifications?.warn(game.i18n.localize("BIVOUAC.CastBar.CombatFailed"));
+    // Foundry's own combat hooks drive the redraw, so the button restates itself
+    // without this having to; see the createCombatant/deleteCombatant wiring.
   }
 
   /** Open the plate menu — the occasional settings, gathered off the bar. */
@@ -1916,6 +1956,29 @@ class CastBar {
       plate.exited ? "BIVOUAC.CastBar.Enter" : "BIVOUAC.CastBar.Exit",
       "bivouac-plate__ctrl--exit",
       () => void this.#mutate(plate.id, (p) => (p.exited = !p.exited)),
+    );
+
+    // Enter / leave the encounter, beside the exit-the-conversation button — the
+    // two are the same kind of decision about where a character stands, one in
+    // the fiction and one in the initiative order, and a conversation turning
+    // into a fight is exactly when you reach for both.
+    //
+    // Lit while the character IS in the encounter, and unlike the conditions
+    // control it has a real on/off state to show. It wears Foundry's own
+    // `CONFIG.controlIcons.combat` for the same reason the conditions button
+    // wears `.effects`: this is the token HUD's job, done from a plate, so it
+    // should not need a second symbol learning.
+    // Resolved here rather than handed in from `fill()`: the controls are built
+    // before the async resolve path finishes, and a compendium actor that cannot
+    // resolve synchronously cannot be in a scene's combat either — so `false` is
+    // the correct answer in exactly the cases this returns null for.
+    const resolved = fromUuidSync(plate.uuid) as Record<string, unknown> | null;
+    const fighting = inCombat(resolved ? sceneActor(resolved) : null);
+    btn(
+      String(CONFIG?.controlIcons?.combat ?? "icons/svg/combat.svg"),
+      fighting ? "BIVOUAC.CastBar.CombatLeave" : "BIVOUAC.CastBar.CombatEnter",
+      `${CTRL_COMBAT}${fighting ? " bivouac-plate__ctrl--active" : ""}`,
+      () => void this.#toggleCombat(plate.id),
     );
 
     // The condition palette. A plain LEFT-click now: it was briefly a right-click

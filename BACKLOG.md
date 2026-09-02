@@ -15,19 +15,27 @@ Round 8 inbox raised 2026-09-01; round 9 raised 2026-09-02.
 |---|------|--------|
 | 1 | Everyone-raising-hand bug | Landed (`83558ab`) — no live pass |
 | 2 | Sheet-opening vs. speaker selection | Landed (`83558ab`) — no live pass |
-| 3 | GM-only stats overlay | Built — no live pass |
-| 4 | Treat Plates as Tokens in the Scene | Built, simulated — no live pass |
-| 5 | Apply status effects from a Plate | Built — no live pass |
-| 6 | Show active effects on Plates | Extended for temporary effects — no live pass |
+| 3 | GM-only stats overlay | Shipped in 1.3.0 — no live pass |
+| 4 | Treat Plates as Tokens in the Scene | Shipped in 1.3.0, simulated — **no live pass** |
+| 5 | Apply status effects from a Plate | Shipped in 1.3.0 — live-checked in part |
+| 6 | Show active effects on Plates | Extended for temporary effects in 1.3.1 — no live pass |
 | 7 | Drag & drop into the Cast Bar | Landed (`83558ab`) — no live pass |
 | 8 | Quick background switching | **Not this module** — withdrawn |
-| 9 | HP-based Plate images | Built, partly simulated — no live pass |
-| R9 | Plate declutter + layout guarantees | Built, simulated — no live pass |
-| R9 | Wounded states made system-agnostic | Built, simulated — no live pass |
+| 9 | HP-based Plate images | Shipped in 1.3.0, partly simulated — no live pass |
+| R9 | Plate declutter + layout guarantees | Shipped in 1.3.0, simulated — live-checked in part |
+| R9 | Wounded states made system-agnostic | Shipped in 1.3.0, simulated — no live pass |
+| R9 | Combat control on each plate | Shipped in 1.3.2, simulated — no live pass |
 
-Everything above is in the working tree, not yet committed. `npm run typecheck`,
-`npm run lint` and `npm run build` pass clean, and five simulation harnesses pass
-(see **What was checked** under round 9).
+All of the above is committed and released. `npm run check` (typecheck, lint and
+eight harnesses) passes clean; see **What was checked** under round 9 for what
+that does and does not mean.
+
+**Released as 1.3.2 on 2026-09-02 with the live pass still outstanding.** That was
+a deliberate call, not an oversight. The mitigation is that the two features that
+touch world data are both opt-in and default off: `castPlateTokens` writes
+TokenDocuments into scenes, and `castWoundStates` only reads. The combat control
+writes Combatants, which is a normal, reversible GM action. Everything else is
+display. The live tests below are still owed and still worth running.
 
 ## Landed (`83558ab`)
 

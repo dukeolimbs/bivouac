@@ -3,6 +3,54 @@
 All notable changes to Bivouac are documented here. This project follows
 [Semantic Versioning](https://semver.org/).
 
+## [1.4.0] — 2026-09-02
+
+1.3.3 was tagged nowhere and released as nothing — it was committed and then
+overtaken by this round, so everything in its section below ships here for the
+first time. There is no v1.3.3 to go looking for.
+
+### Added
+
+- **A hotkey to hide the landing tiles for the whole table** (`Shift+L`). The
+  board comes off every client's screen entirely — not dimmed, unmounted — so the
+  map underneath is fully interactive. The scene stays a Landing Page with its
+  layout intact, which is what makes this different from removing the Landing
+  Page: that changes the designation and still asks first. Stored per scene, so
+  each board answers for itself; switching on the Bivouac scene controls brings
+  the tiles back (and reveals them to the table, since editing a board with the
+  lights off makes no sense). Designating a scene as a Landing Page always shows
+  its board, so a board can never come back invisible.
+
+- **A hotkey that shows or hides both Cast Bars at once** (`Shift+V`), wherever
+  the pointer is. While either bar is hidden it opens both, and only with both up
+  does it close them — two bars in different states end up agreeing rather than
+  swapping.
+
+- **Exhaustion is additive, and its level is shown.** In the condition palette a
+  click adds a level and a right-click removes one — the same gesture as dnd5e's
+  Token HUD, and the level is written where the system reads it, so the effect,
+  its per-level icon and the sheet all follow. The number appears on the palette
+  button, on the plate's condition icon and in both tooltips. How many levels
+  there are comes from your world's own configuration; a condition without levels
+  keeps its plain on/off toggle.
+
+### Changed
+
+- **`Shift+B` is now the bar under the pointer, and only that.** It used to flip
+  the hovered bar, or every bar if the pointer was nowhere near one; that second
+  half is the new `Shift+V` above. Both are renamed in Configure Controls to say
+  which they are.
+
+- **A plate using TOKEN art starts with conditions shown to everyone.** A token on
+  the canvas shows its status icons to the whole table, so a plate standing in for
+  one now does too. Plates using profile art are unchanged — off by default, since
+  a portrait for a conversation is where an NPC's condition is still the GM's to
+  give out. Existing plates are untouched, and the three-state reveal in the plate
+  menu still overrides it either way.
+
+- **Plate names now carry the token nameplate's drop shadow** instead of the text
+  outline used elsewhere, matching what a name looks like on the canvas.
+
 ## [1.3.3] — 2026-09-02
 
 ### Changed

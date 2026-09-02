@@ -686,3 +686,94 @@ export function statblockFor(doc: Record<string, unknown>): StatBlock | null {
     return null;
   }
 }
+
+/* ------------------------------------------- levelled statuses ---------- */
+
+/**
+ * Statuses that are a NUMBER rather than an on/off flag, and where the system
+ * keeps that number.
+ *
+ * dnd5e's exhaustion is the case that matters: the level lives at
+ * `system.attributes.exhaustion` (0–6) and the "exhaustion" ActiveEffect is
+ * derived from it, which is why the level is written to that path rather than to
+ * the effect — literally the same update dnd5e's own Token HUD makes
+ * (`ActiveEffect5e._manageExhaustion`, which is also where the left-click-up /
+ * right-click-down gesture comes from).
+ *
+ * HOW MANY levels there are is not hard-coded: it comes from the world's own
+ * `CONFIG.statusEffects` entry, into which dnd5e spreads its `conditionTypes`
+ * definition (`levels: 6` included), so a world that redefines the condition is
+ * respected. A status absent from this table keeps the plain on/off toggle —
+ * a level we cannot store anywhere the system will read is worse than no level.
+ */
+const LEVELLED_STATUS_PATHS: Record<string, Record<string, string>> = {
+  dnd5e: { exhaustion: "system.attributes.exhaustion" },
+};
+
+/** A levelled status: where its level lives, and the highest it goes. */
+export interface LevelledStatus {
+  /** Dot path from the ACTOR (not `system`) to the number. */
+  path: string;
+  /** Highest level this world's config allows. */
+  max: number;
+}
+
+/** Is this status levelled under the active system? `null` for "no — treat it as
+ *  a plain toggle", which is the answer for every status but one. */
+export function levelledStatus(id: string): LevelledStatus | null {
+  const path = LEVELLED_STATUS_PATHS[String(game.system?.id ?? "")]?.[id];
+  if (!path) return null;
+  const cfg = (CONFIG?.statusEffects ?? []) as { id?: string; levels?: unknown }[];
+  const levels = Number(cfg.find((s) => s.id === id)?.levels);
+  // Under 2 levels there is nothing to count — fall back to the toggle rather
+  // than drawing a "1" badge that never changes.
+  if (!Number.isFinite(levels) || levels < 2) return null;
+  return { path, max: Math.floor(levels) };
+}
+
+/** Read a dot path off the actor. Hand-rolled rather than
+ *  `foundry.utils.getProperty` because nothing else in this file reaches for a
+ *  Foundry helper, which is what lets the harnesses drive these functions with a
+ *  near-empty stub (`custom-stats.ts` reads its paths the same way). */
+function readPath(doc: Record<string, unknown>, path: string): unknown {
+  return path
+    .split(".")
+    .reduce<unknown>((o, k) => (o == null ? undefined : (o as Record<string, unknown>)[k]), doc);
+}
+
+/** An actor's current level for a levelled status: 0 when it does not have it,
+ *  `null` when the status is not levelled here (so callers can tell "off" from
+ *  "not a thing"). */
+export function statusLevel(doc: Record<string, unknown> | null, id: string): number | null {
+  if (!doc) return null;
+  const def = levelledStatus(id);
+  if (!def) return null;
+  const v = Number(readPath(doc, def.path));
+  if (!Number.isFinite(v)) return null; // an actor type without the attribute
+  return Math.max(0, Math.min(def.max, Math.trunc(v)));
+}
+
+/**
+ * Set an actor's level for a levelled status, clamped to the configured range.
+ * Resolves to whether it wrote anything.
+ *
+ * Writes through `actor.update()` on the path the system reads, so everything the
+ * system hangs off that number — dnd5e syncs the ActiveEffect, its icon and, at
+ * the top level, the `dead` status — happens as it normally would. Nothing here
+ * touches the effect itself: that is the system's job, and doing both would
+ * fight it.
+ */
+export async function setStatusLevel(
+  doc: Record<string, unknown> | null,
+  id: string,
+  level: number,
+): Promise<boolean> {
+  const def = levelledStatus(id);
+  if (!doc || !def) return false;
+  const update = (doc as { update?: (d: object) => Promise<unknown> }).update;
+  if (typeof update !== "function") return false;
+  const next = Math.max(0, Math.min(def.max, Math.trunc(level)));
+  if (next === statusLevel(doc, id)) return false;
+  await update.call(doc, { [def.path]: next });
+  return true;
+}

@@ -121,6 +121,11 @@ export interface ConditionBadge {
   /** True for a timed ActiveEffect that is not a status condition — a spell or
    *  feature running on this character rather than a state it is in. */
   effect: boolean;
+  /** The `CONFIG.statusEffects` id this badge came from, when it is a status
+   *  condition (absent on a bare effect). Exposed so a caller can ask the active
+   *  system whether the status carries a LEVEL — dnd5e exhaustion — without this
+   *  file having to know that any system does. */
+  status?: string;
 }
 
 /**
@@ -202,6 +207,7 @@ export function conditionBadges(doc: unknown): ConditionBadge[] {
       label: named.length ? [...new Set(named)].join(" · ") : generic,
       img: String(s.img ?? s.icon ?? ""),
       effect: false,
+      status: String(s.id),
     });
   }
 

@@ -118,6 +118,28 @@ export async function writeLayout(scene: unknown, layout: Layout): Promise<void>
   await s?.setFlag?.(MODULE_ID, FLAGS.layout, layout);
 }
 
+/* -------------------------------------------- Board visibility ---------- */
+// Hidden is a SCENE flag, not a client setting, because hiding the board is a
+// thing the table sees — the same decision (and the same storage) as the Cast
+// Bar's own `visible`. It sits beside the layout rather than inside it on
+// purpose: the layout carries undo/redo history, and hiding the board is not an
+// edit to it.
+
+/** Is the board hidden on this scene? False for a scene that has never been
+ *  told either way, which is what makes the flag's absence mean "shown". */
+export function readBoardHidden(scene: unknown): boolean {
+  const s = scene as { getFlag?: (m: string, k: string) => unknown } | null;
+  return s?.getFlag?.(MODULE_ID, FLAGS.boardHidden) === true;
+}
+
+/** Hide/show the board on this scene, for everyone. GM only (enforced by
+ *  Foundry permissions — a non-GM controller needs scene ownership, and Foundry
+ *  says so itself if they lack it). */
+export async function writeBoardHidden(scene: unknown, hidden: boolean): Promise<void> {
+  const s = scene as { setFlag?: (m: string, k: string, v: unknown) => Promise<unknown> } | null;
+  await s?.setFlag?.(MODULE_ID, FLAGS.boardHidden, hidden);
+}
+
 /* -------------------------------------------- DM screen layout ---------- */
 
 export function readDMLayout(): Layout {

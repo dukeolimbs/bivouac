@@ -168,6 +168,20 @@ check(
   check("an unnamed effect is dropped rather than drawn blank", labels(a), []);
 }
 
+console.log("\n7. Each badge says which status it came from");
+{
+  const a = actor({ statuses: ["prone", "poisoned"], applied: [eff("Bless")] });
+  // The plate asks the active system whether a status is LEVELLED (dnd5e
+  // exhaustion) and draws the number if so, which it can only do from the id —
+  // the label is localised and may have been replaced by the granting effect's
+  // name.
+  check(
+    "status ids, and none on a bare effect",
+    conditionBadges(a).map((b) => b.status ?? null),
+    ["prone", "poisoned", null],
+  );
+}
+
 const failed = results.filter((r) => !r).length;
 console.log(`\n${results.length - failed}/${results.length} checks passed`);
 if (failed) process.exitCode = 1;

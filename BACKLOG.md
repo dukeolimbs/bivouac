@@ -7,7 +7,7 @@ This file is **committed on purpose**. The previous inbox (`docs/bivouac-tasks.m
 was referenced by commit messages but never added to git, so it was lost when the
 history was rebuilt. Anything worth acting on later belongs here instead.
 
-Round 8 inbox raised 2026-09-01; round 9 raised 2026-09-02.
+Round 8 inbox raised 2026-09-01; rounds 9 and 10 raised 2026-09-02.
 
 ## At a glance
 
@@ -25,17 +25,28 @@ Round 8 inbox raised 2026-09-01; round 9 raised 2026-09-02.
 | R9 | Plate declutter + layout guarantees | Shipped in 1.3.0, simulated — live-checked in part |
 | R9 | Wounded states made system-agnostic | Shipped in 1.3.0, simulated — no live pass |
 | R9 | Combat control on each plate | Shipped in 1.3.2, simulated — no live pass |
+| R10 | Two hotkeys, one rename, additive exhaustion | Shipped in 1.4.0 — **no live pass** |
+| FR1 | Notes on a condition icon | **Not started** — see Feature requests |
+| FR2 | Party-inventory tile | **Not started** — see Feature requests |
 
-All of the above is committed and released. `npm run check` (typecheck, lint and
-eight harnesses) passes clean; see **What was checked** under round 9 for what
-that does and does not mean.
+Rounds 1–10 are committed and released; the two FR items are not started.
+`npm run check` (typecheck, lint and nine harnesses) passes clean; see **What was
+checked** under round 9 for what that does and does not mean.
 
-**Released as 1.3.2 on 2026-09-02 with the live pass still outstanding.** That was
-a deliberate call, not an oversight. The mitigation is that the two features that
-touch world data are both opt-in and default off: `castPlateTokens` writes
-TokenDocuments into scenes, and `castWoundStates` only reads. The combat control
-writes Combatants, which is a normal, reversible GM action. Everything else is
-display. The live tests below are still owed and still worth running.
+**Released as 1.3.2, then 1.4.0, on 2026-09-02 with the live pass still
+outstanding.** That was a deliberate call each time, not an oversight. For 1.3.2
+the mitigation was that the two features touching world data were both opt-in and
+default off. That is no longer the whole story: 1.3.3 turned `castPlateTokens` ON
+by default (so a world that never touched the setting now gets parked tokens), and
+1.4.0 writes a `boardHidden` scene flag and can hide the board for the whole table
+from one keypress. Both are reversible — switching the setting off sweeps every
+token Bivouac placed, and the same key brings the board back — but neither is
+opt-in any more. The live tests below are owed, and 1.4.0's are the ones to run
+first.
+
+**1.3.3 was never released.** It was committed (`4d6da6f`) and tagged nowhere,
+then overtaken by round 10, so its changes reached users inside 1.4.0. Worth
+knowing when reading the changelog: there is no v1.3.3 tag and no release for it.
 
 ## Landed (`83558ab`)
 
@@ -719,6 +730,230 @@ will land. Then walk the size range with the quick-scale control and confirm the
 tiers hand over cleanly at each step, on each of the four plate shapes, with
 nothing clipped at any point. On dnd5e, give a wounded PC temporary HP and confirm
 the plate stops reading as critical.
+## Round 10 — two hotkeys, one rename, additive exhaustion
+
+Raised 2026-09-02, released as 1.4.0 the same day, no live pass.
+
+### R10.1 Hide the landing tiles for the whole table (`toggleTiles`, Shift+L)
+
+`worldLayer.toggleTiles()` + a `boardHidden` SCENE flag, read and written through
+`readBoardHidden` / `writeBoardHidden` in `layout.ts`. The whole overlay is
+UNMOUNTED rather than hidden with CSS, so nothing of the board is left to catch a
+click or a wheel event over the map — which is the point of hiding it.
+
+**Built client-side first, then moved.** It shipped in this round's first pass as a
+per-client view toggle (a `boardHidden` client setting), and was reworked to scene
+state on request before release, so there is no migration owed — nobody ever had
+the client setting. Storage now matches the Cast Bar's own `visible`: a scene flag,
+GM-authored, broadcast to every client, with the `updateScene` hook mounting or
+unmounting on each of them. `refresh()`, not `render()`, because a hidden board has
+no overlay for `render()` to draw into.
+
+**Per SCENE, not one switch for the world.** Each landing scene has its own layout,
+so each gets its own answer about whether that layout is on show. Switch scenes and
+you get that scene's answer.
+
+Still deliberately NOT `toggleLanding`, which is a different thing: that removes
+the landing DESIGNATION (and asks first, because the board goes with it). This
+leaves the scene a landing page with its layout intact — the light switch, not the
+demolition. Which is why it ships bound where `toggleLanding` ships unbound, and
+why it is gated on `canControl()` rather than `restricted: true`: the same gate the
+Cast Bar's visibility key uses, so a trusted player with control can use it and
+anyone else falls through to Foundry.
+
+Three consequences, all handled on purpose:
+
+- **Hidden on every client, the GM's included.** A board only the GM could see
+  would be a third state that nothing on screen distinguishes from the other two.
+- **Entering edit mode un-hides**, which now reveals the board to the table.
+  Activating the Bivouac control group is an explicit "I want to work on the
+  board" gesture, and you edit a board with the lights on; without it the GM
+  clicks the tool and gets an empty screen with no clue why. Hiding while already
+  in edit mode is left alone — just as explicit, in the other direction.
+- **Designating a scene clears the flag.** Hidden is scene state that outlives the
+  designation, so a scene hidden before it was un-designated would otherwise come
+  back invisible: the GM sets a landing page, no tiles appear, nothing says why.
+
+**Live test.** On a landing scene with a player connected: Shift+L → tiles go on
+BOTH screens, the GM gets the notification, and the map is fully interactive
+underneath (drag a token where a tile was). Shift+L → they come back in place, for
+both. Reload while hidden → still hidden, and a client connecting while hidden sees
+no board. Switch to a second landing scene → its own state, unaffected. Click the
+Bivouac scene control while hidden → tiles return for everyone and edit mode is on.
+Un-designate a hidden scene, then designate it again → the board comes back
+visible. On a NON-landing scene the key must do nothing and fall through (test with
+a core binding on the same key). As a plain player, the key does nothing; with
+`controlRole` lowered to trusted, it works if they own the scene and Foundry says
+so itself if they do not.
+
+### R10.2 The Cast Bar visibility keys, split in two
+
+`castToggleBar` (Shift+B) used to mean "the hovered bar, or every bar if the
+pointer is nowhere near one". That fallback is now its own binding:
+
+- `castToggleBar` (Shift+B) — **the bar under the pointer**, and nothing when the
+  pointer is elsewhere (the key falls through).
+- `castToggleBars` (Shift+V) — **both bars, pointer anywhere**. Ships bound
+  because it is what the old fallback did; splitting them should not cost the
+  capability.
+
+The all-bars key SETS both bars to one state rather than toggling each: while
+either is hidden it opens both, and only with both up does it close them. Two
+bars in different states must not simply swap. `CastBar#setVisible` was added for
+that — `toggleVisible()` cannot express it.
+
+Both are still world changes (visibility is Scene state, so it shows/hides for
+every player); the rename is about WHICH bar, not about who sees it.
+
+**Live test.** With the second bar enabled: hover bar 1, Shift+B → only bar 1
+flips. Pointer over the map, Shift+B → nothing happens and the key reaches
+Foundry. Shift+V with one bar open → both open. Shift+V again → both close.
+With `castBar2Dock` off, Shift+V acts on the one enabled bar. Check the names in
+Configure Controls read as the two different things they are.
+
+### R10.3 Exhaustion is additive, and its level is shown
+
+Exhaustion is a NUMBER, and the palette was toggling it like a flag — so a GM
+could turn it on and off but never say which of the six levels the character was
+on, and the plate showed an icon that meant "some exhaustion".
+
+`systems.ts` gained `levelledStatus()` / `statusLevel()` / `setStatusLevel()`:
+
+- **The level is written where the system reads it** —
+  `system.attributes.exhaustion` for dnd5e, through `actor.update()`. That is
+  literally the update dnd5e's own Token HUD makes
+  (`ActiveEffect5e._manageExhaustion`), so everything the system hangs off that
+  number still happens: it rebuilds the effect, swaps in the per-level icon, and
+  adds `dead` at the top level. Nothing here touches the effect itself.
+- **The gesture is the Token HUD's too** — left click adds a level, right-click
+  removes one — so the palette and the HUD cannot teach the GM two different
+  things. Bound only on a levelled status; a plain condition keeps its toggle and
+  its context menu.
+- **How many levels is the world's business, not ours.** The count comes from the
+  `CONFIG.statusEffects` entry (dnd5e spreads `conditionTypes.exhaustion` into it,
+  `levels: 6` and all), so a homebrewed count is respected, and a status with no
+  `levels` falls back to the plain toggle. Only dnd5e exhaustion is mapped: a
+  level written where the system will not read it is worse than no level.
+- **Displayed in three places**: a badge on the palette button, a badge on the
+  plate's condition icon (`ConditionBadge.status` was added so the plate can ask
+  the adapter about a status without `foundry-api.ts` knowing any system exists),
+  and the level appended to both tooltips, the `+n` overflow included.
+
+**Live test.** dnd5e. Open the palette on a plate → exhaustion shows no badge at
+0. Click → level 1, badge appears, the plate's strip shows a 1 and the sheet
+agrees. Click to 6 → a seventh click does nothing (clamped, no write). Right-click
+down through 0 → the icon leaves the plate and the strip. Set the level from the
+Token HUD and the character sheet → the palette and plate follow. Confirm the
+plate's number is legible at the default plate size and check what it does at the
+`min` tier. On Daggerheart, confirm exhaustion (if the world defines one) is a
+plain toggle with no badge and no right-click.
+
+### R10.4 What was checked
+
+`npm run check` — typecheck, lint, nine harnesses, all clean. New: 22 checks in
+`test/status-levels.test.mjs` driving the real `levelledStatus` / `statusLevel` /
+`setStatusLevel` against a stubbed world (which system maps what, the clamp, the
+truncation, no-write-when-unchanged, and the fallbacks for another system, a
+missing attribute and a document with no `update()`), plus one check in
+`conditions.test.mjs` pinning the new `status` id on every badge.
+
+Nothing NEW is pinned for R10.1: `readBoardHidden` / `writeBoardHidden` are
+three-line flag probes, and everything that could actually go wrong about them is
+Foundry-side — whether the `updateScene` hook fires with that flag path, whether a
+broadcast write reaches a player's client, whether an unmounted overlay really
+leaves the canvas alone. None of that can be stubbed usefully, which is exactly
+why the live test above is written out in full.
+
+Unverified by anything, as usual: every DOM and keybinding path. Nothing in this
+round has been executed by Foundry — in particular the two new keybindings, the
+broadcast hide (including on a second client), the palette's right-click and both
+level badges.
+
+## Feature requests — to do (raised 2026-09-02)
+
+Neither of these is started. They are written up here rather than kept in a chat
+log so the design questions they raise are answered once, in the open, before
+anyone starts typing.
+
+### FR1. A note on a condition icon
+
+**Asked for.** Right-click a status/condition icon on a Plate to type a short
+note, shown to the GM when they hover that condition. The example given is a
+`DC:18` on **Stunned**, so the GM can refer back to the save DC later.
+
+Design questions, with a recommendation each:
+
+- **Where the note lives.** On the granting **ActiveEffect**, as a module flag
+  (`effect.setFlag(MODULE_ID, "note", …)`). Recommended, because the note then
+  has the same lifetime as the thing it annotates: clear the condition and the
+  note goes with it, which is right — a DC belongs to *this* Stunned, not to the
+  character forever. The alternative (a map on the Plate, in the Scene flag)
+  outlives the condition and would need its own cleanup pass.
+  - Caveat to check first: a status can be present with no effect of its own to
+    hang a flag on. dnd5e exhaustion is the awkward case — its effect is derived
+    from `system.attributes.exhaustion` and carries a static id, so a flag on it
+    may not survive the system rebuilding it. A per-Plate fallback keyed by status
+    id is probably needed for exactly that case.
+- **Who sees it.** GMs only, per the request. Note honestly that this is a
+  DISPLAY choice, not secrecy: a flag on an effect is readable by any client that
+  can read the actor, so the note must never hold anything the table must not
+  have. Say so in the entry UI.
+- **The gesture.** Right-click already means something on a Plate (and
+  `contextmenu` is now taken inside the condition palette for stepping a level
+  DOWN — see round 10). Check what a right-click on the strip currently does
+  before claiming it: the strip is `pointer-events: none` with the icons set to
+  `auto`, so the icon can take the event, but the plate's own handlers are behind
+  it.
+- **Where it shows.** The icons' only label today is `data-tooltip`, which is
+  plain text — a name plus a note wants two lines, so this likely needs
+  `data-tooltip-html` (or a small popover on hover) and an HTML-escaping pass on
+  whatever the GM typed. Don't forget the `+n` overflow: its tooltip lists the
+  conditions that did not fit, and a note on one of those has to appear there too.
+- **Entry UI.** Reuse `src/popover.ts` anchored to the icon, as the condition
+  palette and the plate menu do, rather than a `DialogV2` — same idiom, and it
+  cannot be clipped by the plate.
+- **A note is worth a badge.** An annotated condition should look annotated
+  (a dot or a corner mark), or the GM has to hover every icon to find the one
+  they wrote on.
+
+### FR2. A party-inventory tile
+
+**Asked for.** A Bivouac tile that collates the inventories of a set number of
+Actors: key totals such as combined currency, with items grouped into categories
+(Equipment, Food, Consumables, Loot, …).
+
+Design questions, with a recommendation each:
+
+- **Actor selection.** Reuse the `cards` tile's shape: a list of Actor UUIDs the
+  GM drops in, with `applyCardOp` already handling add / remove / reorder. No new
+  configuration idiom needed.
+- **Currency is system-specific and needs an adapter hook.** dnd5e keeps
+  `system.currency` as pp/gp/ep/sp/cp; Daggerheart counts handfuls, bags and
+  chests; the generic adapter has no concept of money. This belongs in
+  `systems.ts` as a `currency()` reader per adapter (returning labelled
+  denominations, not a single number — collapsing to "gp" bakes in a conversion
+  rate that is a table's house rule), with the tile drawing whatever comes back
+  and showing nothing at all on a system with no reader.
+- **So are categories.** "Food" is not an item type in dnd5e, it is
+  `consumable` with `system.type.value === "food"`; Loot, Equipment and Tool are
+  types. That mapping is exactly the kind of knowledge `systems.ts` exists to
+  hold — an `itemCategory(item)` hook per adapter, with an "Other" bucket so an
+  unmapped item is still listed rather than silently dropped. The category ORDER
+  should be the adapter's, so it reads the way that system's players think.
+- **Which totals earn their place.** Combined currency, per-category counts, and
+  (where the system has encumbrance) total weight against the party's capacity.
+  Resist a wall of numbers: the tile is read from across the room.
+- **Permissions.** A player looking at this tile should see what they could see
+  by opening the sheets they own — no more. The plate conditions reveal is the
+  precedent: default to what `canView` allows, with an explicit GM override to
+  make the whole thing public.
+- **Sizing.** It is a list tile, so it needs the container-query sizing the mini
+  sheet uses plus its own internal scroll, and a sensible LOD placeholder when
+  the board is zoomed out.
+- **Out of scope for a first version**, and worth saying so up front: moving
+  items between actors from the tile. That is a write path into other people's
+  sheets and deserves its own round.
+
 ## Verification debt
 
 **Nothing in rounds 7, 8 or 9 has run in a live Foundry world.** That is the whole

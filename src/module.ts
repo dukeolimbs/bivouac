@@ -21,6 +21,7 @@ import {
   setLandingSceneId,
   setLandingScenes,
   undoLayout,
+  writeBoardHidden,
 } from "./layout";
 import { worldLayer } from "./world-layer";
 import { dmScreen } from "./dm-screen";
@@ -29,6 +30,7 @@ import {
   castBar2,
   castBars,
   castPlateAction,
+  castToggleAllVisible,
   castToggleVisible,
   onRaiseHandMessage,
 } from "./cast-bar";
@@ -614,6 +616,10 @@ Hooks.once("init", () => {
   };
 
   castKey("castToggleBar", "KeyB", () => castToggleVisible());
+  // The all-bars key, so the hovered one above can be exactly that. It ships
+  // bound because it is what the old hovered-or-everything behaviour of Shift+B
+  // fell back to — splitting them should not cost the capability.
+  castKey("castToggleBars", "KeyV", () => castToggleAllVisible());
   castKey("castSpeaker", "KeyS", () => castPlateAction("speaker"));
   castKey("castStats", "KeyT", () => castPlateAction("stats"));
   castKey("castHidePlate", "KeyH", () => castPlateAction("hidden"));
@@ -630,6 +636,26 @@ Hooks.once("init", () => {
   // on it, so it ships UNBOUND — a hotkey that deletes on a single press is far
   // too easy to fire by accident. Assign it in Configure Controls if wanted.
   castKey("castRemovePlate", "", () => castPlateAction("remove"), false);
+
+  // Hide/show the board TILES for the whole table — the "everyone look at the
+  // map for a moment" key. Deliberately NOT the same thing as `toggleLanding`
+  // below: that removes the scene's landing DESIGNATION and asks first, while
+  // this leaves the scene a landing page with its layout intact and flips one
+  // flag. Scene state, so it broadcasts (see `worldLayer.boardHidden`).
+  //
+  // Ships BOUND, unlike `toggleLanding`, because it is reversible in one press
+  // and has no confirm to bypass. Not `restricted` — GM-only — for the same
+  // reason the Cast Bar keys are not: `canControl()` inside is the real gate, so
+  // a trusted player the GM has given control can use it and everyone else falls
+  // straight through to Foundry.
+  game.keybindings.register(MODULE_ID, "toggleTiles", {
+    name: "BIVOUAC.Keybindings.ToggleTiles",
+    hint: "BIVOUAC.Keybindings.ToggleTilesHint",
+    editable: [{ key: "KeyL", modifiers: ["Shift"] }],
+    restricted: false,
+    precedence: CONST.KEYBINDING_PRECEDENCE.NORMAL,
+    onDown: () => worldLayer.toggleTiles(),
+  });
 
   // Toggle the Landing Page on the current scene. The scene-control button
   // already does this, but reaching it means selecting the Bivouac control group
@@ -771,6 +797,16 @@ Hooks.on("dropCanvasData", (_canvas: unknown, data: { x?: number; y?: number } &
 Hooks.on("updateScene", (scene: { id: string }, changes: object) => {
   if (isLandingScene(scene) && foundry.utils.hasProperty(changes, `flags.${MODULE_ID}.${FLAGS.layout}`)) {
     worldLayer.render("updateScene");
+  }
+  // Hidden/shown is scene state, so this fires on EVERY client — which is what
+  // makes one GM keypress take the board off (or put it back on) the whole
+  // table's screens. `refresh()`, not `render()`: the overlay is unmounted while
+  // hidden, and `render()` returns early with nothing to draw into.
+  if (
+    scene.id === canvas?.scene?.id &&
+    foundry.utils.hasProperty(changes, `flags.${MODULE_ID}.${FLAGS.boardHidden}`)
+  ) {
+    worldLayer.refresh();
   }
   // Cast Bar state is per-scene and works on any scene — refresh when the current
   // scene's cast-bar flags change (broadcast to players too).
@@ -1104,6 +1140,11 @@ async function toggleLandingScene(): Promise<void> {
   }
 
   await setLandingScenes(clearing ? ids.filter((id) => id !== scene.id) : [...ids, scene.id]);
+  // Designating a scene always SHOWS its board. Hidden is scene state that
+  // outlives the designation, so without this a scene hidden before it was
+  // un-designated would come back invisible — the GM sets a landing page, no
+  // tiles appear, and nothing on screen says why.
+  if (!clearing) await writeBoardHidden(scene, false);
   ui.notifications?.info(
     game.i18n.localize(clearing ? "BIVOUAC.Notify.LandingCleared" : "BIVOUAC.Notify.LandingSet"),
   );

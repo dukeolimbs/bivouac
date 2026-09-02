@@ -6,6 +6,11 @@ export const MODULE_ID = "bivouac";
 export const FLAGS = {
   /** Landing layout stored on a Scene. */
   layout: "layout",
+  /** Landing board hidden on a Scene — for EVERYONE, like the Cast Bar's own
+   *  visibility, and stored the same way so it broadcasts. Not the same thing as
+   *  the scene's landing DESIGNATION (`landingSceneIds`): the board is still
+   *  configured here, with its layout intact, and one keypress brings it back. */
+  boardHidden: "boardHidden",
   /** DM screen layout stored per-GM on the User document. */
   dmScreenLayout: "dmScreenLayout",
   /** Cast Bar roster + speaker + visibility, stored per Scene (broadcast to all). */
@@ -235,15 +240,18 @@ export interface Plate {
    *  is checking them. This flag therefore says "the GM is looking at this", not
    *  "the table can see this". */
   stats?: boolean;
-  /** Show the Actor's active conditions (status effects) on this plate. Off by
-   *  default; a per-plate toggle exactly like `stats`. */
+  /** Show the Actor's active conditions (status effects) on this plate. A
+   *  per-plate toggle exactly like `stats`. Off by default on a PROFILE-art
+   *  plate; on (and public, below) on a TOKEN-art one, which is standing in for
+   *  a token whose status icons the whole table would see — see the drop handler
+   *  in `cast-bar.ts`. */
   conditions?: boolean;
   /** Also reveal those conditions to players who could NOT otherwise know them.
-   *  Conditions on an NPC are GM information — whether the boss is frightened is
-   *  usually something a table plays to find out — so showing them is a per-plate
-   *  decision rather than all-or-nothing. Has no effect unless `conditions` is on,
-   *  and none for an actor the player can already inspect (their own character's
-   *  conditions are theirs regardless). */
+   *  Conditions on an NPC are usually GM information — whether the boss is
+   *  frightened is something a table plays to find out — so on a portrait plate
+   *  showing them is a per-plate decision rather than all-or-nothing. Has no
+   *  effect unless `conditions` is on, and none for an actor the player can
+   *  already inspect (their own character's conditions are theirs regardless). */
   conditionsPublic?: boolean;
 }
 

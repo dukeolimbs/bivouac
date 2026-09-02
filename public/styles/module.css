@@ -1883,6 +1883,22 @@ body.bivouac-dnd-active .bivouac-card__body iframe {
   -webkit-line-clamp: var(--bivouac-name-lines);
   line-clamp: var(--bivouac-name-lines);
   overflow: hidden;
+  /* Legibility comes from the TOKEN NAMEPLATE's treatment, not the outline ring
+     every other short label over art uses (which is why this selector is absent
+     from the text-stroke block below). Foundry draws nameplates with
+     `CONFIG.canvasTextStyle`: a black drop shadow, centred (angle 0, distance 0)
+     and blurred by 4 — a soft dark halo hugging the glyph. Canvas `shadowBlur`
+     and `text-shadow`'s blur radius mean the same thing, so `0 0 4px #000` is
+     that shadow, not an approximation of it; the blur is a fixed 4 on the canvas
+     at every font size and grid scale, so it is a fixed 4 here too rather than
+     scaling with --bivouac-name-line.
+
+     Fixed, NOT driven by the text-outline setting: a nameplate on the canvas
+     carries this shadow whatever that setting says, and the banner's own
+     gradient already does most of the work. Declaring it here also means it wins
+     over an inherited ring, should a plate ever sit inside a `.bivouac-stroke-on`
+     tile. */
+  text-shadow: 0 0 4px #000;
 }
 .bivouac-plate__name--editable {
   cursor: pointer;
@@ -1897,6 +1913,10 @@ body.bivouac-dnd-active .bivouac-card__body iframe {
 .bivouac-plate__name--editable:not(.bivouac-plate__name--hidden):hover {
   color: transparent;
   background: linear-gradient(transparent, rgba(0, 0, 0, 0.92));
+  /* The nameplate shadow has to go with it: `text-shadow` paints under
+     transparent text, so leaving it would hold a dark smear of the name in the
+     banner the preview is meant to have emptied. */
+  text-shadow: none;
 }
 /* Hover an already-hidden (greyed) name → brighten it to preview revealing it. */
 .bivouac-plate__name--editable.bivouac-plate__name--hidden:hover {
@@ -2105,6 +2125,35 @@ body.bivouac-dnd-active .bivouac-card__body iframe {
   font-weight: 700;
   pointer-events: auto;
 }
+/* A LEVELLED status (dnd5e exhaustion) — the icon plus its level, drawn on the
+   corner. The wrapper exists because the strip is a flex line of icons: a bare
+   number after the <img> would take its own place in that line instead of
+   sitting on the icon it belongs to. `line-height: 0` keeps the wrapper exactly
+   the icon's height, so a levelled icon lines up with the plain ones beside it. */
+.bivouac-plate__condwrap {
+  position: relative;
+  display: block;
+  line-height: 0;
+  pointer-events: auto; /* the tooltip is the only way to name an icon this small */
+}
+/* Bottom-right, overhanging by a pixel so it reads as a badge ON the icon rather
+   than part of the artwork. Scales with the plate like everything else here; at
+   the smallest tiers it goes the way the icons do (see the tier rules), because a
+   6px digit is a smudge. */
+.bivouac-plate__condlvl {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  min-width: 0.95em;
+  padding: 0 1px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.85);
+  color: #fff;
+  font-size: clamp(7px, calc(var(--bivouac-castbar-fit, var(--bivouac-castbar-size)) * 0.055), 12px);
+  font-weight: 700;
+  line-height: 1.15;
+  text-align: center;
+}
 
 
 /* ============================================================================
@@ -2172,6 +2221,7 @@ body.bivouac-dnd-active .bivouac-card__body iframe {
   overflow: hidden auto;
 }
 .bivouac-cond-picker__item {
+  position: relative; /* anchors the level badge below */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2210,6 +2260,27 @@ body.bivouac-dnd-active .bivouac-card__body iframe {
 .bivouac-cond-picker__item--on img {
   opacity: 1;
   filter: none;
+}
+/* The current level of a levelled status (dnd5e exhaustion), on the palette
+   button. Click adds a level and right-click removes one — the same gesture as
+   dnd5e's Token HUD — so the number is the only feedback that says which of the
+   six the character is on, and it has to be legible over any icon. */
+.bivouac-cond-picker__lvl {
+  position: absolute;
+  right: 1px;
+  bottom: 1px;
+  min-width: 11px;
+  padding: 0 2px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.85);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: center;
+}
+.bivouac-cond-picker__lvl[hidden] {
+  display: none;
 }
 
 /* ------------------------------------------------------- the plate menu ---- */
@@ -3039,8 +3110,7 @@ body.bivouac-dnd-active .bivouac-card__body iframe {
 .bivouac-meter__num,
 .bivouac-cards__name,
 .bivouac-placeholder__label,
-.bivouac-plate__name,
-.bivouac-plate__stat,
+.bivouac-plate__stat, /* the NAME takes the token nameplate's shadow instead — see its rule */
 .bivouac-stroke-on {
   /* Ring radius. `--bivouac-text-ring-scale` is 1 for a hard stroke and small in
      blur mode: a halo wants its copies pulled in toward the glyph, because a

@@ -12,7 +12,8 @@
     "Notify": {
       "LandingSet": "This scene is now a Landing Page.",
       "LandingCleared": "Landing Page removed from this scene.",
-      "NotLanding": "Switch to a Landing Page scene to add tiles."
+      "NotLanding": "Switch to a Landing Page scene to add tiles.",
+    "TilesHidden": "Landing tiles hidden for everyone on this scene — press the same key again to bring them back."
     },
     "Confirm": {
       "ClearLandingTitle": "Remove this landing page?",
@@ -225,6 +226,7 @@
       "CondsApply": "Apply conditions",
       "CondsUnsupported": "This game system does not support toggling conditions from Bivouac.",
       "CondsFailed": "Could not change that condition — check you own the Actor.",
+    "CondsLevelHint": "click adds a level, right-click removes one",
       "ImageTitle": "Plate image",
       "ImagePrompt": "Which image should this Actor's plate use?",
       "ImageProfile": "Profile",
@@ -293,7 +295,8 @@
     },
     "Keybindings": {
       "CloseDMScreen": "Close the DM screen",
-      "CastToggleBar": "Cast Bar: show / hide",
+      "CastToggleBar": "Cast Bar: show / hide the bar under the pointer",
+      "CastToggleBars": "Cast Bar: show / hide both bars, pointer anywhere",
       "CastSpeaker": "Cast Bar: set the hovered character as speaker",
       "CastStats": "Cast Bar: show / hide the hovered character's stats",
       "CastHidePlate": "Cast Bar: hide / show the hovered character from players",
@@ -301,6 +304,8 @@
       "CastToggleName": "Cast Bar: show / hide the hovered character's name",
       "CastConditions": "Cast Bar: apply conditions to the hovered character",
       "CastRemovePlate": "Cast Bar: remove the hovered character (unbound by default)",
+      "ToggleTiles": "Landing Page: hide / show the tiles for everyone",
+      "ToggleTilesHint": "Takes this scene's board off the table's screens so everyone can see the map under it, and puts it back. The scene stays a Landing Page with its layout intact — unlike setting or removing the Landing Page below, which is the designation itself and asks before it takes one away. Remembered per scene, and switching on the Bivouac scene controls brings the tiles back.",
       "ToggleLanding": "Landing Page: set / remove on the current scene (unbound by default)",
       "ToggleLandingHint": "Does exactly what the map button in the Bivouac scene controls does, without selecting that control group — which would also switch you into edit mode. Removing a scene's Landing Page still asks first.",
       "Undo": "Undo landing layout change",

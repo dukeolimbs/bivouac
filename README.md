@@ -36,6 +36,10 @@ strip of character portraits that shows who's in the scene and who's talking.
   ownership rules — a player never sees a document they don't have access to.
 - **Undo and redo.** `Ctrl+Z` / `Ctrl+Y` on the board, so a mistaken drag or
   delete is never a problem.
+- **Look past it when you need to.** `Shift+L` takes the tiles off the table's
+  screens and puts them back, leaving the map underneath fully usable for
+  everyone. The scene stays a Landing Page with its layout intact — this is the
+  light switch, not the demolition — and it is remembered per scene.
 
 ## Requirements
 
@@ -141,7 +145,9 @@ speaking?" without putting tokens on a map.
     Lit while they're in it. It needs a token in the scene to make a combatant
     out of, and says so if there isn't one.
   - **conditions** — opens a palette of the world's status effects to apply and
-    clear, the same job the token HUD's effects button does,
+    clear, the same job the token HUD's effects button does. A condition that
+    has levels rather than being simply on or off — exhaustion — counts up on
+    click and back down on right-click, and shows the level it is on,
   - **⋯** — everything you set up once rather than mid-conversation (below).
 - **The plate menu** (the **⋯** control, or `Shift+M`):
   - *Visibility* — in the conversation, **hidden from players** (gone from their
@@ -158,7 +164,10 @@ speaking?" without putting tokens on a map.
   the character is *in* from something running *on* them. And where an effect
   named a condition, the plate says so: concentration reads **Concentrating:
   Hunter's Mark**, not a bare "Concentrating". Permanent effects stay out, so a
-  PC's racial and feat effects can't bury the portrait.
+  PC's racial and feat effects can't bury the portrait. A levelled condition
+  carries its number on the icon, so exhaustion 1 and exhaustion 6 don't look
+  alike. A plate that uses **token** art starts with all of this shown to
+  everyone, the way a token's status icons are.
 - **Wounded states** *(optional, off by default)* — as a character's health
   falls, their plate can switch to **injured** and **critical** art, or, if you
   haven't drawn any, tint the normal portrait instead. A fast read of who needs
@@ -191,9 +200,10 @@ speaking?" without putting tokens on a map.
 - **Keyboard** — with the pointer over a plate: `Shift+S` speaker, `Shift+E`
   exit, `Shift+F` fight (add / remove from the encounter), `Shift+H` hide,
   `Shift+N` name, `Shift+T` stats, `Shift+C` conditions, `Shift+A` plate art,
-  `Shift+M` menu. `Shift+B` shows or hides the bar. Remove ships unbound on
-  purpose. All of them are inert unless you're hovering a plate, so they fall
-  through to Foundry otherwise.
+  `Shift+M` menu. Remove ships unbound on purpose. All of those are inert unless
+  you're hovering a plate, so they fall through to Foundry otherwise. For the
+  bars themselves: `Shift+B` shows or hides the bar **under the pointer**, and
+  `Shift+V` shows or hides **both bars** from wherever the pointer is.
 
 Bar visibility is per-scene and the GM broadcasts it to everyone.
 

@@ -2,7 +2,13 @@
  *  tracks the scene's pan/zoom, hosting widgets placed on scene grid squares. */
 
 import { GRID, LOD, MODULE_ID, SETTINGS, canControl, cardsCanControl, type Widget, type WidgetCell, type WidgetType } from "./constants";
-import { activeLandingScene, readLayout, writeLayout } from "./layout";
+import {
+  activeLandingScene,
+  readBoardHidden,
+  readLayout,
+  writeBoardHidden,
+  writeLayout,
+} from "./layout";
 import {
   applyBackground,
   applyCardOp,
@@ -58,6 +64,47 @@ class WorldLayer {
     return this.#editMode;
   }
 
+  /* ------------------------------------- hide the tiles (everyone) ----- */
+
+  /**
+   * Is the board hidden on the scene being viewed?
+   *
+   * Scene state, so hiding the tiles hides them for the WHOLE TABLE — the same
+   * arrangement as the Cast Bar's own visibility, and stored the same way so it
+   * broadcasts to every client without anything here having to send it.
+   *
+   * Still not the same thing as `toggleLandingScene()`, which un-designates the
+   * scene (and asks first, because a scene that is no longer a landing page has
+   * no board at all). This leaves the scene a landing page with its layout
+   * intact: it is the light switch, not the demolition.
+   *
+   * Per SCENE rather than one switch for the world, because everything else
+   * about a board already is: each landing scene has its own layout, so each gets
+   * its own answer to whether that layout is currently on show.
+   */
+  get boardHidden(): boolean {
+    return readBoardHidden(activeLandingScene());
+  }
+
+  /** Hide/show the board for everyone. Returns whether it acted, so the
+   *  keybinding consumes the key only when there was a board to act on and the
+   *  user may act on it. */
+  toggleTiles(): boolean {
+    const scene = activeLandingScene();
+    if (!scene) return false; // no board here — let the key through
+    if (!canControl()) return false; // not ours to hide — ditto
+    const next = !readBoardHidden(scene);
+    // No local refresh: the write broadcasts, and the `updateScene` hook mounts
+    // or unmounts on every client including this one. Refreshing here would only
+    // re-read the flag before the write had landed.
+    void writeBoardHidden(scene, next);
+    // Said once, on the way out only. The tiles going is the state that needs
+    // explaining — both that it was the table's board and not just yours, and
+    // that the same key brings it back. Their return explains itself.
+    if (next) ui.notifications?.info(game.i18n.localize("BIVOUAC.Notify.TilesHidden"));
+    return true;
+  }
+
   /** Pixel size of one scene grid square. */
   #gridSize(): number {
     return canvas?.grid?.size || 100;
@@ -98,7 +145,12 @@ class WorldLayer {
   /* ---------------------------------------- mount / lifecycle ---------- */
 
   refresh(): void {
-    if (activeLandingScene()) {
+    // `boardHidden` is deliberately checked HERE rather than in `render()`: the
+    // whole overlay comes down, so nothing of the board is left to catch clicks
+    // or wheel events over the map — which is the point of hiding it. Checked on
+    // every client, the GM's included: a board only the GM can see would be a
+    // third state nothing on screen distinguishes from the other two.
+    if (activeLandingScene() && !this.boardHidden) {
       this.#mount();
       this.syncTransform();
       this.render("refresh");
@@ -229,6 +281,15 @@ class WorldLayer {
 
   setEditMode(on: boolean): void {
     this.#editMode = on;
+    // Activating the Bivouac control group is an explicit "I want to work on the
+    // board" gesture, so it also brings a hidden board back — otherwise the GM
+    // clicks the tool and gets an empty screen with no clue why. Now that hidden
+    // is scene state this also reveals the board to the table, which is the right
+    // reading of the gesture: you edit a board with the lights on. Hiding while
+    // already in edit mode is left alone — that is just as explicit, in the other
+    // direction.
+    const scene = activeLandingScene();
+    if (on && scene && readBoardHidden(scene)) void writeBoardHidden(scene, false);
     this.#overlay?.classList.toggle("bivouac-edit", on);
     if (!on) this.#selected.clear(); // no lingering selection outside edit mode
     this.render("edit-mode");

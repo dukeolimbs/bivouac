@@ -13,7 +13,14 @@ import {
   type CastBarData,
   type Plate,
 } from "./constants";
-import { formatStat, healthFraction, visibleStats } from "./systems";
+import {
+  formatStat,
+  healthFraction,
+  levelledStatus,
+  setStatusLevel,
+  statusLevel,
+  visibleStats,
+} from "./systems";
 import { readCastBar, writeCastBar } from "./layout";
 import {
   canView,
@@ -185,16 +192,36 @@ export function castPlateAction(action: PlateAction): boolean {
   return true;
 }
 
-/** Show/hide the Cast Bar: the hovered bar if the pointer is over one, otherwise
- *  every enabled bar (so the key still works with the pointer anywhere). */
+/** Show/hide the ONE Cast Bar the pointer is over. Returns false with the pointer
+ *  anywhere else, so the key falls through to Foundry rather than acting on a bar
+ *  the user was not pointing at — `castToggleAllVisible` is the key for that,
+ *  and the two are separate bindings so each can say which it does.
+ *
+ *  Like the bar's own × this is a WORLD change: visibility lives on the scene
+ *  flag, so it shows/hides for every player, not just the GM pressing the key. */
 export function castToggleVisible(): boolean {
   if (!canControl()) return false;
   const hovered = barById(hoveredBarId);
-  const bars = hovered ? [hovered] : castBars.filter((b) => b.enabled);
-  if (!bars.length) return false;
-  bars.forEach((b) => void b.toggleVisible());
+  if (!hovered) return false;
+  void hovered.toggleVisible();
   return true;
 }
+
+/** Show/hide EVERY enabled Cast Bar at once, wherever the pointer is. Both bars
+ *  are flipped to the same state rather than each being toggled independently:
+ *  with one bar already open, one press should leave the table looking at both
+ *  bars or neither, not swap which one is up. So while EITHER is hidden the key
+ *  opens both, and only with both already up does it close them. */
+export function castToggleAllVisible(): boolean {
+  if (!canControl()) return false;
+  const bars = castBars.filter((b) => b.enabled);
+  if (!bars.length) return false;
+  const shown = bars.filter((b) => b.visible).length;
+  const next = shown <= bars.length / 2;
+  bars.forEach((b) => void b.setVisible(next));
+  return true;
+}
+
 
 /** How badly hurt a plate's character is — "" (fine), "injured" or "critical".
  *
@@ -315,33 +342,75 @@ function openConditionPalette(
         return s && typeof s.has === "function" ? s : new Set<string>();
       };
       for (const e of effects) {
+        // A levelled status is a NUMBER, not a flag — dnd5e exhaustion is the one
+        // in practice. `levelledStatus` answers null for everything else, and
+        // that null is what keeps the ordinary path below exactly as it was.
+        const levels = levelledStatus(e.id);
+        const level = (): number => statusLevel(actor, e.id) ?? 0;
         const b = document.createElement("button");
         b.type = "button";
         b.className = "bivouac-cond-picker__item";
-        b.dataset.tooltip = e.name;
         b.setAttribute("aria-label", e.name);
         const icon = document.createElement("img");
         icon.src = e.img;
         icon.alt = "";
         b.appendChild(icon);
+        // The count, drawn on the icon. Only a levelled status gets one at all —
+        // an empty badge on every other condition would be a box to explain.
+        const badge = levels ? document.createElement("span") : null;
+        if (badge) {
+          badge.className = "bivouac-cond-picker__lvl";
+          b.appendChild(badge);
+        }
+        const hint = game.i18n.localize("BIVOUAC.CastBar.CondsLevelHint");
+        b.dataset.tooltip = levels ? `${e.name} — ${hint}` : e.name;
         onRepaint(() => {
-          b.classList.toggle("bivouac-cond-picker__item--on", active().has(e.id));
-          b.setAttribute("aria-pressed", String(active().has(e.id)));
+          const n = levels ? level() : 0;
+          const on = levels ? n > 0 : active().has(e.id);
+          b.classList.toggle("bivouac-cond-picker__item--on", on);
+          b.setAttribute("aria-pressed", String(on));
+          if (badge) {
+            badge.textContent = n ? String(n) : "";
+            badge.hidden = !n;
+            b.dataset.tooltip = `${e.name}${n ? ` ${n}` : ""} — ${hint}`;
+          }
         });
-        b.addEventListener("click", (ev) => {
-          ev.stopPropagation();
-          // Optimistic: flip the icon now, then write. The plate is redrawn by
-          // the ActiveEffect hooks, so this only has to keep the PALETTE honest
-          // for the moment between the click and the round trip.
-          b.classList.toggle("bivouac-cond-picker__item--on");
-          void Promise.resolve(toggle.call(actor, e.id))
+        /** Apply a click: the level step for a levelled status, else the toggle.
+         *  Optimistic on the plain path (flip the icon now, write after) — the
+         *  plate is redrawn by the ActiveEffect hooks, so this only has to keep
+         *  the PALETTE honest for the moment between the click and the round
+         *  trip. A level is NOT flipped optimistically: the number comes back
+         *  from the actor, and guessing it would show a level the system may
+         *  have clamped. */
+        const apply = (step: number): void => {
+          const write = levels
+            ? setStatusLevel(actor, e.id, level() + step)
+            : Promise.resolve(toggle.call(actor, e.id));
+          if (!levels) b.classList.toggle("bivouac-cond-picker__item--on");
+          void Promise.resolve(write)
             .catch(() =>
               ui.notifications?.warn(
                 game.i18n.localize("BIVOUAC.CastBar.CondsFailed"),
               ),
             )
             .finally(() => repaintPopover());
+        };
+        b.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          apply(1);
         });
+        // Right-click steps a level back DOWN, which is the same gesture dnd5e's
+        // own Token HUD uses for exhaustion — so the palette and the HUD cannot
+        // teach the GM two different things. Bound only on a levelled status: on
+        // a plain one there is nothing for it to do and a context menu is the
+        // more useful default.
+        if (levels) {
+          b.addEventListener("contextmenu", (ev) => {
+            ev.preventDefault();
+            ev.stopPropagation();
+            apply(-1);
+          });
+        }
         grid.appendChild(b);
       }
     },
@@ -1186,6 +1255,17 @@ class CastBar {
     } | null;
     const remembered = doc?.getFlag?.(MODULE_ID, FLAGS.castNameHidden);
     const nameHidden = typeof remembered === "boolean" ? remembered : true;
+    // A TOKEN-art plate is standing in for the token itself, and a token on the
+    // canvas shows its status icons to the whole table — so it starts at the third
+    // of the three reveal states (on, and public) rather than off. Profile art is
+    // a portrait for a conversation, where a condition is still the GM's to give
+    // out, so that keeps the off default.
+    //
+    // Only the STARTING state: the menu's three-state reveal owns it from then
+    // on, and switching an existing plate to token art through the art editor
+    // deliberately does NOT re-decide it — that would overwrite a choice the GM
+    // had already made.
+    const asToken = art === "token";
     const d = this.#read();
     d.plates.push({
       id: foundry.utils.randomID(),
@@ -1195,6 +1275,8 @@ class CastBar {
       exited: false,
       hidden: false,
       nameHidden,
+      conditions: asToken,
+      conditionsPublic: asToken,
     });
     d.visible = true; // dropping a character shows the bar
     await this.#write(d);
@@ -1209,10 +1291,21 @@ class CastBar {
     return this.#enabled;
   }
 
+  /** Is this bar currently shown (for everyone — it is scene state)? */
+  get visible(): boolean {
+    return this.#read().visible === true;
+  }
+
   /** Show/hide this bar for everyone (the tab, the × and the keybinding all
    *  land here). Public so `castToggleVisible` can reach it. */
   async toggleVisible(): Promise<void> {
     await this.#setVisible(!this.#read().visible);
+  }
+
+  /** Set it outright rather than flipping it — what the all-bars key needs, so
+   *  that two bars in different states end up agreeing. */
+  async setVisible(v: boolean): Promise<void> {
+    await this.#setVisible(v);
   }
 
   /** Apply one of the hover-control actions to a plate by id. A single public
@@ -1656,14 +1749,35 @@ class CastBar {
     const box = document.createElement("div");
     box.className = "bivouac-plate__conds";
     for (const b of found.slice(0, cap)) {
+      // A levelled status shows its LEVEL on the icon — an exhausted character
+      // is 1 or 6, and which of those it is decides everything about the scene.
+      // `statusLevel` is null for every status but the levelled one, and for a
+      // levelled one the actor does not have, so the number is only ever drawn
+      // where it means something.
+      const lvl = b.status ? statusLevel(doc, b.status) : null;
+      const label = lvl ? `${b.label} ${lvl}` : b.label;
       const icon = document.createElement("img");
       icon.className = b.effect
         ? "bivouac-plate__cond bivouac-plate__cond--effect"
         : "bivouac-plate__cond";
       icon.src = b.img;
       icon.alt = "";
-      icon.dataset.tooltip = b.label;
-      box.appendChild(icon);
+      icon.dataset.tooltip = label;
+      if (!lvl) {
+        box.appendChild(icon);
+        continue;
+      }
+      // Wrapped, because the number has to sit ON the icon and the strip is a
+      // flex row of icons: a bare <span> after the <img> would become the next
+      // item in the row instead of an overlay on this one.
+      const wrap = document.createElement("span");
+      wrap.className = "bivouac-plate__condwrap";
+      wrap.dataset.tooltip = label;
+      const num = document.createElement("span");
+      num.className = "bivouac-plate__condlvl";
+      num.textContent = String(lvl);
+      wrap.append(icon, num);
+      box.appendChild(wrap);
     }
     if (found.length > cap) {
       const more = document.createElement("span");
@@ -1671,7 +1785,10 @@ class CastBar {
       more.textContent = `+${found.length - cap}`;
       more.dataset.tooltip = found
         .slice(cap)
-        .map((b) => b.label)
+        .map((b) => {
+          const lvl = b.status ? statusLevel(doc, b.status) : null;
+          return lvl ? `${b.label} ${lvl}` : b.label;
+        })
         .join(", ");
       box.appendChild(more);
     }

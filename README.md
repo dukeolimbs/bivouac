@@ -27,8 +27,10 @@ strip of character portraits that shows who's in the scene and who's talking.
   the sidebar (so chat and dice stay visible), or over it, or to the left, top,
   or bottom. Drag to resize; arrange its tiles into rows.
 - **A Cast Bar for narrative scenes.** A floating strip of character plates for
-  roleplay-heavy moments: click a portrait to mark who's speaking, dim characters
-  who've stepped out of the conversation, hide names players shouldn't know yet.
+  roleplay-heavy moments: right-click a portrait to mark who's speaking, dim
+  characters who've stepped out of the conversation, hide names players shouldn't
+  know yet, apply conditions without hunting for a token, and let a plate show
+  when its character is badly hurt.
 - **Players can join in.** Card collections and tiles can be handed to players
   or trusted players to arrange, and every tile respects Foundry's normal
   ownership rules — a player never sees a document they don't have access to.
@@ -122,33 +124,81 @@ A floating strip of character **plates** — a portrait and a name — for runni
 narrative encounters. It answers "who's in this conversation, and who's
 speaking?" without putting tokens on a map.
 
-- **Adding characters** — in Bivouac's edit mode, drag an actor onto the bar.
-  You'll be asked which image the plate should use: the actor's **profile**
-  picture, its **token** art, or a **custom** image.
-- **Speaking and sheets** — **single-click** a plate to mark that character as
-  the current speaker (they highlight); **double-click** to open the sheet.
-- **Per-plate states** (GM, from the hover controls):
-  - **Exit the conversation** — the plate dims: still in the scene, just not
-    part of this exchange.
-  - **Hide from players** — removed from the players' view entirely.
-  - **Name hidden** — players see **?** instead of the name. New plates start
-    name-hidden, and Bivouac remembers your choice per actor.
+- **Adding characters** — drag an actor onto the bar. You'll be asked which
+  image the plate should use: the actor's **profile** picture, its **token** art,
+  or a **custom** image. (Getting from *no* plates to the first one still needs
+  Bivouac's edit mode, since an empty bar has nothing to drop onto.)
+- **Speaking and sheets** — one action per mouse button, one click each:
+  **left-click** a plate to open the sheet, **right-click** to mark that
+  character as the current speaker (they highlight green). Right-click again to
+  clear it.
+- **The hover controls** (GM) — four, along the top of a plate:
+  - a **grip** to drag plates into a different order,
+  - **exit / rejoin** the conversation — the plate dims: still in the scene, just
+    not part of this exchange,
+  - **conditions** — opens a palette of the world's status effects to apply and
+    clear, the same job the token HUD's effects button does,
+  - **⋯** — everything you set up once rather than mid-conversation (below).
+- **The plate menu** (the **⋯** control, or `Shift+M`):
+  - *Visibility* — in the conversation, **hidden from players** (gone from their
+    view entirely), **name shown to players** (otherwise they see **?**). New
+    plates start name-hidden, and Bivouac remembers your choice per actor.
+  - *Overlays* — the **stat overlay**, and how much of the **conditions** display
+    to reveal: off, you only, or everyone.
+  - *Appearance* — **plate art**, including the wounded variants below.
+  - **Remove from the bar.**
+- **Conditions on a plate** — show a character's active conditions as icons on
+  their portrait, revealed per plate: off, GM-only, or to everyone. Only
+  toggleable conditions appear, so a PC's long list of permanent effects can't
+  bury the portrait.
+- **Wounded states** *(optional, off by default)* — as a character's health
+  falls, their plate can switch to **injured** and **critical** art, or, if you
+  haven't drawn any, tint the normal portrait instead. A fast read of who needs
+  help. The thresholds are yours to set, and it works on any system Bivouac can
+  read health from — see **Other game systems** below.
+- **Plates as scene tokens** *(optional, off by default)* — gives each plated
+  character a hidden, sightless token in the scene, so the combat tracker and
+  token-aware modules can find them. Actors that already have a token are left
+  alone, tokens you placed yourself are never touched, and switching the setting
+  off removes every token Bivouac placed. It changes what your scenes contain,
+  which is why it is opt-in.
 - **Two bars** — turn on a **Second Cast Bar** on another edge, e.g. the party
   along the top and NPCs along the bottom. Each keeps its own roster and speaker.
 - **Size and position** — dock it to any edge; it keeps clear of Foundry's scene
-  controls and sidebar. Players can resize it by dragging, or use the hover
-  **−/+** buttons to scale it 25–150%. It shrinks to fit so a big cast never
-  overflows.
-- **Stat overlay** *(D&D 5e)* — optionally show **AC, Passive Perception, HP,
-  and Passive Investigation** on a plate. The GM chooses which of the four are
-  available; each plate starts with them hidden.
+  controls and sidebar. The hover cluster under the bar is **−**, **move to the
+  next edge**, **+**; the move control's icon shows which edge you're on.
+  Plates scale 25–150% and shrink to fit, so a big cast never overflows — and as
+  they get smaller the plate chrome thins out in steps rather than crowding.
+- **Stat overlay** — optionally show an actor's key numbers on their plate.
+  **GM-only**: a player never sees this, not even on their own character, so
+  checking someone's passive Perception doesn't announce itself to the table.
 - **Raise My Hand tie-in** — if the [Raise My
   Hand](https://foundryvtt.com/packages/raise-my-hand) module is active, a player
   raising their hand shows a large hand on their character's plate.
 - **During combat** — optionally hide the Cast Bar automatically while a combat
   encounter is running.
+- **Keyboard** — with the pointer over a plate: `Shift+S` speaker, `Shift+E`
+  exit, `Shift+H` hide, `Shift+N` name, `Shift+T` stats, `Shift+C` conditions,
+  `Shift+A` plate art, `Shift+M` menu. `Shift+B` shows or hides the bar. Remove
+  ships unbound on purpose. All of them are inert unless you're hovering a plate,
+  so they fall through to Foundry otherwise.
 
 Bar visibility is per-scene and the GM broadcasts it to everyone.
+
+## Other game systems
+
+The stat overlay, the Mini Sheet tile and the wounded plate states all read an
+actor's numbers through a small per-system adapter, so nothing here is hard-wired
+to D&D 5e.
+
+- **D&D 5e** — HP, AC, Passive Perception, Passive Investigation. Temporary HP
+  counts toward the wounded states, so a buffered character isn't shown as dying.
+- **Daggerheart** — Hit Points, Stress, Hope, Evasion, Armor. Its pools count
+  damage *upward*, and Bivouac accounts for that rather than reading them
+  backwards.
+- **Anything else** — define your own rows in **Custom stat rows**: a name, an
+  icon, and the data path to read. Tick **Health** on one of them and the wounded
+  states work too. On a system Bivouac has no adapter for, this is all it needs.
 
 ## Settings
 
@@ -162,7 +212,12 @@ Under **Game Settings → Configure Settings → Bivouac**. The ones worth knowi
 | **DM screen position** | Which edge the drawer emerges from. |
 | **Cast Bar position** / **Second Cast Bar** | Which edge each bar centres on. |
 | **Cast Bar font / font size / Actor size** | Per-client look of the bar. |
+| **Plate shape** | Portrait, tarot, square or wide. |
 | **Hide the Cast Bar during combat** | Auto-hide while an encounter runs. |
+| **Give plates a token in the scene** | Off by default. Places a hidden, sightless token for each plated character so token-aware modules and the combat tracker can find them. Skips actors that already have one, never touches tokens you placed, and removes everything it placed when switched off. |
+| **Show wounded states on plates** | Off by default. Swap to a plate's injured / critical art as health falls — or tint the normal portrait if it has none. |
+| **Injured / Critical at or below (% health)** | The two thresholds, yours to set rather than fixed at 50 / 10. |
+| **Which system supplies the stats** / **Custom stat rows** | Auto-detects your system. Custom rows let you read anything the system exposes on any system at all — see **Other game systems**. |
 
 Most Cast Bar appearance settings are **per client**, so each player sizes it to
 their own screen; rosters, visibility and the stat toggles are shared.
@@ -245,10 +300,17 @@ yourself.
 | `npm run watch` | Rebuild on every save. |
 | `npm run typecheck` | Type-check (`tsc --noEmit`). |
 | `npm run lint` | Lint `src/`. |
+| `npm test` | Run the harnesses in `test/` (see `test/README.md`). |
+| `npm run check` | Typecheck, lint and test in one go. |
 | `npm run build` | One-off production bundle. |
 
 JavaScript changes need a Foundry page reload; enable Foundry's Hot Reload for
 CSS and language files.
+
+`npm test` is worth understanding before trusting it: the harnesses reason about
+logic and cross-check names, and they deliberately do **not** try to prove
+anything about how a browser lays out or paints. A green run is not a substitute
+for loading the module — `test/README.md` says exactly where the line is.
 
 ### Project structure
 
@@ -258,6 +320,12 @@ src/
   world-layer.ts    The board: DOM-over-canvas surface, screen-space layout, drag/resize
   dm-screen.ts      The GM DM-screen drawer (dock edges, resize, row grid, drop targets)
   cast-bar.ts       The Cast Bar(s): docked plate strip, states, stats, scale/fit, raise-hand
+  plate-tokens.ts   Optional hidden Tokens backing each plate (reconcile, not callbacks)
+  plate-art.ts      Which image a plate shows: the drop prompt, file picker, art editor
+  popover.ts        The floating panels a plate opens (condition palette, plate menu)
+  systems.ts        Per-system adapters: stat rows, health, statblocks, item info
+  custom-stats.ts   GM-defined stat rows + their editor
+  settings-ui.ts    Regroups Foundry's flat settings list into labelled sections
   widgets/          Tiles. `index.ts` is the only file the rest of the module imports from:
     index.ts          Public surface (re-exports) + the tile-type import order
     registry.ts       Tile type registry + createWidget factory
@@ -275,6 +343,9 @@ src/
   constants.ts      Data model, settings keys, permission helper
 public/
   module.json       Foundry manifest    lang/en.json   UI copy    styles/module.css   Styles
+test/
+  run.mjs           `npm test` — bundles what needs bundling, runs every harness
+  *.test.mjs        See test/README.md for what these do and do not prove
 ```
 
 All user-facing copy lives in `public/lang/en.json`. In the code, tiles are

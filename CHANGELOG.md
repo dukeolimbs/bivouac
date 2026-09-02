@@ -3,6 +3,112 @@
 All notable changes to Bivouac are documented here. This project follows
 [Semantic Versioning](https://semver.org/).
 
+## [1.3.0] — 2026-09-02
+
+Two rounds of reported items, plus a redesign of the Cast Bar plate controls that
+came out of them.
+
+### Added
+
+- **Apply conditions from a plate.** A plate could already *show* a character's
+  conditions; now it can change them. The conditions control opens a palette of
+  the world's status effects — the same list, in the same order, the token HUD
+  shows — and applies them the way that HUD does. During roleplay the token is
+  often the whole problem: it may be parked out of the way, in another scene, or
+  not exist at all. It writes to the actor **as it exists in the scene**, so on an
+  unlinked NPC the condition lands on the token rather than on the sidebar
+  prototype, and what the plate shows can never disagree with what it changed.
+
+- **A plate menu.** The occasional settings — hidden from players, name shown,
+  the stat overlay, how far to reveal conditions, plate art, remove — moved off
+  the hover bar and into a **⋯** menu, or `Shift+M`. Two of them read better for
+  it: the conditions reveal was a three-state cycle on one button, i.e. something
+  you clicked repeatedly to find out what it did, and is now three visible
+  states; and name visibility had no button at all, only a bare click on the name
+  banner.
+
+- **Wounded plate art.** Optionally, as a character's health falls their plate
+  switches to **injured** and **critical** art — and if you haven't drawn any, it
+  tints the normal portrait instead, so the feature reads with no per-character
+  setup and the art is an upgrade rather than the entry fee. A plate with its own
+  wounded art isn't also tinted. Both thresholds are yours to set rather than
+  fixed. Off by default.
+
+- **Plate art can be changed after the fact.** A new art editor covers the base
+  image and the two wounded variants. Until now the profile/token/custom choice
+  was made once, on the drop, and picking wrong meant removing the character and
+  adding them again.
+
+- **Plates as scene tokens** *(opt-in, off by default)*. A plate is an entry in a
+  scene flag, which is invisible to the rest of Foundry — modules ask
+  `actor.getActiveTokens()`, `scene.tokens` or `canvas.tokens.placeables`, and a
+  flag satisfies none of them. With this on, each plated character gets one
+  hidden, sightless token parked in the scene's padding. A real token always
+  wins, so an actor that already has one gets nothing added; only tokens Bivouac
+  placed are ever deleted; and switching the setting off removes every one of
+  them, in every scene. It changes what your scenes contain, which is why it is
+  opt-in.
+
+- **Wounded states and stats work on any system.** Both read through the
+  per-system adapter rather than fixed data paths. D&D 5e counts **temporary
+  HP** toward health, so a buffered character isn't shown as dying; Daggerheart's
+  pools count damage *upward* and are read that way rather than backwards. On a
+  system with no adapter, tick **Health** on one of your **custom stat rows** and
+  it works there too — previously a GM could tell Bivouac exactly where health
+  lived and still get nothing.
+
+- **Keyboard shortcuts** for the conditions palette (`Shift+C`), plate art
+  (`Shift+A`) and the plate menu (`Shift+M`). Every control the menu absorbed
+  kept its own shortcut, so nothing became harder to reach.
+
+- **`npm test`.** Six harnesses covering the plate-token reconcile, health
+  readings across systems, the plate's layout budget, and cross-checks that every
+  i18n key and CSS class the source names actually exists. `test/README.md` is
+  explicit about what they prove and what they cannot.
+
+### Changed
+
+- **The plate hover controls are four, not seven.** A portrait plate at the
+  default size has 144px of usable control bar, and seven buttons needed 161px —
+  it could not fit its own contents at the default size and shape, and wrapped
+  onto a second row across the portrait. What remains is what gets used
+  mid-conversation: reorder, exit/rejoin, conditions, and the menu.
+
+- **Nothing on a plate overlaps anything else any more.** Hovering a plate used
+  to put the control bar directly on top of the stat and condition overlays,
+  hiding the numbers you were reading; the overlays now slide clear of it. Both
+  overlay columns are bounded so they can never meet in the middle or reach the
+  name banner, conditions wrap into columns rather than running down two-thirds
+  of the plate, and controls scale with the plate instead of staying a fixed size.
+  As a plate gets smaller its chrome now thins out in deliberate steps rather
+  than crowding.
+
+- **The stat overlay is GM-only.** A player could previously watch it appear on
+  their own plate, so flicking it on to check a passive Perception announced the
+  check to the table.
+
+- **The bar's hover cluster is − / move / +**, with the move control between the
+  two scale buttons instead of off to one side. Its icon shows which edge the bar
+  is currently docked to.
+
+- **The conditions control wears Foundry's own status-effects icon**, since it
+  does the same job as the effects button on the token HUD.
+
+### Fixed
+
+- **Drag-to-reorder had no visible feedback at all.** The drop indicator was
+  positioned in the gap *between* plates — i.e. outside a box that clips its
+  overflow — so it was never drawn. It now sits on the plate's own edge.
+
+- **Damage to an unlinked NPC never refreshed its plate.** A token's actor is a
+  different document with a different uuid, which never matched what a plate
+  stores, so anything read from the live actor sat stale. This affected the stat
+  overlay before wounded states existed to make it obvious.
+
+- The plate-image hint no longer claims the stat overlay is four fixed D&D 5e
+  values, and the raised-hand badge, the name hint and the "missing actor" state
+  all now behave sensibly at small plate sizes.
+
 ## [1.2.0] — 2026-08-11
 
 ### Added

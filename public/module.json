@@ -2,7 +2,7 @@
   "id": "bivouac",
   "title": "Bivouac",
   "description": "A persistent campaign landing page for your table: designate any scene as a zoomable board of tiles — web views, images, notes, meters, actors, journals, rollable tables, macros, and card hands — plus a GM-only DM screen drawer and a Cast Bar of character plates for narrative scenes.",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "authors": [
     { "name": "Owen Tidy", "url": "https://github.com/dukeolimbs" }
   ],

@@ -176,6 +176,22 @@ console.log("\n10. Setting off — the active scene is withdrawn from");
   check("nothing created while off", s.created.length === 0);
 }
 
+console.log("\n10b. An UNREADABLE setting does nothing — it is not off");
+{
+  // Once the setting became default-on, reporting an unreadable setting as off
+  // would have deleted a scene's worth of parked tokens and recreated them on
+  // the next pass. Unknown must mean wait.
+  const s = scene("J2", [{ actorId: "a1", managed: true }], { bar1: ["Actor.a1"] });
+  makeWorld({ actors: [actor("a1", "A")], scenes: [s] });
+  globalThis.game.settings.get = () => {
+    throw new Error("not registered yet");
+  };
+  await syncPlateTokens();
+  check("nothing deleted", s.deleted.length === 0, `deleted=${s.deleted.length}`);
+  check("nothing created", s.created.length === 0, `created=${s.created.length}`);
+  check("the parked token is left alone", summarise(s) === "a1*", summarise(s));
+}
+
 console.log("\n11. Sweep clears EVERY scene, ours only");
 {
   const s1 = scene("K1", [{ actorId: "a1", managed: true }, { actorId: "a2" }]);

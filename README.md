@@ -164,12 +164,13 @@ speaking?" without putting tokens on a map.
   haven't drawn any, tint the normal portrait instead. A fast read of who needs
   help. The thresholds are yours to set, and it works on any system Bivouac can
   read health from — see **Other game systems** below.
-- **Plates as scene tokens** *(optional, off by default)* — gives each plated
-  character a hidden, sightless token in the scene, so the combat tracker and
-  token-aware modules can find them. Actors that already have a token are left
-  alone, tokens you placed yourself are never touched, and switching the setting
-  off removes every token Bivouac placed. It changes what your scenes contain,
-  which is why it is opt-in.
+- **Plates as scene tokens** *(on by default)* — gives each plated character a
+  hidden, sightless token in the scene, so the combat tracker and token-aware
+  modules can find them, and so the plate's own **add to the encounter** control
+  has something to work with. Actors that already have a token are left alone,
+  tokens you placed yourself are never touched, and switching the setting off
+  removes every token Bivouac placed, in every scene — so if you'd rather your
+  scenes held nothing but what you put there, one click gives you that back.
 - **Two bars** — turn on a **Second Cast Bar** on another edge, e.g. the party
   along the top and NPCs along the bottom. Each keeps its own roster and speaker.
 - **Size and position** — dock it to any edge; it keeps clear of Foundry's scene
@@ -225,7 +226,7 @@ Under **Game Settings → Configure Settings → Bivouac**. The ones worth knowi
 | **Cast Bar font / font size / Actor size** | Per-client look of the bar. |
 | **Plate shape** | Portrait, tarot, square or wide. |
 | **Hide the Cast Bar during combat** | Auto-hide while an encounter runs. |
-| **Give plates a token in the scene** | Off by default. Places a hidden, sightless token for each plated character so token-aware modules and the combat tracker can find them. Skips actors that already have one, never touches tokens you placed, and removes everything it placed when switched off. |
+| **Give plates a token in the scene** | On by default. Places a hidden, sightless token for each plated character so token-aware modules, the combat tracker and the plate's own combat control can find them. Skips actors that already have one, never touches tokens you placed, and removes everything it placed when switched off. |
 | **Show wounded states on plates** | Off by default. Swap to a plate's injured / critical art as health falls — or tint the normal portrait if it has none. |
 | **Injured / Critical at or below (% health)** | The two thresholds, yours to set rather than fixed at 50 / 10. |
 | **Which system supplies the stats** / **Custom stat rows** | Auto-detects your system. Custom rows let you read anything the system exposes on any system at all — see **Other game systems**. |

@@ -258,7 +258,8 @@
       "CombatEnter": "Add to the encounter",
       "CombatLeave": "Remove from the encounter",
       "CombatNoToken": "That character has no token in this scene, so there is nothing to add to the encounter. Turn on “Give plates a token in the scene” to have Bivouac keep one for every plate.",
-      "CombatFailed": "Could not change the encounter — check you are the GM."
+      "CombatFailed": "Could not change the encounter — check you are the GM.",
+      "CombatNoTokenManaged": "That character has no token in this scene, so there is nothing to add to the encounter. Bivouac only keeps tokens for actors in this world — a plate pointing at a compendium actor, or at an Item, needs a token placed by hand."
     },
     "StatBlock": {
       "CR": "CR",
@@ -428,7 +429,7 @@
       },
       "CastPlateTokens": {
         "Name": "Give plates a token in the scene",
-        "Hint": "Place a hidden, sightless token in the scene for each plated character, so the combat tracker and token-aware modules can find them. Skipped for any actor that already has a token — yours are never touched. Switching this off removes every token Bivouac placed, in every scene. GM setting; changes what the scene contains."
+        "Hint": "Place a hidden, sightless token in the scene for each plated character, so the combat tracker and token-aware modules can find them — and so a plate's own “add to the encounter” control has something to work with. Skips actors that already have a token, never touches tokens you placed, and switching this off removes every token Bivouac placed, in every scene. GM setting; changes what your scenes contain."
       },
       "CastBarFont": {
         "Name": "Cast Bar font",

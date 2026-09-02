@@ -3,6 +3,38 @@
 All notable changes to Bivouac are documented here. This project follows
 [Semantic Versioning](https://semver.org/).
 
+## [1.3.3] — 2026-09-02
+
+### Changed
+
+- **"Give plates a token in the scene" is now ON by default.** It shipped off in
+  1.3.0, on the reasoning that it writes to world data and so should be asked
+  for. That put the cost in the wrong place: without it, a plate's *add to the
+  encounter* control has nothing to make a combatant out of, so the common case
+  was a button that could only explain why it wouldn't work. The setting was a
+  prerequisite dressed up as an option.
+
+  **This changes behaviour on upgrade.** A world that never touched the setting
+  will start keeping a hidden, sightless token per plated character in scenes
+  that have plates. If you don't want that, switch it off once and Bivouac
+  removes every token it placed, in every scene — it never touches a token you
+  placed yourself, and it stands aside entirely for actors that already have one.
+
+- **The "no token in this scene" message no longer tells you to enable something
+  you already have enabled.** With the setting on, an actor without a token is a
+  plate the pass can't cover — a compendium actor, or an Item — so the message
+  says that instead.
+
+### Fixed
+
+- **An unreadable setting no longer reads as "switched off".** Internally, "off"
+  is an instruction to delete every token Bivouac placed, so a setting that could
+  not be read — possible if a hook fires before the setting is registered — would
+  have swept a scene's worth of tokens and recreated them on the next pass. It was
+  harmless while the default was off, because the two agreed; making the default
+  on is what gave the two states different consequences. Unknown now means do
+  nothing and wait for a pass that can tell.
+
 ## [1.3.2] — 2026-09-02
 
 ### Added

@@ -336,17 +336,26 @@ Hooks.once("init", () => {
   });
 
   // Back every plate with a hidden Token in the scene, so the rest of Foundry can
-  // find plated characters. OFF by default and deliberately so: unlike every
-  // other setting here this one writes to world data — it changes what the scene
-  // contains, and therefore what the combat tracker and token-aware modules see.
-  // Switching it off sweeps every token it ever placed, in every scene.
+  // find plated characters.
+  //
+  // ON by default as of 1.3.3. It shipped off, on the reasoning that it writes to
+  // world data and so should be asked for — but that put the cost in the wrong
+  // place. Without it the combat control on a plate has nothing to make a
+  // combatant out of, so the common case was a button that explained why it could
+  // not work; the setting was effectively a prerequisite dressed up as an option.
+  //
+  // What makes the default safe is that the pass is reversible and
+  // self-correcting: it never touches a token it did not place, it stands aside
+  // for any real token, and switching the setting OFF sweeps every token it ever
+  // placed, in every scene. So a GM who does not want this gets a clean scene
+  // back from one click, which is the property a default needs.
   game.settings.register(MODULE_ID, SETTINGS.castPlateTokens, {
     name: "BIVOUAC.Settings.CastPlateTokens.Name",
     hint: "BIVOUAC.Settings.CastPlateTokens.Hint",
     scope: "world",
     config: true,
     type: Boolean,
-    default: false,
+    default: true,
     onChange: (v: unknown) => void (v ? syncPlateTokens() : sweepPlateTokens()),
   });
 

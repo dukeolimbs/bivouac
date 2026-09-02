@@ -1331,9 +1331,27 @@ class CastBar {
     const doc = fromUuidSync(uuid) as Record<string, unknown> | null;
     if (!doc) return;
     const result = await toggleCombat(sceneActor(doc));
-    if (result === "no-token")
-      ui.notifications?.warn(game.i18n.localize("BIVOUAC.CastBar.CombatNoToken"));
-    else if (result === "failed")
+    if (result === "no-token") {
+      // Two different situations, and pointing at the wrong one is worse than
+      // saying less. With the setting OFF, turning it on is the fix and the
+      // message should say so. With it ON, this plate is one the pass cannot
+      // cover — a compendium actor, an Item, or a scene whose sync has not run —
+      // and telling a GM to switch on something already switched on reads as a
+      // broken module.
+      let managed = false;
+      try {
+        managed = !!game.settings.get(MODULE_ID, SETTINGS.castPlateTokens);
+      } catch {
+        /* not registered yet — treat as off, which gives the actionable text */
+      }
+      ui.notifications?.warn(
+        game.i18n.localize(
+          managed
+            ? "BIVOUAC.CastBar.CombatNoTokenManaged"
+            : "BIVOUAC.CastBar.CombatNoToken",
+        ),
+      );
+    } else if (result === "failed")
       ui.notifications?.warn(game.i18n.localize("BIVOUAC.CastBar.CombatFailed"));
     // Foundry's own combat hooks drive the redraw, so the button restates itself
     // without this having to; see the createCombatant/deleteCombatant wiring.

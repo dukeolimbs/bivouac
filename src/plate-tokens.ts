@@ -1,5 +1,5 @@
 /**
- * Bivouac — Plates as Scene Tokens (opt-in).
+ * Bivouac — Plates as Scene Tokens.
  *
  * A Plate is an entry in a Scene flag holding an Actor UUID. That is enough for
  * everything Bivouac itself draws, but it is invisible to the rest of Foundry:
@@ -11,7 +11,15 @@
  * So when the setting is on we keep one for each plated actor: a hidden,
  * sightless token parked in the scene's padding, created when a plate appears and
  * deleted when it goes. It is a side effect on world data — it changes what the
- * scene actually CONTAINS — which is why it is opt-in and off by default.
+ * scene actually CONTAINS — and it shipped off by default for that reason.
+ *
+ * It is ON by default as of 1.3.3. The reasoning changed rather than the risk:
+ * without this, a plate's "add to the encounter" control has nothing to make a
+ * combatant out of, so the setting was a prerequisite dressed up as an option and
+ * the common case was a button explaining why it could not work. What makes the
+ * default defensible is that this pass is reversible and self-correcting — rules
+ * 1 and 2 below mean it never touches anything it did not place, and switching
+ * the setting off sweeps every token it ever did, in every scene.
  *
  * Three rules keep it from fighting the GM:
  *
@@ -64,13 +72,24 @@ type Scn = {
   deleteEmbeddedDocuments?: (t: string, ids: string[]) => Promise<unknown>;
 };
 
-/** Is the feature switched on? Read defensively — the hooks below can fire
- *  before the setting is registered. */
-function enabled(): boolean {
+/**
+ * Is the feature switched on? `null` means UNKNOWN — the setting could not be
+ * read, which the hooks driving this can manage if one fires before `init` has
+ * registered it.
+ *
+ * The three states matter, and collapsing unknown into `false` was a real hazard
+ * once the setting became default-on. `false` is an instruction to sweep: the
+ * reconcile deletes every parked token, because that is what switching the
+ * feature off means. An unreadable setting reported as `false` would therefore
+ * delete a scene's worth of tokens and then recreate them on the next pass — a
+ * lot of world-data churn triggered by a race. `null` means do nothing and wait
+ * for a pass that can actually tell.
+ */
+function enabled(): boolean | null {
   try {
     return !!game.settings.get(MODULE_ID, SETTINGS.castPlateTokens);
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -182,10 +201,13 @@ async function reconcile(scene: Scn): Promise<void> {
   const tokens = [...(scene.tokens ?? [])];
   const managed = tokens.filter(isManaged);
 
+  const on = enabled();
+  // Unreadable setting → do nothing at all. Not the same as off; see `enabled`.
+  if (on === null) return;
   // Switched off: withdraw everything we put here and do nothing else. The
   // setting's own handler sweeps the other scenes; this covers the active one,
   // and any token left behind by a world that was disabled while off-scene.
-  if (!enabled()) {
+  if (!on) {
     if (managed.length) await del(scene, managed.map((t) => t.id));
     return;
   }

@@ -32,6 +32,11 @@ export interface CustomStatRow {
   maxPath: string;
   /** A higher number is worse (the flag Daggerheart's marked-damage pools need). */
   reverse: boolean;
+  /** This row is the actor's HEALTH — what the wounded plate states measure.
+   *  Needs `maxPath`, since a fraction needs a denominator. On an unsupported
+   *  system this is the only way to get wounded states at all; on a supported one
+   *  it overrides the adapter's own health row. */
+  health: boolean;
 }
 
 /** Toggle setting key for a row. Prefixed so it can never collide with a
@@ -77,6 +82,7 @@ export function customStatRows(): CustomStatRow[] {
       path,
       maxPath: String(r?.maxPath ?? "").trim(),
       reverse: !!r?.reverse,
+      health: !!r?.health,
     });
   }
   return out;
@@ -125,6 +131,9 @@ function rowHtml(r: CustomStatRow): string {
     <input type="text" data-f="maxPath" value="${esc(r.maxPath)}" placeholder="${esc(t("BIVOUAC.CustomStats.MaxPath"))}">
     <label class="bivouac-cstat__rev" data-tooltip="${esc(t("BIVOUAC.CustomStats.ReverseHint"))}">
       <input type="checkbox" data-f="reverse" ${r.reverse ? "checked" : ""}> ${esc(t("BIVOUAC.CustomStats.Reverse"))}
+    </label>
+    <label class="bivouac-cstat__rev" data-tooltip="${esc(t("BIVOUAC.CustomStats.HealthHint"))}">
+      <input type="checkbox" data-f="health" ${r.health ? "checked" : ""}> ${esc(t("BIVOUAC.CustomStats.Health"))}
     </label>
     <span class="bivouac-cstat__probe" data-probe></span>
     <button type="button" class="bivouac-cstat__del" data-del title="${esc(t("BIVOUAC.CustomStats.Delete"))}">
@@ -179,6 +188,7 @@ function readEditor(form: HTMLElement): CustomStatRow[] {
       path,
       maxPath: get("maxPath")?.value.trim() ?? "",
       reverse: !!get("reverse")?.checked,
+      health: !!get("health")?.checked,
     });
   }
   return out;
@@ -217,7 +227,10 @@ function ensureEditorHook(): void {
     if (!form) return;
     const rows = form.querySelector(".bivouac-cstats__rows");
     form.querySelector("[data-add]")?.addEventListener("click", () => {
-      rows?.insertAdjacentHTML("beforeend", rowHtml({ id: newRowId(), name: "", icon: "", path: "", maxPath: "", reverse: false }));
+      rows?.insertAdjacentHTML(
+        "beforeend",
+        rowHtml({ id: newRowId(), name: "", icon: "", path: "", maxPath: "", reverse: false, health: false }),
+      );
       refreshProbes(form);
     });
     form.addEventListener("click", (e) => {

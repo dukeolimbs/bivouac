@@ -13,10 +13,12 @@ import {
   type CastBarData,
   type Plate,
 } from "./constants";
-import { formatStat, visibleStats } from "./systems";
+import { formatStat, healthFraction, visibleStats } from "./systems";
 import { readCastBar, writeCastBar } from "./layout";
 import { canView, docImg, sceneActor } from "./widgets";
 import { isDocDrag, parseDrop } from "./drop";
+import { openPlateArt, pickImageFile, pickImageSource } from "./plate-art";
+import { closePopover, openPopover, repaintPopover } from "./popover";
 import { worldLayer } from "./world-layer";
 
 const DOCKS = ["bottom", "top", "left", "right"] as const;
@@ -140,7 +142,16 @@ interface CastBarConfig {
 
 /** The plate actions a keybinding can fire — the same set as the hover control
  *  bar, so the keys are an accelerator for buttons that already exist. */
-export type PlateAction = "speaker" | "name" | "exited" | "hidden" | "stats" | "remove";
+export type PlateAction =
+  | "speaker"
+  | "name"
+  | "exited"
+  | "hidden"
+  | "stats"
+  | "conditions"
+  | "menu"
+  | "art"
+  | "remove";
 
 /** What the pointer is currently over. Keybindings for "the hovered plate" only
  *  make sense against live pointer state, and this has to be module-level because
@@ -177,15 +188,419 @@ export function castToggleVisible(): boolean {
   return true;
 }
 
+/** How badly hurt a plate's character is — "" (fine), "injured" or "critical".
+ *
+ *  Off unless the GM switched wounded states on, and "" whenever health can't be
+ *  read at all: an unsupported system, an actor type with no health, or a pool
+ *  with no maximum to measure against. A plate that CANNOT be assessed must look
+ *  exactly like one that is unhurt, never like one that is dying.
+ *
+ *  Thresholds are inclusive and read live from the settings — `critical` is
+ *  tested first so it wins when the two are set to the same number. */
+function woundState(doc: Record<string, unknown> | null): "" | "injured" | "critical" {
+  if (!doc) return "";
+  try {
+    if (!game.settings.get(MODULE_ID, SETTINGS.castWoundStates)) return "";
+    const frac = healthFraction(doc);
+    if (frac == null) return "";
+    const pct = frac * 100;
+    if (pct <= Number(game.settings.get(MODULE_ID, SETTINGS.castWoundCritical)))
+      return "critical";
+    if (pct <= Number(game.settings.get(MODULE_ID, SETTINGS.castWoundInjured)))
+      return "injured";
+    return "";
+  } catch {
+    return "";
+  }
+}
+
+/* ------------------------------------------- plate panels ---------------- */
+
+/**
+ * The two floating panels a plate can open, built on the shared `popover`
+ * mechanics (mounting, positioning, toggle-on-retrigger, dismissal, repaint).
+ *
+ *  • **The condition palette** — apply and clear conditions, the job the Token
+ *    HUD does for a token.
+ *  • **The plate menu** — everything about a plate that is set up once rather
+ *    than done mid-conversation.
+ *
+ * They exist as panels rather than more controls because the control bar is the
+ * scarce resource: a portrait plate at the default size has 144px of usable bar,
+ * and seven 22px buttons plus the grip need 161px. Moving the occasional actions
+ * into a menu takes the bar to four items, which fits every plate shape and
+ * leaves room for the size ladder to thin it further.
+ */
+
+/** The status effects this world has, in its configured order — the same list,
+ *  in the same order, that the Token HUD shows. */
+function statusEffectList(): { id: string; name: string; img: string }[] {
+  const cfg = (CONFIG?.statusEffects ?? []) as {
+    id?: string;
+    name?: string;
+    label?: string;
+    img?: string;
+    icon?: string;
+  }[];
+  return cfg
+    .filter((s) => !!s.id)
+    .map((s) => ({
+      id: String(s.id),
+      name: game.i18n.localize(String(s.name ?? s.label ?? s.id)),
+      img: String(s.img ?? s.icon ?? ""),
+    }));
+}
+
+/**
+ * The condition palette.
+ *
+ * Writes to the SCENE actor, not the sidebar one. For an unlinked NPC those are
+ * different documents, and the scene one is what the plate reads back — so a
+ * condition applied here shows on the plate immediately, and the showing and
+ * applying halves can never disagree about which actor they meant.
+ */
+function openConditionPalette(
+  anchor: HTMLElement,
+  actor: Record<string, unknown> | null,
+  key: string,
+): void {
+  if (!actor) return;
+  const toggle = (
+    actor as { toggleStatusEffect?: (id: string, o?: object) => Promise<unknown> }
+  ).toggleStatusEffect;
+  if (typeof toggle !== "function") {
+    ui.notifications?.warn(game.i18n.localize("BIVOUAC.CastBar.CondsUnsupported"));
+    return;
+  }
+  const effects = statusEffectList();
+  if (!effects.length) return;
+
+  openPopover({
+    key,
+    anchor,
+    className: "bivouac-cond-picker",
+    title: String(actor.name ?? ""),
+    exempt: `.${CTRL_CONDS}`,
+    build: (body, onRepaint) => {
+      const grid = document.createElement("div");
+      grid.className = "bivouac-cond-picker__grid";
+      // The column count has to be a NUMBER, not `auto-fill`: the panel is
+      // shrink-to-fit, so a grid asking how wide its container is gets no answer
+      // and lays out one column — which is how this palette came to be a single
+      // stripe down the screen.
+      //
+      // Slightly wider than square (hence the 1.6), because a row of icons scans
+      // faster than a column of them. Clamped either end: below 3 a small world's
+      // palette turns into a stack, and above 8 a large one gets wider than the
+      // plate it belongs to.
+      const cols = Math.min(
+        effects.length, // never more columns than there are icons to put in them
+        Math.max(3, Math.min(8, Math.ceil(Math.sqrt(effects.length * 1.6)))),
+      );
+      grid.style.setProperty("--cond-cols", String(cols));
+      body.appendChild(grid);
+      // Re-read the live set on every paint rather than caching it: a condition
+      // can also arrive from the Token HUD, a macro, or another GM, while this
+      // sits open.
+      const active = (): Set<string> => {
+        const s = actor.statuses as Set<string> | undefined;
+        return s && typeof s.has === "function" ? s : new Set<string>();
+      };
+      for (const e of effects) {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "bivouac-cond-picker__item";
+        b.dataset.tooltip = e.name;
+        b.setAttribute("aria-label", e.name);
+        const icon = document.createElement("img");
+        icon.src = e.img;
+        icon.alt = "";
+        b.appendChild(icon);
+        onRepaint(() => {
+          b.classList.toggle("bivouac-cond-picker__item--on", active().has(e.id));
+          b.setAttribute("aria-pressed", String(active().has(e.id)));
+        });
+        b.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          // Optimistic: flip the icon now, then write. The plate is redrawn by
+          // the ActiveEffect hooks, so this only has to keep the PALETTE honest
+          // for the moment between the click and the round trip.
+          b.classList.toggle("bivouac-cond-picker__item--on");
+          void Promise.resolve(toggle.call(actor, e.id))
+            .catch(() =>
+              ui.notifications?.warn(
+                game.i18n.localize("BIVOUAC.CastBar.CondsFailed"),
+              ),
+            )
+            .finally(() => repaintPopover());
+        });
+        grid.appendChild(b);
+      }
+    },
+  });
+}
+
+/** A menu row that reads and writes one piece of plate state. */
+interface MenuToggle {
+  label: string;
+  /** Current value, re-read on every repaint. */
+  get(): boolean;
+  set(): void | Promise<void>;
+}
+
+/** One labelled group of rows in the plate menu. */
+function menuGroup(body: HTMLElement, label: string): HTMLElement {
+  const g = document.createElement("div");
+  g.className = "bivouac-pmenu__group";
+  const h = document.createElement("p");
+  h.className = "bivouac-pmenu__grouplabel";
+  h.textContent = label;
+  g.appendChild(h);
+  body.appendChild(g);
+  return g;
+}
+
+/**
+ * The plate menu.
+ *
+ * Holds what used to be four separate buttons plus one undiscoverable click
+ * target. Two of those readings improve by moving here rather than merely fitting:
+ *
+ *  • The conditions REVEAL is a three-state cycle (off → you → everyone). As a
+ *    button that was a thing you clicked repeatedly to find out what it did; as
+ *    three radio rows the states are simply visible.
+ *  • Name visibility had no button at all — it was a bare click on the name
+ *    banner, hinted at only by a `title` and a "?" that appears on hover. It
+ *    keeps that shortcut, and now also has a place you can find it.
+ */
+function openPlateMenu(
+  anchor: HTMLElement,
+  bar: CastBar,
+  plate: Plate,
+  name: string,
+): void {
+  openPopover({
+    key: `${bar.id}:menu:${plate.id}`,
+    anchor,
+    className: "bivouac-pmenu",
+    title: name,
+    exempt: `.${CTRL_MENU}`,
+    build: (body, onRepaint) => {
+      const t = (k: string): string => game.i18n.localize(k);
+
+      /** A checkbox row. Stays open after a click, so several can be set in one
+       *  visit — the whole point of gathering them here. */
+      const check = (into: HTMLElement, row: MenuToggle): void => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "bivouac-pmenu__item";
+        b.setAttribute("role", "menuitemcheckbox");
+        const tick = document.createElement("i");
+        tick.className = "bivouac-pmenu__tick fa-solid fa-check";
+        const span = document.createElement("span");
+        span.textContent = row.label;
+        b.append(tick, span);
+        onRepaint(() => {
+          const on = row.get();
+          b.classList.toggle("bivouac-pmenu__item--on", on);
+          b.setAttribute("aria-checked", String(on));
+        });
+        b.addEventListener("click", (e) => {
+          e.stopPropagation();
+          void row.set();
+        });
+        into.appendChild(b);
+      };
+
+      /* -- visibility ------------------------------------------------------ */
+      const vis = menuGroup(body, t("BIVOUAC.CastBar.MenuVisibility"));
+      check(vis, {
+        label: t("BIVOUAC.CastBar.MenuInScene"),
+        get: () => !plate.exited,
+        set: () => bar.plateAction(plate.id, "exited"),
+      });
+      check(vis, {
+        label: t("BIVOUAC.CastBar.MenuHidden"),
+        get: () => !!plate.hidden,
+        set: () => bar.plateAction(plate.id, "hidden"),
+      });
+      check(vis, {
+        label: t("BIVOUAC.CastBar.MenuNameShown"),
+        get: () => !plate.nameHidden,
+        set: () => bar.plateAction(plate.id, "name"),
+      });
+
+      /* -- overlays -------------------------------------------------------- */
+      const ov = menuGroup(body, t("BIVOUAC.CastBar.MenuOverlays"));
+      check(ov, {
+        label: t("BIVOUAC.CastBar.MenuStats"),
+        get: () => !!plate.stats,
+        set: () => bar.plateAction(plate.id, "stats"),
+      });
+
+      // The reveal states as radios rather than a cycling button. `conditions`
+      // and `conditionsPublic` are two booleans in the data but only three of
+      // their four combinations mean anything, so the UI offers exactly three.
+      const revealRow = document.createElement("div");
+      revealRow.className = "bivouac-pmenu__reveal";
+      const revealLabel = document.createElement("span");
+      revealLabel.className = "bivouac-pmenu__revealtitle";
+      revealLabel.textContent = t("BIVOUAC.CastBar.MenuConditions");
+      revealRow.appendChild(revealLabel);
+      const states: { key: string; conditions: boolean; publicly: boolean }[] = [
+        { key: "BIVOUAC.CastBar.MenuCondsOff", conditions: false, publicly: false },
+        { key: "BIVOUAC.CastBar.MenuCondsYou", conditions: true, publicly: false },
+        { key: "BIVOUAC.CastBar.MenuCondsAll", conditions: true, publicly: true },
+      ];
+      for (const s of states) {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "bivouac-pmenu__radio";
+        b.setAttribute("role", "menuitemradio");
+        b.textContent = t(s.key);
+        onRepaint(() => {
+          const on =
+            !!plate.conditions === s.conditions &&
+            (!s.conditions || !!plate.conditionsPublic === s.publicly);
+          b.classList.toggle("bivouac-pmenu__radio--on", on);
+          b.setAttribute("aria-checked", String(on));
+        });
+        b.addEventListener("click", (e) => {
+          e.stopPropagation();
+          void bar.setConditionReveal(plate.id, s.conditions, s.publicly);
+        });
+        revealRow.appendChild(b);
+      }
+      ov.appendChild(revealRow);
+
+      /* -- appearance ------------------------------------------------------ */
+      const app = menuGroup(body, t("BIVOUAC.CastBar.MenuAppearance"));
+      const artBtn = document.createElement("button");
+      artBtn.type = "button";
+      artBtn.className = "bivouac-pmenu__item";
+      artBtn.setAttribute("role", "menuitem");
+      artBtn.innerHTML = `<i class="bivouac-pmenu__tick fa-solid fa-image"></i>`;
+      artBtn.append(
+        Object.assign(document.createElement("span"), {
+          textContent: t("BIVOUAC.CastBar.ArtEdit"),
+        }),
+      );
+      // Opens a dialog, so the menu goes — unlike the checkboxes, there is
+      // nothing more to set here and leaving it up would sit behind the dialog.
+      artBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        closePopover();
+        void bar.plateAction(plate.id, "art");
+      });
+      app.appendChild(artBtn);
+
+      /* -- remove ---------------------------------------------------------- */
+      const rm = document.createElement("button");
+      rm.type = "button";
+      rm.className = "bivouac-pmenu__item bivouac-pmenu__item--danger";
+      rm.setAttribute("role", "menuitem");
+      rm.innerHTML = `<i class="bivouac-pmenu__tick fa-solid fa-xmark"></i>`;
+      rm.append(
+        Object.assign(document.createElement("span"), {
+          textContent: t("BIVOUAC.CastBar.MenuRemove"),
+        }),
+      );
+      rm.addEventListener("click", (e) => {
+        e.stopPropagation();
+        closePopover();
+        void bar.plateAction(plate.id, "remove");
+      });
+      body.appendChild(rm);
+    },
+  });
+}
+
 /** Quick-scale bounds + step for the hover +/- control (× the base Actor size). */
 const SCALE_MIN = 0.25;
 const SCALE_MAX = 1.5;
 const SCALE_STEP = 0.1;
 
-/** How many condition icons a plate draws before collapsing the rest into "+n".
- *  The plate face is already shared with the stats overlay, the name banner and
- *  the raised-hand badge, and it shrinks under `#fit()`. */
-const CONDITION_CAP = 6;
+/** How many condition icons a plate draws before collapsing the rest into "+n",
+ *  per size tier. The plate face is shared with the stats overlay, the name
+ *  banner and the raised-hand badge, and six icons come to two thirds of a
+ *  portrait plate's height at ANY size — the icons scale with the plate, so the
+ *  proportion never improves on its own. */
+const CONDITION_CAP: Record<Tier, number> = {
+  full: 6,
+  compact: 3,
+  min: 0,
+  none: 0,
+};
+
+/** How many stat rows a plate draws, per size tier.
+ *
+ *  A cap is needed because the row count is not ours: the GM chooses which stats
+ *  are enabled, and a custom row can be added for anything the system exposes, so
+ *  "however many there are" could be ten. Four rows plus the control bar and a
+ *  two-line name banner is the most a default-size portrait plate holds.
+ *
+ *  At `compact` the one row kept is the HEALTH row, whichever the active adapter
+ *  (or a GM's custom row) says that is — so it is HP on dnd5e, marked Hit Points
+ *  on Daggerheart, and whatever a GM declared on a system with no adapter. */
+const STAT_CAP: Record<Tier, number> = {
+  full: 4,
+  compact: 1,
+  min: 0,
+  none: 0,
+};
+
+/** Control classes the panels' dismiss handlers must treat as their trigger
+ *  rather than as an outside press. Named constants because the class is written
+ *  in one place and matched in another, and a typo would silently break the
+ *  open/close toggle rather than fail loudly. */
+const CTRL_CONDS = "bivouac-plate__ctrl--conds";
+const CTRL_MENU = "bivouac-plate__ctrl--menu";
+
+/**
+ * Plate size tiers.
+ *
+ * A plate's height is `--bivouac-castbar-fit` and its width is that times the
+ * aspect, so a portrait plate at the default 200px size is 150px wide with 144px
+ * of usable control bar — and `#fit()` can take the height down to 24px. Nothing
+ * about the chrome survives that range unchanged, so the tier says how much of
+ * it to draw:
+ *
+ *  • `full`     ≥ 150px wide — grip, exit, conditions, menu; stats and
+ *                conditions overlays in full.
+ *  • `compact`  ≥ 90px  — grip, exit, menu; the health stat row only;
+ *                conditions capped at 3.
+ *  • `min`      ≥ 50px  — grip and menu; no overlays.
+ *  • `none`     < 50px  — no controls at all. At that size a plate is a
+ *                thumbnail and a 16px button is a third of its width; the
+ *                keybindings remain the way to act on it.
+ *
+ * Laddered on BOTH axes, and the stricter answer wins. The two constraints are
+ * genuinely different: the control bar runs across the plate, while the banner
+ * and the overlay columns stack down it. A short wide plate can be broad enough
+ * for the full bar with no height for a bar plus a banner; a narrow tall one is
+ * the reverse.
+ *
+ * A single threshold on the smaller side was tried first and was too blunt — it
+ * dropped a tarot plate at the DEFAULT size to `compact`, losing three stat rows
+ * and the conditions button on a plate with room for both.
+ *
+ * The numbers are each tier's measured requirement plus headroom, verified
+ * against every size/shape combination:
+ *   full     needs 95px across (grip + 3 buttons + padding) and ~120px down
+ *   compact  needs 56px across (grip + 2 buttons + padding) and ~84px down
+ *   min      needs 38px across (grip + 1 button + padding) and ~46px down
+ */
+export const TIERS = ["full", "compact", "min", "none"] as const;
+export type Tier = (typeof TIERS)[number];
+
+const TIER_MIN_W = { full: 110, compact: 62, min: 40 } as const;
+const TIER_MIN_H = { full: 130, compact: 84, min: 46 } as const;
+
+function tierFor(widthPx: number, heightPx: number): Tier {
+  for (const t of ["full", "compact", "min"] as const)
+    if (widthPx >= TIER_MIN_W[t] && heightPx >= TIER_MIN_H[t]) return t;
+  return "none";
+}
 
 /** Extra horizontal inset (px) for the vertical docks, ON TOP of the base edge
  *  clearance (left → scene-controls toolbar, right → sidebar). Tweak to taste. */
@@ -203,6 +618,12 @@ class CastBar {
   /** Plate id being drag-reordered, or null. */
   #dragId: string | null = null;
   #fitFrames = 0;
+  /** Current size tier, and whether a tier-change re-render is already pending.
+   *  `#fit()` decides the tier because it is the one place that knows the
+   *  effective plate size; the parts of the tier CSS can't express (which
+   *  controls exist, how many condition icons) need a re-render to catch up. */
+  #tier: Tier = "full";
+  #tierPending = false;
   #fitting = false;
   #cfg: CastBarConfig;
   #enabled = true;
@@ -285,8 +706,6 @@ class CastBar {
         b.addEventListener("click", () => void this.#nudgeScale(delta));
         scaleBox.appendChild(b);
       };
-      scaleBtn("fa-minus", "BIVOUAC.CastBar.ScaleDown", -SCALE_STEP);
-      scaleBtn("fa-plus", "BIVOUAC.CastBar.ScaleUp", SCALE_STEP);
       // Move the bar from the bar itself. Where the strip sits is a look-and-feel
       // judgement made WHILE LOOKING at the scene, and it currently costs a round
       // trip through the Settings window — conspicuous next to the chrome that's
@@ -300,10 +719,37 @@ class CastBar {
       const dockBtn = document.createElement("button");
       dockBtn.type = "button";
       dockBtn.className = "bivouac-castbar__dockbtn";
-      dockBtn.innerHTML = `<i class="fa-solid fa-arrows-up-down-left-right"></i>`;
+      // A rectangle with one filled edge, ROTATED to match the dock — so the
+      // button reports where the bar currently is as well as offering to move it.
+      // No other single glyph does both, and this one costs nothing to keep in
+      // sync: the rotation is four CSS rules hanging off the
+      // `bivouac-castdock-*` class `applyDock()` already puts on the bar.
+      //
+      // Two glyphs were tried and rejected first. `fa-arrows-up-down-left-right`
+      // is a thin symmetrical cross sitting between a real − and a real +, and
+      // read as a third plus. `fa-hand`/`fa-hand-back-fist` said "grab" but the
+      // open hand is already the RAISED-HAND badge on a plate — one glyph for "a
+      // player wants to speak" and "move the bar" is two unrelated meanings — and
+      // a hand implies dragging, where this button clicks.
+      //
+      // REGULAR weight, not solid: the solid cut is a filled block with the edge
+      // knocked out of it, which reads as a white tile. The regular cut is what
+      // the button is actually describing — an outlined rectangle with one solid
+      // edge, i.e. an empty screen with a bar along one side. Foundry ships FA
+      // PRO, so the outline weights (`fa-regular-400.woff2` and friends) are
+      // there to use; on the free set only solid and brands exist.
+      dockBtn.innerHTML = `<i class="fa-regular fa-window-maximize"></i>`;
       dockBtn.addEventListener("click", () => void this.#cycleDock());
-      scaleBox.appendChild(dockBtn);
       this.#dockBtn = dockBtn;
+
+      // Order: −  move  +. The move control sits BETWEEN the two scale buttons
+      // rather than off to one side, so the trio reads as one cluster of three
+      // matching circles instead of a pair plus a stray. It hides itself under a
+      // forced dock (`#syncDockBtn`), and `display: none` leaves no gap behind —
+      // the row closes up to − + on its own.
+      scaleBtn("fa-minus", "BIVOUAC.CastBar.ScaleDown", -SCALE_STEP);
+      scaleBox.appendChild(dockBtn);
+      scaleBtn("fa-plus", "BIVOUAC.CastBar.ScaleUp", SCALE_STEP);
       bar.appendChild(scaleBox);
       this.#syncDockBtn();
 
@@ -474,6 +920,34 @@ class CastBar {
     requestAnimationFrame(step);
   };
 
+  /**
+   * Adopt the size tier for a plate of height `fitPx` and the given aspect.
+   *
+   * Published two ways because the ladder is split between them. `data-tier` on
+   * the bar lets CSS thin the chrome with no JavaScript in the loop — which
+   * controls are visible, whether the overlays are drawn, which stat rows show.
+   * The parts CSS cannot express — how many condition icons to draw before the
+   * `+n`, since the count has to be arithmetic — need a re-render.
+   *
+   * That re-render is scheduled, not immediate: `#fit()` is called ~20 times per
+   * settle from `#scheduleFit`, and it is `#fit()` that calls this, so rendering
+   * synchronously from here would re-enter the render it was called from. One
+   * frame later is soon enough, and `#tierPending` collapses a burst into a
+   * single pass. It terminates because the second pass measures the same width
+   * and so finds the tier unchanged.
+   */
+  #applyTier(fitPx: number, aspect: number): void {
+    const next = tierFor(fitPx * aspect, fitPx);
+    if (this.#el) this.#el.dataset.tier = next;
+    if (next === this.#tier || this.#tierPending) return;
+    this.#tier = next;
+    this.#tierPending = true;
+    requestAnimationFrame(() => {
+      this.#tierPending = false;
+      this.refresh();
+    });
+  }
+
   /** Scale the plates down so the whole cast fits the available space (clear of
    *  Foundry's side UI) instead of overlapping it or running off-screen. Sets the
    *  effective plate size on `--bivouac-castbar-fit`; the CSS falls back to the
@@ -540,6 +1014,7 @@ class CastBar {
     const floor = Math.min(80, size);
     const fit = Math.max(floor, Math.min(size, maxSize));
     el.style.setProperty("--bivouac-castbar-fit", `${Math.floor(fit)}px`);
+    this.#applyTier(fit, aspect);
   }
 
   /** Position the bar with a dock-specific inset that clears the adjacent Foundry
@@ -684,12 +1159,12 @@ class CastBar {
     // Choose the image FIRST — the plate isn't created/shown until Profile/Token
     // is chosen, or (Custom) a file is actually picked. Cancelling anywhere adds
     // nothing.
-    const choice = await this.#pickImageSource();
+    const choice = await pickImageSource();
     if (!choice) return;
     let art: "profile" | "token" = "profile";
     let img: string | undefined;
     if (choice === "custom") {
-      img = await this.#pickFile();
+      img = await pickImageFile();
       if (!img) return; // file picker closed without a selection → don't add
     } else {
       art = choice; // "profile" | "token"
@@ -714,79 +1189,6 @@ class CastBar {
     });
     d.visible = true; // dropping a character shows the bar
     await this.#write(d);
-  }
-
-  /** Ask which image to use for a dropped actor. Returns the choice or null. */
-  async #pickImageSource(): Promise<"profile" | "token" | "custom" | null> {
-    const loc = (k: string): string => game.i18n.localize(k);
-    const result = await foundry.applications.api.DialogV2.wait({
-      window: {
-        title: loc("BIVOUAC.CastBar.ImageTitle"),
-        icon: "fa-solid fa-image",
-      },
-      classes: ["bivouac-dialog", "bivouac-dialog--picker"],
-      position: { width: 560 }, // same as the tile picker, so both land on a 3-across grid
-      content: `<p class="bivouac-pick-hint">${loc("BIVOUAC.CastBar.ImagePrompt")}</p>`,
-      buttons: [
-        {
-          action: "profile",
-          label: loc("BIVOUAC.CastBar.ImageProfile"),
-          icon: "fa-solid fa-user",
-          default: true,
-        },
-        {
-          action: "token",
-          label: loc("BIVOUAC.CastBar.ImageToken"),
-          icon: "fa-solid fa-chess-pawn",
-        },
-        {
-          action: "custom",
-          label: loc("BIVOUAC.CastBar.ImageCustom"),
-          icon: "fa-solid fa-folder-open",
-        },
-      ],
-      rejectClose: false,
-    }).catch(() => null);
-    return result === "profile" || result === "token" || result === "custom"
-      ? result
-      : null;
-  }
-
-  /** Open Foundry's file picker and resolve with the chosen image path — or
-   *  `undefined` if it's closed without a selection (so the drop is abandoned).
-   *  Wrapping the instance's `close()` catches cancel without relying on a hook
-   *  name; a selection resolves first via the callback, so the close is a no-op. */
-  #pickFile(): Promise<string | undefined> {
-    return new Promise((resolve) => {
-      const FP = (foundry.applications?.apps?.FilePicker?.implementation ??
-        (globalThis as { FilePicker?: unknown }).FilePicker) as
-        | (new (o: unknown) => {
-            render: (b: boolean) => void;
-            close: (o?: unknown) => Promise<unknown>;
-          })
-        | undefined;
-      if (!FP) {
-        resolve(undefined);
-        return;
-      }
-      let done = false;
-      const finish = (v: string | undefined): void => {
-        if (!done) {
-          done = true;
-          resolve(v);
-        }
-      };
-      const picker = new FP({
-        type: "image",
-        callback: (path: string) => finish(path),
-      });
-      const close = picker.close.bind(picker);
-      picker.close = (opts?: unknown): Promise<unknown> => {
-        finish(undefined);
-        return close(opts);
-      };
-      picker.render(true);
-    });
   }
 
   /** This bar's element id — also its identity in the hover tracking above. */
@@ -822,7 +1224,96 @@ class CastBar {
         return this.#mutate(id, (p) => (p.hidden = !p.hidden));
       case "stats":
         return this.#mutate(id, (p) => (p.stats = !p.stats));
+      case "conditions":
+        this.openConditions(id);
+        return;
+      case "menu":
+        this.openMenu(id);
+        return;
+      case "art":
+        return this.#editArt(id);
     }
+  }
+
+  /** Open the art editor for a plate and store whatever comes back.
+   *
+   *  Writes all four art fields together rather than merging: the editor shows
+   *  the complete set, so an empty slot is a deliberate "none", not an omission.
+   *  Merging would make clearing an image impossible. */
+  async #editArt(id: string): Promise<void> {
+    if (!canControl()) return;
+    const p = this.#read().plates.find((x) => x.id === id);
+    if (!p) return;
+    const doc = (await fromUuid(p.uuid).catch(() => null)) as Record<
+      string,
+      unknown
+    > | null;
+    if (!doc) return;
+    const token = (
+      doc.prototypeToken as { texture?: { src?: string } } | undefined
+    )?.texture?.src;
+    const art = await openPlateArt(
+      { art: p.art ?? "profile", img: p.img, imgInjured: p.imgInjured, imgCritical: p.imgCritical },
+      String(doc.name ?? ""),
+      docImg(doc),
+      String(token ?? ""),
+    );
+    if (!art) return;
+    await this.#mutate(id, (x) => {
+      x.art = art.art;
+      // DELETE rather than assign undefined: the roster is persisted as a scene
+      // flag, and a key set to undefined is not the same as an absent one on the
+      // way through serialisation. Clearing an image has to actually clear it.
+      for (const k of ["img", "imgInjured", "imgCritical"] as const) {
+        if (art[k]) x[k] = art[k];
+        else delete x[k];
+      }
+    });
+  }
+
+  /** The rendered element for a plate id, or null. Both panels anchor to the
+   *  PLATE rather than to the control that opened them: the control is 16–22px
+   *  and sits inside the plate, so anchoring there would put the panel over the
+   *  face it belongs to. */
+  #plateEl(id: string): HTMLElement | null {
+    return (
+      this.#strip?.querySelector<HTMLElement>(
+        `.bivouac-plate[data-id="${CSS.escape(id)}"]`,
+      ) ?? null
+    );
+  }
+
+  /** Open the condition palette over a plate. Unlike the other plate actions
+   *  this writes to the ACTOR, not the roster, so it goes nowhere near
+   *  `#mutate` — nothing about the plate itself changes. */
+  openConditions(id: string): void {
+    if (!canControl()) return;
+    const el = this.#plateEl(id);
+    const uuid = el?.dataset.uuid;
+    if (!el || !uuid) return;
+    const doc = fromUuidSync(uuid) as Record<string, unknown> | null;
+    // The SCENE actor, for the same reason the plate reads from it: for an
+    // unlinked NPC the sidebar prototype is a different document, and applying a
+    // condition to it would change nothing the plate is showing.
+    const live = doc ? (sceneActor(doc) as Record<string, unknown>) : null;
+    openConditionPalette(el, live, `${this.id}:conds:${id}`);
+  }
+
+  /** Open the plate menu — the occasional settings, gathered off the bar. */
+  openMenu(id: string): void {
+    if (!canControl()) return;
+    const el = this.#plateEl(id);
+    const plate = this.#read().plates.find((p) => p.id === id);
+    if (!el || !plate) return;
+    const doc = plate.uuid
+      ? (fromUuidSync(plate.uuid) as Record<string, unknown> | null)
+      : null;
+    openPlateMenu(
+      el,
+      this,
+      plate,
+      String(doc?.name ?? game.i18n.localize("BIVOUAC.CastBar.Missing")),
+    );
   }
 
   async #remove(id: string): Promise<void> {
@@ -831,6 +1322,23 @@ class CastBar {
     d.plates = d.plates.filter((p) => p.id !== id);
     if (d.speakerId === id) d.speakerId = null;
     await this.#write(d);
+  }
+
+  /** Set the conditions reveal to one of its three meaningful states.
+   *
+   *  The data is two booleans, but only three of their four combinations mean
+   *  anything — `conditionsPublic` with `conditions` off is "reveal something
+   *  that isn't being shown". The menu offers the three and this writes both
+   *  fields together, so the fourth is never reachable. */
+  async setConditionReveal(
+    id: string,
+    conditions: boolean,
+    publicly: boolean,
+  ): Promise<void> {
+    await this.#mutate(id, (p) => {
+      p.conditions = conditions;
+      p.conditionsPublic = conditions && publicly;
+    });
   }
 
   async #setSpeaker(id: string): Promise<void> {
@@ -929,6 +1437,10 @@ class CastBar {
         d.visible ? "BIVOUAC.CastBar.Close" : "BIVOUAC.CastBar.Reveal",
       );
     }
+    // An open condition palette outlives the plate rebuild below (it is parented
+    // to the interface, not the plate), so it has to be restated here — this is
+    // the call the ActiveEffect hooks make when a condition lands.
+    repaintPopover();
     // Always (re)build from the permitted set, so a player's DOM never contains a
     // hidden plate. NOTE: the plate *data* still lives in the scene flag Foundry
     // broadcasts to all clients — a determined player could read it there. True
@@ -969,24 +1481,67 @@ class CastBar {
 
   /** Overlay the Actor's enabled stats (AC / passive perception / HP / passive
    *  investigation) on a plate, if the plate has stats toggled on. Only stats the
-   *  GM has enabled and that resolve to a value are shown. */
+   *  GM has enabled and that resolve to a value are shown.
+   *
+   *  CONTROLLERS ONLY — a player never draws this, not even for their own
+   *  character. The overlay is a GM's reference tool, and a player who watches it
+   *  appear can tell the moment they are being looked up: flicking it on to check
+   *  a passive perception announced the check to the table. Unlike the conditions
+   *  overlay there is deliberately NO reveal state and no `canView` escape hatch —
+   *  the actor a GM most often checks is a PC, so the one player who would pass
+   *  `canView` is precisely the one who must not see it.
+   *
+   *  Gated on `canControl()` (threaded in as `controller`) rather than `isGM` so
+   *  the audience that SEES it matches the audience that can TOGGLE it — the hover
+   *  controls are controller-only. Nobody can switch on something they can't see,
+   *  and anyone who can see it can switch it off.
+   *
+   *  Known limit: `plate.stats` still lives on the Scene flag Foundry broadcasts,
+   *  so the toggle itself stays inferable by a player reading scene updates.
+   *  Closing that means holding the state client-side per GM, at the cost of it no
+   *  longer following the GM between browsers — see BACKLOG.md. */
   #renderStats(
     el: HTMLElement,
     plate: Plate,
     doc: Record<string, unknown> | null,
+    controller: boolean,
   ): void {
     el.querySelector(".bivouac-plate__stats")?.remove();
-    if (!plate.stats || !doc) return;
+    if (!plate.stats || !doc || !controller) return;
     // Whatever the active system adapter exposes — not a fixed dnd5e four. A stat
     // whose `read` returns null doesn't apply to this actor (wrong actor type, or
     // absent), so its row is simply skipped. Shared with the Mini Sheet tile.
-    const rows = visibleStats(doc);
-    if (!rows.length) return;
+    const all = visibleStats(doc);
+    const cap = STAT_CAP[this.#tier];
+    if (!all.length || !cap) return;
+    // At the tighter tiers keep the HEALTH row rather than the first row: which
+    // stats are enabled, and in what order, is the GM's choice, and "how hurt is
+    // this character" is the one that earns the last remaining line. Falls back to
+    // simple truncation on a system with no health row to prefer.
+    const ordered =
+      cap < all.length
+        ? [...all].sort(
+            (a, b) => Number(!!b.stat.health) - Number(!!a.stat.health),
+          )
+        : all;
+    const rows = ordered.slice(0, cap);
     const box = document.createElement("div");
     box.className = "bivouac-plate__stats";
+    // Nothing is dropped silently — the rows that didn't fit are named on hover,
+    // the same courtesy the conditions overflow gets from its "+n".
+    if (ordered.length > cap)
+      box.dataset.tooltip = ordered
+        .slice(cap)
+        .map((r) => `${game.i18n.localize(r.stat.label)} ${formatStat(r.val)}`)
+        .join(" · ");
     for (const { stat, val: v } of rows) {
       const row = document.createElement("div");
       row.className = `bivouac-plate__stat bivouac-plate__stat--${stat.key}`;
+      // Marks the one row the size ladder keeps when the plate is too small for
+      // the full set. Which row that is comes from the adapter (or from a GM's
+      // custom row), not from a hard-coded key — so it is the right row on
+      // dnd5e, on Daggerheart, and on a system with no adapter at all.
+      if (stat.health) row.classList.add("bivouac-plate__stat--health");
       // Pools show `value/max`, so a Daggerheart plate reads "3/6" rather than a
       // bare "3" that gives no sense of scale — and `reverse` marks the ones where
       // a rising number is bad (damage and stress are MARKED upward), so the CSS
@@ -1010,16 +1565,19 @@ class CastBar {
    *  between renders) and anything unrecognised is skipped rather than drawn as a
    *  broken icon.
    *
-   *  Capped, with a "+n" overflow: a plate already shares its face with the stats
-   *  overlay, the name banner and the raised-hand badge, and a stunned-and-cursed
-   *  boss with nine effects would otherwise bury the portrait. */
+   *  Capped per size tier, with a "+n" overflow: a plate already shares its face
+   *  with the stats overlay, the name banner and the raised-hand badge, and a
+   *  stunned-and-cursed boss with nine effects would otherwise bury the portrait.
+   *  The cap is arithmetic — the `+n` has to count what was left out — which is
+   *  why it lives here rather than in the tier CSS with the rest of the ladder. */
   #renderConditions(
     el: HTMLElement,
     plate: Plate,
     doc: Record<string, unknown> | null,
   ): void {
     el.querySelector(".bivouac-plate__conds")?.remove();
-    if (!plate.conditions || !doc) return;
+    const cap = CONDITION_CAP[this.#tier];
+    if (!plate.conditions || !doc || !cap) return;
     // Conditions on an NPC are GM information — who's poisoned or concentrating
     // is exactly what a table plays to find out — so revealing them is a
     // PER-PLATE decision (the hover control cycles off → GM only → everyone).
@@ -1045,7 +1603,7 @@ class CastBar {
 
     const box = document.createElement("div");
     box.className = "bivouac-plate__conds";
-    for (const s of found.slice(0, CONDITION_CAP)) {
+    for (const s of found.slice(0, cap)) {
       const icon = document.createElement("img");
       icon.className = "bivouac-plate__cond";
       // `name`/`img` are the v12+ fields; `label`/`icon` are the older ones. Both
@@ -1055,12 +1613,12 @@ class CastBar {
       icon.dataset.tooltip = game.i18n.localize(String(s.name ?? s.label ?? s.id));
       box.appendChild(icon);
     }
-    if (found.length > CONDITION_CAP) {
+    if (found.length > cap) {
       const more = document.createElement("span");
       more.className = "bivouac-plate__cond-more";
-      more.textContent = `+${found.length - CONDITION_CAP}`;
+      more.textContent = `+${found.length - cap}`;
       more.dataset.tooltip = found
-        .slice(CONDITION_CAP)
+        .slice(cap)
         .map((s) => game.i18n.localize(String(s.name ?? s.label ?? s.id)))
         .join(", ");
       box.appendChild(more);
@@ -1159,7 +1717,7 @@ class CastBar {
       const token = (
         doc.prototypeToken as { texture?: { src?: string } } | undefined
       )?.texture?.src;
-      img.src =
+      const base =
         plate.img || (plate.art === "token" && token ? token : docImg(doc));
       img.alt = String(doc.name ?? "");
       if (plate.nameHidden && !controller) {
@@ -1179,7 +1737,33 @@ class CastBar {
       // are the actor's identity, and the token's copy can carry a renamed or
       // re-arted duplicate.
       const live = sceneActor(doc);
-      this.#renderStats(el, plate, live);
+      // Wounded states read the SCENE actor for the same reason the stats do: the
+      // sidebar prototype of an unlinked NPC is at full health no matter what has
+      // happened to it in play, which would make this show nothing exactly when
+      // it matters. Health is a live number or it is decoration.
+      const wound = woundState(live);
+      // Art for the state, if the plate has any. A critical character with only
+      // INJURED art keeps showing that rather than dropping back to healthy — the
+      // nearer-to-death picture is the safer one to be wrong with.
+      const woundImg =
+        wound === "critical"
+          ? (plate.imgCritical ?? plate.imgInjured)
+          : wound === "injured"
+            ? plate.imgInjured
+            : undefined;
+      img.src = woundImg || base;
+      if (wound) el.classList.add(`bivouac-plate--${wound}`);
+      // Dedicated art IS the signal, so the tint stands down for it. Without this
+      // a GM who drew a bloodied portrait would get it washed red on top.
+      el.querySelector(".bivouac-plate__wound")?.remove();
+      if (woundImg) {
+        el.classList.add("bivouac-plate--wound-art");
+      } else if (wound) {
+        const tint = document.createElement("div");
+        tint.className = "bivouac-plate__wound";
+        el.appendChild(tint);
+      }
+      this.#renderStats(el, plate, live, controller);
       this.#renderConditions(el, plate, live);
       this.#renderHand(el, doc);
     };
@@ -1259,7 +1843,24 @@ class CastBar {
     return el;
   }
 
-  /** GM hover controls: reorder grip · exit · hide · remove. */
+  /**
+   * The hover control bar: reorder grip · exit/enter · conditions · menu.
+   *
+   * Four items, where there were seven. A portrait plate at the default size has
+   * 144px of usable bar and seven 22px buttons plus the grip needed 161px, so the
+   * bar could not fit its own contents at the DEFAULT size on the DEFAULT shape —
+   * it wrapped onto a second row across the top of the portrait. Four items come
+   * to ~89px, which fits every plate shape with room for the size ladder to thin
+   * it further.
+   *
+   * What stayed is what gets used mid-conversation; what moved into the menu is
+   * what gets set up once. Speaker is not here at all and never was — it is a
+   * right-click on the plate face, which is the most-used action of the lot and
+   * so deserves the largest target rather than a 22px one.
+   *
+   * Every control the menu absorbed keeps its keybinding, so nothing became
+   * unreachable — which is also what makes the `min` and `none` tiers safe.
+   */
   #controls(plate: Plate, el: HTMLElement): HTMLElement {
     const bar = document.createElement("div");
     bar.className = "bivouac-plate__controls";
@@ -1282,66 +1883,82 @@ class CastBar {
     });
     bar.appendChild(grip);
 
+    // `icon` is either a Font Awesome class (`fa-…`) or an image path. A path is
+    // recognised by containing a slash, which no FA class does — that lets a
+    // control borrow one of Foundry's own `CONFIG.controlIcons` and sit beside the
+    // FA ones without a second helper or a second call shape.
     const btn = (
       icon: string,
       titleKey: string,
       cls: string,
       on: () => void,
-    ): void => {
+    ): HTMLButtonElement => {
       const b = document.createElement("button");
       b.type = "button";
       b.className = `bivouac-plate__ctrl ${cls}`.trim();
       b.title = game.i18n.localize(titleKey);
-      b.innerHTML = `<i class="fa-solid ${icon}"></i>`;
+      if (icon.includes("/")) {
+        const img = document.createElement("img");
+        img.src = icon;
+        img.alt = "";
+        b.appendChild(img);
+      } else {
+        b.innerHTML = `<i class="fa-solid ${icon}"></i>`;
+      }
       b.addEventListener("click", (e) => {
         e.stopPropagation();
         on();
       });
       bar.appendChild(b);
+      return b;
     };
 
+    // Exit / rejoin the conversation — the one plate state that changes while
+    // people are actually talking.
     btn(
       plate.exited
         ? "fa-arrow-right-to-bracket"
         : "fa-arrow-right-from-bracket",
       plate.exited ? "BIVOUAC.CastBar.Enter" : "BIVOUAC.CastBar.Exit",
-      "",
+      "bivouac-plate__ctrl--exit",
       () => void this.#mutate(plate.id, (p) => (p.exited = !p.exited)),
     );
+
+    // The condition palette. A plain LEFT-click now: it was briefly a right-click
+    // on the reveal button, which was only ever a way to avoid a seventh control.
+    // With the reveal moved into the menu the button does one thing on one click,
+    // like every other control here.
+    //
+    // Deliberately carries no active/lit state. A lit button reads as "this is
+    // switched on", and this one is an action, not a toggle — what conditions are
+    // applied is shown by the plate's own icons, and whether they are revealed to
+    // players is shown in the menu.
+    //
+    // It wears Foundry's OWN status-effects icon — `CONFIG.controlIcons.effects`,
+    // which is `icons/svg/aura.svg` out of the box — because this button does the
+    // same job as the effects control on the token HUD, and a GM should not have
+    // to learn a second symbol for it. Read from CONFIG rather than hard-coded so
+    // that a system or module which re-points that icon moves this one with it,
+    // which is what "the same as on tokens" actually means in a given world.
     btn(
-      plate.hidden ? "fa-eye" : "fa-eye-slash",
-      plate.hidden ? "BIVOUAC.CastBar.Show" : "BIVOUAC.CastBar.Hide",
-      "",
-      () => void this.#mutate(plate.id, (p) => (p.hidden = !p.hidden)),
+      String(CONFIG?.controlIcons?.effects ?? "icons/svg/aura.svg"),
+      "BIVOUAC.CastBar.CondsApply",
+      CTRL_CONDS,
+      () => this.openConditions(plate.id),
     );
+
+    // Everything occasional. Lit when the plate is in a non-default state the bar
+    // no longer shows a button for, so a hidden or stat-showing plate is still
+    // legible at a glance without opening the menu to find out.
+    const flagged =
+      !!plate.hidden || !!plate.stats || !!plate.conditions || plate.nameHidden;
     btn(
-      "fa-heart-pulse",
-      plate.stats ? "BIVOUAC.CastBar.StatsHide" : "BIVOUAC.CastBar.StatsShow",
-      plate.stats ? "bivouac-plate__ctrl--active" : "",
-      () => void this.#mutate(plate.id, (p) => (p.stats = !p.stats)),
+      "fa-ellipsis",
+      "BIVOUAC.CastBar.MenuOpen",
+      `${CTRL_MENU}${flagged ? " bivouac-plate__ctrl--active" : ""}`,
+      () => this.openMenu(plate.id),
     );
-    // One button, THREE states — off → GM only → everyone → off. A separate
-    // "show to players" button would make seven controls on a plate that already
-    // shrinks under `#fit()`, and the two switches are never independent anyway:
-    // revealing conditions you aren't showing means nothing.
-    const condState = !plate.conditions ? 0 : plate.conditionsPublic ? 2 : 1;
-    btn(
-      "fa-hand-sparkles",
-      ["BIVOUAC.CastBar.CondsShow", "BIVOUAC.CastBar.CondsPublic", "BIVOUAC.CastBar.CondsHide"][condState],
-      ["", "bivouac-plate__ctrl--active", "bivouac-plate__ctrl--active bivouac-plate__ctrl--public"][condState],
-      () =>
-        void this.#mutate(plate.id, (p) => {
-          // off → GM only → everyone → off
-          p.conditions = condState !== 2;
-          p.conditionsPublic = condState === 1;
-        }),
-    );
-    btn(
-      "fa-xmark",
-      "BIVOUAC.CastBar.Remove",
-      "bivouac-plate__ctrl--danger",
-      () => void this.#remove(plate.id),
-    );
+
     return bar;
   }
 

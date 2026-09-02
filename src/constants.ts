@@ -15,6 +15,10 @@ export const FLAGS = {
   /** Per-Actor: remembered "name hidden from players" default for the Cast Bar,
    *  so re-adding an actor reuses the last choice instead of defaulting to hidden. */
   castNameHidden: "castNameHidden",
+  /** Per-Token: marks a hidden Token that Bivouac parked in the scene to back a
+   *  plate (see `plate-tokens.ts`). The marker is the ONLY thing that authorises
+   *  deleting a token, so a GM-placed one is never mistaken for ours. */
+  plateToken: "plateToken",
 } as const;
 
 export const SETTINGS = {
@@ -76,6 +80,18 @@ export const SETTINGS = {
   actorDropTile: "actorDropTile",
   /** World setting: Cast Bar plate shape (a key of `PLATE_SHAPES`). */
   castPlateShape: "castPlateShape",
+  /** World setting: back every plate with a hidden Token in the scene, so modules
+   *  that look for `actor.getActiveTokens()` can find plated characters. Opt-in:
+   *  it changes what the scene actually contains. */
+  castPlateTokens: "castPlateTokens",
+  /** World setting: show wounded states on plates at all (art swap, or a tint
+   *  when a plate has no wounded art). */
+  castWoundStates: "castWoundStates",
+  /** World settings: the health PERCENTAGES at or below which a plate counts as
+   *  injured / critical. Configurable rather than fixed at 50/10 — where "hurt"
+   *  sits is a table's judgement, and systems differ on how fast health falls. */
+  castWoundInjured: "castWoundInjured",
+  castWoundCritical: "castWoundCritical",
   /** World setting: draw a thin dark stroke behind text that sits over artwork. */
   textStroke: "textStroke",
   textOutlineMode: "textOutlineMode",
@@ -194,6 +210,17 @@ export interface Plate {
   art?: "profile" | "token";
   /** Optional custom image, overriding `art` and the document's own art. */
   img?: string;
+  /** Optional art for the WOUNDED states, shown in place of the normal image
+   *  once health crosses the matching threshold (see the `castWound…` settings).
+   *  Both are optional and independent: with only `imgInjured` set, a critical
+   *  character keeps showing the injured art rather than falling back to healthy,
+   *  because the nearer-to-death picture is the safer one to be wrong with.
+   *
+   *  When a state has no art, the plate tints the normal portrait instead — so
+   *  the feature reads correctly with no per-character setup at all, and the art
+   *  is the upgrade rather than the entry fee. */
+  imgInjured?: string;
+  imgCritical?: string;
   /** Darkened: physically in the scene but not in this conversation. */
   exited: boolean;
   /** GM-only: filtered out of the players' view entirely (like a hidden token). */
@@ -201,7 +228,12 @@ export interface Plate {
   /** Players see "?" instead of the name; the GM sees the real name greyed. */
   nameHidden: boolean;
   /** Show the Actor's stat overlay (AC / passive perception / HP / investigation)
-   *  on this plate. Off by default; toggled per-plate from the hover controls. */
+   *  on this plate. Off by default; toggled per-plate from the hover controls.
+   *
+   *  Drawn for CONTROLLERS ONLY — unlike `conditions` there is no reveal state,
+   *  because a player watching the overlay appear on their own plate learns the GM
+   *  is checking them. This flag therefore says "the GM is looking at this", not
+   *  "the table can see this". */
   stats?: boolean;
   /** Show the Actor's active conditions (status effects) on this plate. Off by
    *  default; a per-plate toggle exactly like `stats`. */

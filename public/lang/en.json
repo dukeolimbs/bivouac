@@ -221,20 +221,40 @@
       "Missing": "(missing)",
       "Exit": "Exit the conversation (darken — still in the scene)",
       "Enter": "Rejoin the conversation",
-      "Hide": "Hide from players",
-      "Show": "Show to players",
-      "Remove": "Remove Actor",
       "NameToggle": "Click to show/hide this name from players",
-      "StatsShow": "Show stats (AC · Perception · HP · Investigation)",
-      "StatsHide": "Hide stats",
-      "CondsShow": "Show conditions (you only)",
-      "CondsPublic": "Showing to you — click to show players too",
-      "CondsHide": "Showing to everyone — click to hide",
+      "CondsApply": "Apply conditions",
+      "CondsUnsupported": "This game system does not support toggling conditions from Bivouac.",
+      "CondsFailed": "Could not change that condition — check you own the Actor.",
       "ImageTitle": "Plate image",
       "ImagePrompt": "Which image should this Actor's plate use?",
       "ImageProfile": "Profile",
       "ImageToken": "Token",
-      "ImageCustom": "Custom image…"
+      "ImageCustom": "Custom image…",
+      "ArtEdit": "Plate art (normal + wounded)",
+      "ArtTitle": "Plate art",
+      "ArtBase": "Normal art",
+      "ArtCustom": "Custom image",
+      "ArtCustomHint": "Used instead of the Actor's own art. Leave empty to use Profile or Token above.",
+      "ArtWounded": "Wounded art (optional)",
+      "ArtWoundedHint": "Shown in place of the normal art once health drops. Leave a slot empty and the plate tints the normal portrait instead. Needs “Show wounded states on plates” switched on in Settings.",
+      "ArtInjured": "Injured",
+      "ArtCritical": "Critical",
+      "ArtAtOrBelow": "At or below %s health.",
+      "ArtBrowse": "Choose an image…",
+      "ArtClear": "Clear",
+      "MenuOpen": "More…",
+      "MenuVisibility": "Visibility",
+      "MenuInScene": "In the conversation",
+      "MenuHidden": "Hidden from players",
+      "MenuNameShown": "Name shown to players",
+      "MenuOverlays": "Overlays",
+      "MenuStats": "Stats (you only)",
+      "MenuConditions": "Conditions",
+      "MenuCondsOff": "Off",
+      "MenuCondsYou": "You",
+      "MenuCondsAll": "Everyone",
+      "MenuAppearance": "Appearance",
+      "MenuRemove": "Remove from the bar"
     },
     "StatBlock": {
       "CR": "CR",
@@ -262,7 +282,9 @@
       "Delete": "Remove this row",
       "Add": "Add a row",
       "NoValue": "no value",
-      "ReloadNeeded": "Custom stat rows saved. Reload the world for the changes to appear in Settings."
+      "ReloadNeeded": "Custom stat rows saved. Reload the world for the changes to appear in Settings.",
+      "Health": "Health",
+      "HealthHint": "This row is the actor's health — what the wounded plate states measure. Needs a max path, since a fraction needs a denominator. On a system Bivouac has no adapter for, this is the only way to get wounded states; on one it does support, this overrides the built-in health row."
     },
     "Keybindings": {
       "CloseDMScreen": "Close the DM screen",
@@ -272,11 +294,14 @@
       "CastHidePlate": "Cast Bar: hide / show the hovered character from players",
       "CastExitPlate": "Cast Bar: the hovered character leaves / rejoins the scene",
       "CastToggleName": "Cast Bar: show / hide the hovered character's name",
+      "CastConditions": "Cast Bar: apply conditions to the hovered character",
       "CastRemovePlate": "Cast Bar: remove the hovered character (unbound by default)",
       "ToggleLanding": "Landing Page: set / remove on the current scene (unbound by default)",
       "ToggleLandingHint": "Does exactly what the map button in the Bivouac scene controls does, without selecting that control group — which would also switch you into edit mode. Removing a scene's Landing Page still asks first.",
       "Undo": "Undo landing layout change",
-      "Redo": "Redo landing layout change"
+      "Redo": "Redo landing layout change",
+      "CastArt": "Cast Bar: edit the hovered character's plate art",
+      "CastMenu": "Cast Bar: open the hovered character's plate menu"
     },
     "Settings": {
       "Groups": {
@@ -396,6 +421,10 @@
         "Name": "Hide the Cast Bar during combat",
         "Hint": "When a combat encounter is running, hide the Cast Bar(s) — you're usually on tokens/initiative then. Entering Bivouac edit mode still shows it. GM setting, applied for everyone."
       },
+      "CastPlateTokens": {
+        "Name": "Give plates a token in the scene",
+        "Hint": "Place a hidden, sightless token in the scene for each plated character, so the combat tracker and token-aware modules can find them. Skipped for any actor that already has a token — yours are never touched. Switching this off removes every token Bivouac placed, in every scene. GM setting; changes what the scene contains."
+      },
       "CastBarFont": {
         "Name": "Cast Bar font",
         "Hint": "Font for the Cast Bar's names. Pick one Foundry already knows (including fonts added via Manage Fonts). A custom Google Font below overrides this.",
@@ -447,6 +476,18 @@
         "Ask": "Ask me each time",
         "Art": "Always an art tile",
         "Mini": "Always a mini sheet"
+      },
+      "CastWoundStates": {
+        "Name": "Show wounded states on plates",
+        "Hint": "As a character's health falls, swap their plate to its injured / critical art — or, for a plate with no wounded art, tint the normal portrait. A fast read of who needs help. Needs a game system Bivouac can read health from; plates it cannot assess are left alone. GM setting, applied for everyone."
+      },
+      "CastWoundInjured": {
+        "Name": "Injured at or below (% health)",
+        "Hint": "The health percentage at which a plate starts showing as injured."
+      },
+      "CastWoundCritical": {
+        "Name": "Critical at or below (% health)",
+        "Hint": "The health percentage at which a plate shows as critical instead — a stronger tint, and a slow pulse. Tested first, so setting it equal to the injured threshold collapses the two into one state."
       }
     },
     "Stats": {

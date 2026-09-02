@@ -47,6 +47,12 @@
 
   --bivouac-text: var(--color-text-primary, #ecebe6);
   --bivouac-muted: rgba(255, 255, 255, 0.55);
+  /* A second, READABLE muted tier. `--bivouac-muted` is for text you are meant to
+     skim past; this is for text you are meant to read but that should not compete
+     with the content — a section header, a panel's title. 0.55 white was too dim
+     for either at small sizes, especially on a translucent blurred panel where
+     the scene behind lifts the background. */
+  --bivouac-muted-strong: rgba(255, 255, 255, 0.85);
 }
 
 /* The Cast Bar floats over the canvas as CONTENT, not as chrome, so Foundry's
@@ -72,6 +78,7 @@ body {
     --bivouac-panel-border: rgba(0, 0, 0, 0.14);
     --bivouac-text: var(--color-text-primary, #1c1c1c);
     --bivouac-muted: rgba(0, 0, 0, 0.5);
+    --bivouac-muted-strong: rgba(0, 0, 0, 0.74);
   }
 }
 
@@ -85,6 +92,12 @@ body {
   --bivouac-panel-border: rgba(255, 255, 255, 0.1);
   --bivouac-text: var(--color-text-primary, #ecebe6);
   --bivouac-muted: rgba(255, 255, 255, 0.55);
+  /* A second, READABLE muted tier. `--bivouac-muted` is for text you are meant to
+     skim past; this is for text you are meant to read but that should not compete
+     with the content — a section header, a panel's title. 0.55 white was too dim
+     for either at small sizes, especially on a translucent blurred panel where
+     the scene behind lifts the background. */
+  --bivouac-muted-strong: rgba(255, 255, 255, 0.85);
 }
 .theme-light {
   --bivouac-panel-bg: rgba(250, 249, 246, 0.55);
@@ -92,6 +105,7 @@ body {
   --bivouac-panel-border: rgba(0, 0, 0, 0.14);
   --bivouac-text: var(--color-text-primary, #1c1c1c);
   --bivouac-muted: rgba(0, 0, 0, 0.5);
+  --bivouac-muted-strong: rgba(0, 0, 0, 0.74);
 }
 
 /* ---------------------------------------------------------------- overlay */
@@ -1851,23 +1865,23 @@ body.bivouac-dnd-active .bivouac-card__body iframe {
   background: linear-gradient(transparent, rgba(0, 0, 0, 0.85));
   color: #fff;
   font-weight: 600;
-  /* Scales with the plate size and wraps to multiple lines rather than
-     truncating with an ellipsis. The whole range is multiplied by the
-     per-client font-size setting (--bivouac-castbar-font-scale, default 1). */
-  font-size: clamp(
-    calc(10px * var(--bivouac-castbar-font-scale, 1)),
-    calc(var(--bivouac-castbar-fit, var(--bivouac-castbar-size)) * 0.085 * var(--bivouac-castbar-font-scale, 1)),
-    calc(17px * var(--bivouac-castbar-font-scale, 1))
-  );
+  /* Scales with the plate size (and with the per-client font-size setting) and
+     wraps rather than truncating with an ellipsis. The clamp itself lives on
+     .bivouac-plate as --bivouac-name-line, because --bivouac-overlay-max has to
+     do arithmetic with this banner's height to keep the overlay columns clear of
+     it — the two must be the same number, so there is only one of it. */
+  font-size: var(--bivouac-name-line);
   line-height: 1.15;
   text-align: center;
   overflow-wrap: anywhere;
   word-break: break-word;
-  /* Wrap, but cap at two lines (ellipsis beyond). */
+  /* Wrap, but cap at --bivouac-name-lines (ellipsis beyond) — 2 normally, 1 at
+     the `min` tier. Reading the var rather than a literal keeps the clamp and the
+     height arithmetic from disagreeing about how tall this can get. */
   display: -webkit-box;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
+  -webkit-line-clamp: var(--bivouac-name-lines);
+  line-clamp: var(--bivouac-name-lines);
   overflow: hidden;
 }
 .bivouac-plate__name--editable {
@@ -1891,6 +1905,10 @@ body.bivouac-dnd-active .bivouac-card__body iframe {
 }
 /* The "?" preview overlay — centred over the name banner, matching the player
    "?" (see --q below). Hidden until the shown name is hovered. */
+/* SCALES with the plate, like the name banner it sits over. It was a flat 20px
+   with 16px of side padding, which is wider than the whole plate once #fit() has
+   taken the height below ~50px — a "?" that overflowed the box it was hinting
+   about. Same clamp shape as the name, one step larger so it reads as a badge. */
 .bivouac-plate__namehint {
   position: absolute;
   left: 0;
@@ -1902,7 +1920,11 @@ body.bivouac-dnd-active .bivouac-card__body iframe {
   justify-content: center;
   padding: 7px 16px;
   min-height: 1.15em;
-  font-size: 20px;
+  font-size: clamp(
+    12px,
+    calc(var(--bivouac-castbar-fit, var(--bivouac-castbar-size)) * 0.11),
+    20px
+  );
   font-weight: 700;
   color: #fff;
   opacity: 0;
@@ -1926,11 +1948,23 @@ body.bivouac-dnd-active .bivouac-card__body iframe {
 /* Actor stat overlay (AC / passive perception / HP / investigation) — a compact
    top-left column, icons + colours mirroring Monk's Tokenbar. Scales with the
    plate size. */
+/* Top-LEFT. Two bounds, and both are load-bearing:
+
+   width  ≤46%, so it can never reach the conditions column in the opposite
+          corner — a long pool like "125/125" at a small size used to close that
+          gap.
+   height ≤ whatever is left after the control bar and the name banner. The row
+          COUNT is capped in #renderStats (a GM can enable ten stats), so this is
+          the backstop rather than the mechanism. 34% covers the worst-case
+          two-line banner across the whole size range. */
 .bivouac-plate__stats {
   position: absolute;
   top: 4px;
   left: 4px;
+  max-width: 46%;
+  max-height: var(--bivouac-overlay-max);
   z-index: 2;
+  transition: transform 120ms ease;
   display: flex;
   flex-direction: column;
   gap: 1px;
@@ -1940,6 +1974,12 @@ body.bivouac-dnd-active .bivouac-card__body iframe {
   backdrop-filter: blur(3px);
   -webkit-backdrop-filter: blur(3px);
   pointer-events: none;
+}
+/* The box takes the pointer only when it has something to say — the tooltip
+   naming the stat rows the size tier dropped. Otherwise it stays transparent to
+   the mouse, so it never eats a click meant for the plate beneath it. */
+.bivouac-plate__stats[data-tooltip] {
+  pointer-events: auto;
 }
 .bivouac-plate__stat {
   display: flex;
@@ -2011,13 +2051,25 @@ body.bivouac-dnd-active .bivouac-card__body iframe {
    everything — so top-right is the only spot that collides with nothing. Sized
    off `--bivouac-castbar-fit` like every other overlay, so it shrinks with the
    plate under `#fit()` instead of swamping a small one. */
+/* Top-RIGHT, the mirror of the stats box and bounded the same way — but it WRAPS
+   into a second column instead of growing down.
+
+   Six icons at the default size come to 130px of a 200px plate, and with the
+   control bar's shift on hover that ran into the name banner. Wrapping keeps all
+   six visible and bounded: the box is right-anchored with auto width, so a second
+   column grows leftward into the 46% it is allowed, and 3 columns still fit. */
 .bivouac-plate__conds {
   position: absolute;
   top: 4px;
   right: 4px;
+  max-width: 46%;
+  max-height: var(--bivouac-overlay-max);
   z-index: 2;
+  transition: transform 120ms ease;
   display: flex;
   flex-direction: column;
+  flex-wrap: wrap;
+  align-content: flex-end;
   align-items: flex-end;
   gap: 2px;
   pointer-events: none;
@@ -2042,6 +2094,214 @@ body.bivouac-dnd-active .bivouac-card__body iframe {
   font-weight: 700;
   pointer-events: auto;
 }
+
+
+/* ============================================================================
+   PLATE PANELS — the shared shell (see src/popover.ts), then the two bodies.
+
+   Fixed to the viewport, mounted on #interface and positioned against the
+   plate's rect. That is the only arrangement that cannot be clipped: a plate has
+   `overflow: hidden`, the strip has its own overflow, and a plate is rebuilt on
+   almost every state change — including the rebuild that acting on it triggers.
+   One above the bar so a panel is never covered by the plate it belongs to.
+   ========================================================================== */
+.bivouac-pop {
+  position: fixed;
+  z-index: calc(var(--bivouac-castbar-z) + 1);
+  max-width: min(340px, 90vw);
+  padding: 8px;
+  border: 1px solid var(--bivouac-panel-border);
+  border-radius: 8px;
+  background: var(--bivouac-panel-bg-strong);
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  color: var(--bivouac-text);
+  font-family: var(--bivouac-castbar-font, var(--font-primary, "Signika", sans-serif));
+}
+/* The panel's title is the CHARACTER'S NAME — the thing that tells you which
+   plate you are about to act on — so it reads at the strong tier too. At 55%
+   alpha it was quieter than the menu rows beneath it, which is the wrong way
+   round. */
+.bivouac-pop__title {
+  margin: 0 0 6px;
+  padding: 0 2px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--bivouac-muted-strong);
+  text-align: center;
+}
+
+/* ------------------------------------------------- the condition palette --- */
+/* An EXPLICIT column count, set per effect count by `openConditionPalette`.
+
+   This was `repeat(auto-fill, 30px)`, which collapsed the whole palette into a
+   single column stretching the height of the screen. `auto-fill` needs a definite
+   width to work out how many columns fit, and it never had one: the panel is
+   `position: fixed` with no width, so it shrink-to-fits its content — and its
+   content is a grid asking how wide the container is. With nothing to resolve
+   against, `auto-fill` yields one column. Foundry's own status palette sets
+   `--effect-columns: 5` for exactly this reason rather than reaching for
+   `auto-fill`.
+
+   Sizes follow that palette's proportions (24px/3px there, a little larger here
+   because these tiles carry a border and a background where the HUD's are bare
+   images), and the 8-row cap before scrolling is taken from it directly. */
+.bivouac-cond-picker {
+  --cond-size: 30px;
+  --cond-gap: 4px;
+  --cond-cols: 5; /* overridden inline per effect count */
+}
+.bivouac-cond-picker__grid {
+  display: grid;
+  grid-template-columns: repeat(var(--cond-cols), var(--cond-size));
+  gap: var(--cond-gap);
+  max-height: calc(8 * (var(--cond-size) + var(--cond-gap)));
+  overflow: hidden auto;
+}
+.bivouac-cond-picker__item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--cond-size);
+  height: var(--cond-size);
+  padding: 2px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+}
+.bivouac-cond-picker__item img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  /* Inactive conditions read as "available", not "applied" — the icons are
+     otherwise identical whether on or off, which is the one thing this palette
+     has to make obvious at a glance. */
+  opacity: 0.45;
+  filter: grayscale(1);
+  transition:
+    opacity 100ms ease,
+    filter 100ms ease;
+}
+.bivouac-cond-picker__item:hover {
+  border-color: var(--bivouac-accent);
+}
+.bivouac-cond-picker__item:hover img {
+  opacity: 0.8;
+  filter: none;
+}
+.bivouac-cond-picker__item--on {
+  border-color: var(--bivouac-accent);
+  background: color-mix(in srgb, var(--bivouac-accent) 30%, rgba(0, 0, 0, 0.45));
+}
+.bivouac-cond-picker__item--on img {
+  opacity: 1;
+  filter: none;
+}
+
+/* ------------------------------------------------------- the plate menu ---- */
+.bivouac-pmenu {
+  min-width: 200px;
+}
+.bivouac-pmenu__group {
+  padding-bottom: 4px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--bivouac-panel-border);
+}
+/* Section headers. Three things were working against these at once: 10px, upper
+   case with tracking, and `--bivouac-muted` at 55% alpha over a panel that is
+   only 86% opaque and blurred — so a bright scene came through the letters as
+   well as through the panel. Uppercase micro-type has the least margin for low
+   contrast of any text in the UI, so it needs the most.
+
+   Now 11px at the readable muted tier, with slightly more tracking (which HELPS
+   uppercase at small sizes) and more space above, so the header reads as
+   belonging to the group below it rather than floating between two. */
+.bivouac-pmenu__grouplabel {
+  margin: 5px 0 4px;
+  padding: 0 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--bivouac-muted-strong);
+}
+.bivouac-pmenu__item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 4px 6px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+  line-height: 1.3;
+  text-align: left;
+  cursor: pointer;
+}
+.bivouac-pmenu__item:hover {
+  background: color-mix(in srgb, var(--bivouac-accent) 22%, transparent);
+}
+/* The tick column is always present, so labels line up whether or not a row is
+   checked — a checkbox list that reflows as you tick it is hard to scan. */
+.bivouac-pmenu__tick {
+  flex: 0 0 auto;
+  width: 12px;
+  font-size: 11px;
+  text-align: center;
+  opacity: 0;
+}
+.bivouac-pmenu__item--on .bivouac-pmenu__tick {
+  opacity: 1;
+  color: var(--bivouac-accent);
+}
+/* Non-checkbox rows (art, remove) keep a lit icon in the same column. */
+.bivouac-pmenu__item[role="menuitem"] .bivouac-pmenu__tick {
+  opacity: 0.75;
+}
+.bivouac-pmenu__item--danger {
+  color: #e8837c;
+}
+.bivouac-pmenu__item--danger:hover {
+  background: rgba(200, 60, 60, 0.28);
+  color: #fff;
+}
+
+/* The conditions reveal: three states on one row, not a cycling button. Two
+   booleans back it, but only three of their four combinations mean anything. */
+.bivouac-pmenu__reveal {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 6px 4px;
+}
+.bivouac-pmenu__revealtitle {
+  flex: 1 1 auto;
+  font-size: 12px;
+}
+.bivouac-pmenu__radio {
+  flex: 0 0 auto;
+  padding: 2px 7px;
+  border: 1px solid var(--bivouac-panel-border);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.25);
+  color: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+.bivouac-pmenu__radio:hover {
+  border-color: var(--bivouac-accent);
+}
+.bivouac-pmenu__radio--on {
+  border-color: var(--bivouac-accent);
+  background: color-mix(in srgb, var(--bivouac-accent) 34%, rgba(0, 0, 0, 0.4));
+  font-weight: 600;
+}
+
 
 .bivouac-plate__hand {
   position: absolute;
@@ -2084,8 +2344,133 @@ body.bivouac-dnd-active .bivouac-card__body iframe {
     0 0 0 1px var(--bivouac-speaker),
     0 0 14px 1px var(--bivouac-speaker);
 }
-/* Exited — physically in the scene but not in this conversation. Darkened for
-   everyone (the darken sits above the portrait + name). */
+
+/* Wounded states. A plate with its own injured/critical art carries
+   --wound-art, and the tint stands down — that art IS the signal, and washing a
+   deliberately bloodied portrait red on top only muddies it.
+
+   The tint is a filter plus an inset shadow rather than a flat overlay, so the
+   portrait stays readable: you should still recognise the face at a glance,
+   which is the whole job of a plate. */
+.bivouac-plate--injured:not(.bivouac-plate--wound-art) .bivouac-plate__img {
+  filter: saturate(0.75) brightness(0.9);
+}
+.bivouac-plate--critical:not(.bivouac-plate--wound-art) .bivouac-plate__img {
+  filter: saturate(0.45) brightness(0.72);
+}
+/* The vignette is a real child element, not ::before/::after: both pseudos on a
+   plate are already spoken for (the reorder drop indicator uses both, and the
+   "exited" dim uses ::after). z-index 1 keeps it above the portrait but under the
+   name banner, condition icons and the exited dim, so none of those lose contrast. */
+.bivouac-plate__wound {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  border-radius: inherit;
+}
+.bivouac-plate--injured .bivouac-plate__wound {
+  box-shadow: inset 0 0 14px 3px rgba(150, 20, 20, 0.55);
+}
+.bivouac-plate--critical .bivouac-plate__wound {
+  box-shadow: inset 0 0 20px 6px rgba(190, 15, 15, 0.8);
+}
+/* Critical pulses — slowly, and only at critical. A plate that pulsed from 50%
+   down would have half the cast throbbing through an ordinary fight, and the
+   signal would stop meaning anything. Honours reduced-motion. */
+@keyframes bivouac-wound-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+.bivouac-plate--critical .bivouac-plate__wound {
+  animation: bivouac-wound-pulse 2.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .bivouac-plate--critical .bivouac-plate__wound {
+    animation: none;
+    opacity: 1;
+  }
+}
+
+/* Plate art editor (the fa-image plate control). */
+.bivouac-art__who {
+  margin: 0 0 8px;
+  font-weight: 600;
+  text-align: center;
+}
+.bivouac-art__group {
+  margin: 0 0 10px;
+  padding: 8px 10px 10px;
+  border: 1px solid var(--bivouac-panel-border);
+  border-radius: 6px;
+}
+.bivouac-art__group legend {
+  padding: 0 6px;
+  font-weight: 600;
+}
+.bivouac-art__note,
+.bivouac-art__hint {
+  margin: 0 0 6px;
+  font-size: 11px;
+  line-height: 1.3;
+  color: var(--bivouac-muted);
+}
+.bivouac-art__sources {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.bivouac-art__src {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+.bivouac-art__slot {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin-top: 8px;
+}
+.bivouac-art__thumb {
+  flex: 0 0 auto;
+  width: 56px;
+  height: 56px;
+  overflow: hidden;
+  border: 1px solid var(--bivouac-panel-border);
+  border-radius: 5px;
+  background: rgba(0, 0, 0, 0.25);
+}
+.bivouac-art__thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.bivouac-art__body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.bivouac-art__label {
+  display: block;
+  font-weight: 600;
+}
+.bivouac-art__row {
+  display: flex;
+  gap: 4px;
+}
+.bivouac-art__row input[type="text"] {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.bivouac-art__btn {
+  flex: 0 0 auto;
+  width: 30px;
+}
 .bivouac-plate--exited::after {
   content: "";
   position: absolute;
@@ -2103,8 +2488,26 @@ body.bivouac-dnd-active .bivouac-card__body iframe {
 .bivouac-plate--dragging {
   opacity: 0.5;
 }
+/* A plate whose Actor no longer exists. The class was being applied in JS and
+   styled nowhere, so a broken reference looked like a healthy plate with an odd
+   name — draining the colour and dashing the border says "this points at
+   nothing" without needing the name read. */
+.bivouac-plate--missing {
+  border-style: dashed;
+  border-color: var(--bivouac-muted);
+}
+.bivouac-plate--missing .bivouac-plate__img {
+  filter: grayscale(1);
+  opacity: 0.5;
+}
 
-/* GM hover controls: reorder grip · exit · hide · remove. */
+/* GM hover controls: reorder grip · exit · conditions · menu.
+
+   NEVER wraps. Four scaling buttons come to ~89px against 144px of usable bar on
+   a portrait plate at the default size, and the size ladder below thins the set
+   further as the plate shrinks — so a second row is never needed, and forbidding
+   one is what keeps the bar to a known height (--bivouac-ctrl-h) that the
+   overlays can be shifted clear of. */
 .bivouac-plate__controls {
   position: absolute;
   top: 0;
@@ -2112,6 +2515,7 @@ body.bivouac-dnd-active .bivouac-card__body iframe {
   right: 0;
   z-index: 4;
   display: flex;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 2px;
   padding: 3px;
@@ -2123,39 +2527,199 @@ body.bivouac-dnd-active .bivouac-card__body iframe {
   opacity: 1;
 }
 .bivouac-plate__grip {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  height: var(--bivouac-ctrl-sz);
   cursor: grab;
-  padding: 2px 3px;
+  padding: 0 3px;
   margin-right: auto; /* keep the grip left, buttons right */
+  font-size: calc(var(--bivouac-ctrl-sz) * 0.5);
   opacity: 0.85;
 }
 .bivouac-plate__grip:hover {
   opacity: 1;
 }
+/* Buttons SCALE with the plate. At a flat 22px a control was a third of the width
+   of a small plate; the floor of 16px is the smallest that stays hittable. The
+   bar's total height follows from this, and is published as --bivouac-ctrl-h so
+   the overlays can clear it exactly rather than by a guessed margin. */
+.bivouac-plate {
+  --bivouac-ctrl-sz: clamp(
+    16px,
+    calc(var(--bivouac-castbar-fit, var(--bivouac-castbar-size)) * 0.11),
+    22px
+  );
+  --bivouac-ctrl-h: calc(var(--bivouac-ctrl-sz) + 6px); /* + the bar's padding */
+  /* The name banner's line height and total height, published so the overlay
+     columns can be bounded EXACTLY rather than by a guessed percentage. A guess
+     was wrong where it mattered most: the banner's font-size bottoms out at its
+     10px floor, so on a small plate the banner is ~37% of the height, not the
+     ~25% it is at the default size. The banner's own font-size uses the same var,
+     so the two cannot drift, and a client who scales the Cast Bar font up is
+     accounted for without anything else changing. */
+  --bivouac-name-line: clamp(
+    calc(10px * var(--bivouac-castbar-font-scale, 1)),
+    calc(
+      var(--bivouac-castbar-fit, var(--bivouac-castbar-size)) * 0.085 *
+        var(--bivouac-castbar-font-scale, 1)
+    ),
+    calc(17px * var(--bivouac-castbar-font-scale, 1))
+  );
+  --bivouac-name-lines: 2;
+  --bivouac-name-h: calc(
+    var(--bivouac-name-lines) * 1.15 * var(--bivouac-name-line) + 10px
+  );
+  /* What is left for the overlay columns once the control bar and the banner have
+     taken theirs — the number that makes "nothing overlaps" true by construction
+     rather than by inspection. */
+  --bivouac-overlay-max: calc(
+    100% - var(--bivouac-ctrl-h) - var(--bivouac-name-h) - 4px
+  );
+}
 .bivouac-plate__ctrl {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  width: var(--bivouac-ctrl-sz);
+  height: var(--bivouac-ctrl-sz);
   padding: 0;
   border: none;
   border-radius: 5px;
   background: rgba(0, 0, 0, 0.4);
   color: #fff;
-  font-size: 11px;
+  /* Half the button, so a glyph keeps its proportions as the button scales. It
+     was a flat 11px, which was 50% of the old fixed 22px button but 69% of a
+     16px one — the glyph grew as the plate shrank. */
+  font-size: calc(var(--bivouac-ctrl-sz) * 0.5);
   cursor: pointer;
+}
+/* A control wearing one of Foundry's own `CONFIG.controlIcons` rather than a Font
+   Awesome glyph.
+
+   NO filter. Those SVGs are WHITE line art already — `icons/svg/aura.svg` draws
+   its figure at `fill="#ffffff"` over a `fill="#000"` rect pinned at
+   `fill-opacity="0"`. Foundry's `--control-icon-filter: invert(1)` exists for its
+   LIGHT themes, to turn that white art dark; this bar is always dark chrome, so
+   an invert here painted the icon black. (The invisible black backdrop rect is
+   what made it look like black art on a first read of the file — the giveaway was
+   that Foundry's own dark theme applies no filter at all.)
+
+   Kept brighter than the HUD's own 0.7 at rest. The HUD dims its icons against a
+   36px button on its own dark backdrop; this one is 16–22px in a row of `#fff`
+   Font Awesome glyphs, and at 0.7 it read as the grey one out of four. 0.85 → 1
+   still gives a hover lift — which an `<img>` needs, since it cannot take the
+   `color: accent` the glyph controls use to acknowledge a hover. */
+.bivouac-plate__ctrl img {
+  /* Inset like the HUD's own 4px, but proportional so it holds at every tier.
+     Slightly larger than the 50% a glyph gets: this is open line art, which reads
+     lighter than a solid glyph in the same box. */
+  width: 72%;
+  height: 72%;
+  object-fit: contain;
+  opacity: 0.85;
+  transition: opacity 100ms ease;
 }
 .bivouac-plate__ctrl:hover {
   background: color-mix(in srgb, var(--bivouac-accent) 45%, rgba(0, 0, 0, 0.5));
   color: var(--bivouac-accent);
+}
+.bivouac-plate__ctrl:hover img {
+  opacity: 1;
 }
 .bivouac-plate__ctrl--danger:hover {
   background: rgba(200, 60, 60, 0.65);
   color: #fff;
 }
 
+
+/* ============================================================================
+   PLATE ZONES — the rule that nothing on a plate overlaps anything else.
+
+   A plate is a small box (150×200px at the default size, and #fit() can take it
+   to 24px tall) carrying a portrait, a name, two overlay columns, a raised-hand
+   badge and a control bar. Five things competing for one face is how it came to
+   look noisy, so the face is divided into exclusive zones:
+
+     ┌──────────────────────────┐   0 … ctrl-h   controls (hover only)
+     │ ⣿ ⇥ ✋ ⋯   ← controls    │   ctrl-h … name overlays: stats left,
+     │ stats          conds     │                 conditions right, ≤46% each
+     │                          │   centre        raised hand (transient)
+     │      (portrait)          │   bottom        name banner
+     │ ▓▓▓▓▓▓ name ▓▓▓▓▓▓▓▓▓▓▓▓ │
+     └──────────────────────────┘
+
+   The controls used to sit ON the overlays (bar at top:0 z4, both columns at
+   top:4px z2), so hovering a plate to act on it hid the numbers you were reading.
+   Now hovering SHIFTS the overlays down by exactly the bar's height, so both are
+   legible at once and neither is ever covered.
+   ========================================================================== */
+.bivouac-castbar--editable .bivouac-plate:hover .bivouac-plate__stats,
+.bivouac-castbar--editable .bivouac-plate:hover .bivouac-plate__conds {
+  transform: translateY(var(--bivouac-ctrl-h));
+}
+
+/* ---------------------------------------------------------------- the ladder
+
+   Set from #fit() as data-tier on the bar, because #fit() is the one place that
+   knows the effective plate size. Widths, not heights: the control bar is the
+   binding constraint and it runs across the plate.
+
+   Each tier removes the chrome the next size down cannot hold, rather than
+   letting it overflow (which #fit()'s ancestor overflow:hidden would silently
+   clip) or wrap (which put a second row of buttons across the portrait).
+
+     full     ≥150px  everything
+     compact  ≥ 90px  no conditions button; health stat row only
+     min      ≥ 50px  grip + menu only; no overlays
+     none     < 50px  no controls at all
+
+   Nothing becomes unreachable at any tier: every control the ladder removes has
+   a keybinding, and the plate menu (Shift+M) holds the rest. */
+
+/* compact — the conditions palette leaves the bar; the menu stays. */
+.bivouac-castbar[data-tier="compact"] .bivouac-plate__ctrl--conds {
+  display: none;
+}
+/* Which stat rows survive is decided in #renderStats, not here: the count has to
+   be capped as well as filtered, and the dropped rows are named in the box's
+   tooltip — both arithmetic. `.bivouac-plate__stat--health` still marks the
+   health row for anyone styling it. */
+
+/* min — a grip to reorder and a menu to do everything else. */
+.bivouac-castbar[data-tier="min"] .bivouac-plate__ctrl--conds,
+.bivouac-castbar[data-tier="min"] .bivouac-plate__ctrl--exit,
+.bivouac-castbar[data-tier="min"] .bivouac-plate__stats,
+.bivouac-castbar[data-tier="min"] .bivouac-plate__conds {
+  display: none;
+}
+/* At this size the banner cannot hold two lines without meeting the controls.
+   One var drives both the line clamp and the height arithmetic, so they cannot
+   disagree — the banner shrinks and the overlay bound grows by the same line. */
+.bivouac-castbar[data-tier="min"] .bivouac-plate {
+  --bivouac-name-lines: 1;
+}
+
+/* none — a thumbnail. A 16px button would be a third of its width, so the bar
+   goes entirely and the keybindings are the way to act on it. The name goes too:
+   at this size it is a smear rather than a label, and the plate's tooltip and
+   the character sheet both still carry it. */
+.bivouac-castbar[data-tier="none"] .bivouac-plate__controls,
+.bivouac-castbar[data-tier="none"] .bivouac-plate__stats,
+.bivouac-castbar[data-tier="none"] .bivouac-plate__conds,
+.bivouac-castbar[data-tier="none"] .bivouac-plate__name,
+.bivouac-castbar[data-tier="none"] .bivouac-plate__namehint {
+  display: none;
+}
 /* Reorder drop indicator — an accent bar on the main-axis side the plate will
-   land (before/after). Horizontal strip → vertical bars; vertical → horizontal. */
+   land (before/after). Horizontal strip → vertical bars; vertical → horizontal.
+
+   INSIDE the plate, flush to the edge. It used to sit in the gap BETWEEN plates,
+   at `left: calc(-0.5 * gap - 2px)` — i.e. from -6px to -2px, entirely outside a
+   box whose `overflow: hidden` clips it. The result was that drag-to-reorder had
+   no visible feedback at all. Drawing it on the plate's own edge reads almost the
+   same and cannot be clipped; it is 5px rather than 4px and keeps its glow, so it
+   still stands off the border it now sits against. */
 .bivouac-plate--drop-before::before,
 .bivouac-plate--drop-after::after {
   content: "";
@@ -2170,29 +2734,29 @@ body.bivouac-dnd-active .bivouac-card__body iframe {
 .bivouac-castdock-top .bivouac-plate--drop-before::before {
   top: 0;
   bottom: 0;
-  left: calc(-0.5 * var(--bivouac-gap) - 2px);
-  width: 4px;
+  left: 0;
+  width: 5px;
 }
 .bivouac-castdock-bottom .bivouac-plate--drop-after::after,
 .bivouac-castdock-top .bivouac-plate--drop-after::after {
   top: 0;
   bottom: 0;
-  right: calc(-0.5 * var(--bivouac-gap) - 2px);
-  width: 4px;
+  right: 0;
+  width: 5px;
 }
 .bivouac-castdock-left .bivouac-plate--drop-before::before,
 .bivouac-castdock-right .bivouac-plate--drop-before::before {
   left: 0;
   right: 0;
-  top: calc(-0.5 * var(--bivouac-gap) - 2px);
-  height: 4px;
+  top: 0;
+  height: 5px;
 }
 .bivouac-castdock-left .bivouac-plate--drop-after::after,
 .bivouac-castdock-right .bivouac-plate--drop-after::after {
   left: 0;
   right: 0;
-  bottom: calc(-0.5 * var(--bivouac-gap) - 2px);
-  height: 4px;
+  bottom: 0;
+  height: 5px;
 }
 
 /* GM close button — a small round badge floating at the strip's top-right,
@@ -2262,7 +2826,15 @@ body.bivouac-dnd-active .bivouac-card__body iframe {
   opacity: 0.85;
   pointer-events: auto;
 }
-.bivouac-castbar__scalebtn {
+/* The three circles under the bar, in order: −  move  +.
+
+   ONE rule for all three. They were two byte-identical blocks differing only in
+   font-size, kept in step by hand and justified by a comment saying the move
+   button should look like "the same pill as the scale controls" — which is an
+   argument for sharing the rule, not for copying it. Now that the move button
+   sits BETWEEN the other two, any difference between them reads as a mistake. */
+.bivouac-castbar__scalebtn,
+.bivouac-castbar__dockbtn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -2276,27 +2848,43 @@ body.bivouac-dnd-active .bivouac-card__body iframe {
   cursor: pointer;
   font-size: 11px;
 }
-.bivouac-castbar__scalebtn:hover {
-  color: var(--bivouac-accent);
-}
-/* "Move the bar" — same pill as the scale controls, so the hover cluster reads as
-   one toolbar rather than a third floating thing on the strip. */
-.bivouac-castbar__dockbtn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  padding: 0;
-  border: 1px solid var(--bivouac-panel-border);
-  border-radius: 50%;
-  background: var(--bivouac-panel-bg-strong);
-  color: var(--bivouac-text);
-  cursor: pointer;
-  font-size: 10px;
-}
+.bivouac-castbar__scalebtn:hover,
 .bivouac-castbar__dockbtn:hover {
   color: var(--bivouac-accent);
+}
+/* The move button's glyph is a rectangle, wider than + or −, so it is set a touch
+   smaller to carry the same weight inside the same circle. */
+.bivouac-castbar__dockbtn {
+  font-size: 10px;
+}
+
+/* …and it ROTATES to match the dock. `fa-window-maximize` is a rectangle with one
+   filled edge, so turning it points that edge the way the bar actually sits: the
+   button reports the current state as well as offering the action, which no static
+   glyph can do. Nothing here needs JavaScript — `applyDock()` already puts
+   `bivouac-castdock-<edge>` on the bar, and this button is a descendant of it.
+
+   The glyph's own proportions help: it is wider than it is tall, so a left/right
+   dock turns it upright — the shape the bar actually takes in those positions.
+
+   The rotation is transitioned so a click reads as movement. That is the one
+   thing a cycle-through-four-edges button otherwise struggles to communicate,
+   because the bar it moves may be off at the far side of the screen when you
+   press it. */
+.bivouac-castbar__dockbtn i {
+  transition: transform 160ms ease;
+}
+.bivouac-castdock-top .bivouac-castbar__dockbtn i {
+  transform: rotate(0deg);
+}
+.bivouac-castdock-right .bivouac-castbar__dockbtn i {
+  transform: rotate(90deg);
+}
+.bivouac-castdock-bottom .bivouac-castbar__dockbtn i {
+  transform: rotate(180deg);
+}
+.bivouac-castdock-left .bivouac-castbar__dockbtn i {
+  transform: rotate(-90deg);
 }
 
 /* GM-only toggle tab — a glassy pill on the docked edge, mirroring the DM tab. */

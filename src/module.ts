@@ -36,6 +36,7 @@ import { availableFonts, ensureGoogleFont, setTextStrokeVars, textOutlineMode } 
 import { pickWidgetType } from "./widget-config";
 import { decorateSettingsForm, teardownSettingsForm } from "./settings-ui";
 import { ADAPTERS, activeAdapter, statSettingKey } from "./systems";
+import { syncPlateTokens, sweepPlateTokens } from "./plate-tokens";
 
 Hooks.once("init", () => {
   log("Initializing");
@@ -334,9 +335,54 @@ Hooks.once("init", () => {
     onChange: () => castBars.forEach((b) => b.refresh()),
   });
 
-  // How close two plate clicks must be to read as a double (open the sheet)
-  // rather than two singles (toggle Speaking Mode on, then off). Per client,
-  // because it's a motor-speed preference. Defaults BELOW the OS double-click
+  // Back every plate with a hidden Token in the scene, so the rest of Foundry can
+  // find plated characters. OFF by default and deliberately so: unlike every
+  // other setting here this one writes to world data — it changes what the scene
+  // contains, and therefore what the combat tracker and token-aware modules see.
+  // Switching it off sweeps every token it ever placed, in every scene.
+  game.settings.register(MODULE_ID, SETTINGS.castPlateTokens, {
+    name: "BIVOUAC.Settings.CastPlateTokens.Name",
+    hint: "BIVOUAC.Settings.CastPlateTokens.Hint",
+    scope: "world",
+    config: true,
+    type: Boolean,
+    default: false,
+    onChange: (v: unknown) => void (v ? syncPlateTokens() : sweepPlateTokens()),
+  });
+
+  // Wounded states on plates: swap to the plate's injured / critical art when it
+  // has any, otherwise tint the normal portrait — so it reads with no per-character
+  // setup and the art is an upgrade rather than the entry fee.
+  game.settings.register(MODULE_ID, SETTINGS.castWoundStates, {
+    name: "BIVOUAC.Settings.CastWoundStates.Name",
+    hint: "BIVOUAC.Settings.CastWoundStates.Hint",
+    scope: "world",
+    config: true,
+    type: Boolean,
+    default: false,
+    onChange: () => castBars.forEach((b) => b.refresh()),
+  });
+
+  // The two thresholds, as PERCENTAGES of full health. Configurable rather than
+  // fixed at 50/10: where "hurt" sits is a table's judgement, and systems differ
+  // in how fast health falls. `critical` is tested first, so setting both to the
+  // same number collapses to a single state rather than misbehaving.
+  for (const [key, def] of [
+    [SETTINGS.castWoundInjured, 50],
+    [SETTINGS.castWoundCritical, 10],
+  ] as const) {
+    game.settings.register(MODULE_ID, key, {
+      name: `BIVOUAC.Settings.${key[0].toUpperCase()}${key.slice(1)}.Name`,
+      hint: `BIVOUAC.Settings.${key[0].toUpperCase()}${key.slice(1)}.Hint`,
+      scope: "world",
+      config: true,
+      type: Number,
+      range: { min: 0, max: 100, step: 5 },
+      default: def,
+      onChange: () => castBars.forEach((b) => b.refresh()),
+    });
+  }
+
   // Position of the Cast Bar toggle tab along its docked edge (%).
   game.settings.register(MODULE_ID, SETTINGS.castBarTabPos, {
     name: "BIVOUAC.Settings.CastBarTabPos.Name",
@@ -564,6 +610,12 @@ Hooks.once("init", () => {
   castKey("castHidePlate", "KeyH", () => castPlateAction("hidden"));
   castKey("castExitPlate", "KeyE", () => castPlateAction("exited"));
   castKey("castToggleName", "KeyN", () => castPlateAction("name"));
+  castKey("castConditions", "KeyC", () => castPlateAction("conditions"));
+  castKey("castArt", "KeyA", () => castPlateAction("art"));
+  // The menu holds hide / stats / conditions-reveal / name / remove, so this key
+  // is also the escape hatch at the smallest size tiers, where the control bar
+  // thins to a grip and a menu button — or, below 50px wide, disappears.
+  castKey("castMenu", "KeyM", () => castPlateAction("menu"));
   // Removing a plate is the one destructive action here and there is no confirm
   // on it, so it ships UNBOUND — a hotkey that deletes on a single press is far
   // too easy to fire by accident. Assign it in Configure Controls if wanted.
@@ -689,6 +741,10 @@ Hooks.on("canvasReady", () => {
   worldLayer.refresh();
   // The Cast Bars' rosters are per-scene — reflect the newly-loaded scene's cast.
   castBars.forEach((b) => b.refresh());
+  // Reconcile this scene's parked plate tokens. On scene LOAD this is the pass
+  // that matters most: plates may have been added, actors deleted or tokens
+  // placed by hand while the scene sat inactive, and nothing was watching.
+  void syncPlateTokens();
 });
 
 // Keep the world layer glued to the map as the user pans / zooms.
@@ -714,13 +770,34 @@ Hooks.on("updateScene", (scene: { id: string }, changes: object) => {
       foundry.utils.hasProperty(changes, `flags.${MODULE_ID}.${FLAGS.castBar2}`))
   ) {
     castBars.forEach((b) => b.refresh());
+    // The roster just changed — a plate was added, removed or re-pointed, so the
+    // set of actors needing a parked token has moved with it.
+    void syncPlateTokens();
   }
 });
+
+// A token appearing or disappearing changes whether a plate still needs ours: a
+// real token the GM places SUPERSEDES the parked one (so it is withdrawn), and
+// deleting that real token leaves the plate uncovered again (so one is parked).
+// The pass is idempotent, which is what makes it safe to hang off hooks its own
+// writes will fire.
+for (const hook of ["createToken", "deleteToken"]) {
+  Hooks.on(hook, (doc: { parent?: { id?: string } }) => {
+    if (doc?.parent?.id === canvas?.scene?.id) void syncPlateTokens();
+  });
+}
 
 // Keep document-backed tiles (Actor / Journal / Table / Macro …) live: when a
 // referenced document changes or is removed, re-render just the tiles that point
 // at it, on both surfaces (a page also refreshes its parent journal's tiles).
-function refreshDocTiles(doc: { uuid?: string; parent?: { uuid?: string } } | undefined): void {
+type RefreshTarget = {
+  uuid?: string;
+  id?: string;
+  isToken?: boolean;
+  parent?: { uuid?: string };
+};
+
+function refreshDocTiles(doc: RefreshTarget | undefined): void {
   if (doc?.uuid) {
     worldLayer.refreshDocTiles(doc.uuid);
     dmScreen.refreshDocTiles(doc.uuid);
@@ -731,10 +808,17 @@ function refreshDocTiles(doc: { uuid?: string; parent?: { uuid?: string } } | un
     dmScreen.refreshDocTiles(doc.parent.uuid);
     castBars.forEach((b) => b.refreshActor(doc.parent!.uuid as string));
   }
+  // A TOKEN's actor is a different document from the sidebar one: its uuid is
+  // `Scene.x.Token.y.Actor.z`, which never matches the plain `Actor.<id>` a plate
+  // or tile stores, so neither branch above would touch them and the display
+  // would sit stale. That matters for anything read off the live actor — damage
+  // taken by an unlinked NPC, and the conditions applied to it. A synthetic actor
+  // keeps its SOURCE actor's id, so that is what to re-broadcast under.
+  if (doc?.isToken && doc.id) refreshDocTiles({ uuid: `Actor.${doc.id}` });
 }
 for (const kind of ["Actor", "Item", "JournalEntry", "JournalEntryPage", "RollableTable", "Macro"]) {
-  Hooks.on(`update${kind}`, (doc: { uuid?: string; parent?: { uuid?: string } }) => refreshDocTiles(doc));
-  Hooks.on(`delete${kind}`, (doc: { uuid?: string; parent?: { uuid?: string } }) => refreshDocTiles(doc));
+  Hooks.on(`update${kind}`, (doc: RefreshTarget) => refreshDocTiles(doc));
+  Hooks.on(`delete${kind}`, (doc: RefreshTarget) => refreshDocTiles(doc));
 }
 
 // Conditions change through ActiveEffects, which are NOT covered by the loop
@@ -744,18 +828,10 @@ for (const kind of ["Actor", "Item", "JournalEntry", "JournalEntryPage", "Rollab
 // needed as well as update/delete: applying a condition is a create.
 //
 // The effect's `parent` is the Actor, so this routes through the same
-// `refreshDocTiles` path as everything else and picks up the Mini Sheet too.
+// `refreshDocTiles` path as everything else — including its token handling — and
+// picks up the Mini Sheet too.
 for (const hook of ["createActiveEffect", "updateActiveEffect", "deleteActiveEffect"]) {
-  Hooks.on(hook, (effect: { parent?: { uuid?: string; isToken?: boolean; id?: string } }) => {
-    const parent = effect?.parent;
-    refreshDocTiles(parent as { uuid?: string });
-    // An effect applied to a TOKEN is written to that token's synthetic actor,
-    // whose uuid is `Scene.x.Token.y.Actor.z` — it never matches the plain
-    // `Actor.<id>` a plate or tile stores, so the line above would refresh
-    // nothing and the icons would sit stale. A synthetic actor keeps its source
-    // actor's id, so that is what to re-broadcast under.
-    if (parent?.isToken && parent.id) refreshDocTiles({ uuid: `Actor.${parent.id}` });
-  });
+  Hooks.on(hook, (effect: { parent?: RefreshTarget }) => refreshDocTiles(effect?.parent));
 }
 
 // The cast bar can hide while a combat runs (per the setting) — re-evaluate the

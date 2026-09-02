@@ -20,6 +20,16 @@ export interface StatValue {
   value: number;
   /** Present when the stat is a pool; rendered as `value/max`. */
   max?: number | null;
+  /** A BUFFER spent before `value` is touched — dnd5e's temporary hit points are
+   *  the obvious case, but the shape is general and any adapter may fill it.
+   *  Ignored by the display (`formatStat` shows the pool the system shows) and
+   *  used only where the question is "how badly hurt is this character": someone
+   *  on 10 of 40 with 15 temporary HP does not need help, and a wounded state
+   *  that said otherwise would be worse than none. */
+  temp?: number | null;
+  /** A temporary ADDITION to `max` (dnd5e `hp.tempmax`). Same reasoning: it
+   *  changes the denominator of "how hurt", not the number on the plate. */
+  tempMax?: number | null;
   /** True when a HIGHER number is WORSE — Daggerheart marks damage upward, so
    *  its Hit Points and Stress count toward a limit rather than down from one.
    *  Rendering can lean on this instead of assuming dnd5e's "bigger is better". */
@@ -46,6 +56,16 @@ export interface StatDef {
   label: string;
   /** Font Awesome icon class. */
   icon: string;
+  /** This is the actor's HEALTH pool — the one stat that answers "how badly hurt
+   *  is this character". At most one per adapter. Marking it here rather than
+   *  hard-coding a key means `healthFraction` inherits everything the row already
+   *  gets right: the system's own data path, its `max`, and `reverse` for systems
+   *  that count damage upward instead of health downward.
+   *
+   *  Separate from `setting`: the fraction is read whether or not the GM has that
+   *  stat row switched on for DISPLAY. Wanting the wounded states without the
+   *  numbers on show is the normal case, not an odd one. */
+  health?: boolean;
   read(doc: Record<string, unknown>): StatValue | null;
 }
 
@@ -184,9 +204,21 @@ const dnd5e: SystemAdapter = {
       setting: "castStatHP",
       label: "BIVOUAC.Stats.HP",
       icon: "fa-heart",
+      health: true,
       read: (d) => {
         const v = num(at(sys(d), "attributes.hp.value"));
-        return v == null ? null : { value: v, max: num(at(sys(d), "attributes.hp.max")) };
+        // `temp` / `tempmax` are reported but NOT folded into value/max: the
+        // plate shows the same "17/40" the character sheet shows. They exist so
+        // `healthFraction` can tell a buffered character from a dying one — see
+        // `StatValue.temp`.
+        return v == null
+          ? null
+          : {
+              value: v,
+              max: num(at(sys(d), "attributes.hp.max")),
+              temp: num(at(sys(d), "attributes.hp.temp")),
+              tempMax: num(at(sys(d), "attributes.hp.tempmax")),
+            };
       },
     },
     {
@@ -375,6 +407,7 @@ const daggerheart: SystemAdapter = {
       setting: "castStatDhHp",
       label: "BIVOUAC.Stats.DhHP",
       icon: "fa-heart",
+      health: true,
       read: (d) => {
         const v = num(at(sys(d), "resources.hitPoints.value"));
         return v == null ? null : { value: v, max: num(at(sys(d), "resources.hitPoints.max")), reverse: true };
@@ -529,6 +562,13 @@ function customStats(): StatDef[] {
       const max = r.maxPath ? readCustomPath(d, r.maxPath) : undefined;
       return { value: v, max, reverse: r.reverse };
     },
+    // A GM-declared health row is the ONLY way an unsupported system gets
+    // wounded states. The `generic` adapter has no stats at all, so without this
+    // a world on a system nobody has written an adapter for could tell Bivouac
+    // exactly where its health lives and still get nothing — even though the
+    // read contract was already satisfied. Requires a max path, because a
+    // fraction needs a denominator.
+    health: r.health && !!r.maxPath,
   }));
 }
 
@@ -572,6 +612,56 @@ export function visibleStats(doc: Record<string, unknown>): { stat: StatDef; val
   return out;
 }
 
+
+/**
+ * How healthy an actor is, as a fraction from 1 (untouched) to 0 (down), or null
+ * when this system/actor gives no way to tell.
+ *
+ * Derived from whichever stat row the active adapter marked `health`, so it is
+ * correct per system without this function knowing any data paths. Two things it
+ * has to get right that a naive `value / max` would not:
+ *
+ *  • **`reverse`.** Daggerheart's Hit Points count damage MARKED, rising toward
+ *    the maximum, so there 3/6 means half GONE where dnd5e's 3/6 means half LEFT.
+ *  • **No usable maximum.** A fraction needs a denominator. An uncapped or
+ *    zero-max pool returns null rather than a number that would read as either
+ *    perfectly fine or already dead.
+ *
+ * Null is a real answer and callers must handle it — an unsupported system, a
+ * `generic` world, or an actor type with no health at all (a vehicle, a shop)
+ * should show no wounded state rather than a guessed one.
+ */
+export function healthFraction(doc: Record<string, unknown>): number | null {
+  const stat = healthStat();
+  if (!stat) return null;
+  let val: StatValue | null = null;
+  try {
+    val = stat.read(doc);
+  } catch {
+    return null;
+  }
+  if (!val) return null;
+  const max = (num(val.max) ?? 0) + (num(val.tempMax) ?? 0);
+  if (max <= 0) return null;
+  const value = val.value + (val.reverse ? 0 : (num(val.temp) ?? 0));
+  const frac = val.reverse ? 1 - value / max : value / max;
+  return Math.max(0, Math.min(1, frac));
+}
+
+/**
+ * The stat row that answers "how hurt is this character", or undefined.
+ *
+ * A GM-defined row WINS over the adapter's own. On a supported system the
+ * built-in is almost always right, so it is the default — but a GM who has gone
+ * to the row editor and ticked "this is health" has said something deliberate
+ * about their world, and that has to beat a guess made in this file. Custom rows
+ * are appended to the adapter's, so searching from the end prefers them.
+ */
+function healthStat(): StatDef | undefined {
+  const stats = activeAdapter().stats;
+  for (let i = stats.length - 1; i >= 0; i--) if (stats[i].health) return stats[i];
+  return undefined;
+}
 /** How a stat reads on screen: a pool shows `value/max`, everything else the
  *  bare number. Kept here so both renderers format identically. */
 export function formatStat(val: StatValue): string {

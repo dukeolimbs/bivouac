@@ -18,7 +18,7 @@ Round 8 inbox raised 2026-09-01; round 9 raised 2026-09-02.
 | 3 | GM-only stats overlay | Built — no live pass |
 | 4 | Treat Plates as Tokens in the Scene | Built, simulated — no live pass |
 | 5 | Apply status effects from a Plate | Built — no live pass |
-| 6 | Show active effects on Plates | Already built (Round 7) — needs verification |
+| 6 | Show active effects on Plates | Extended for temporary effects — no live pass |
 | 7 | Drag & drop into the Cast Bar | Landed (`83558ab`) — no live pass |
 | 8 | Quick background switching | **Not this module** — withdrawn |
 | 9 | HP-based Plate images | Built, partly simulated — no live pass |
@@ -282,14 +282,38 @@ It provides: a per-plate toggle, condition icons with localised names on hover, 
 6-icon cap with a `+n` overflow carrying the rest in its tooltip, and a
 three-state reveal per plate (off → GM only → everyone).
 
-The "ideally hide passive/permanent effects by default" caveat is satisfied
-structurally rather than as an option: it renders only `CONFIG.statusEffects`
-entries present in `actor.statuses`, i.e. toggleable conditions. Passive
-ActiveEffects never appear, so a PC's long list of permanents can't bury the
-portrait.
+The "ideally hide passive/permanent effects by default" caveat was satisfied
+structurally rather than as an option: it rendered only `CONFIG.statusEffects`
+entries present in `actor.statuses`, i.e. toggleable conditions.
 
-Still the cheapest item on the list, and #5 now sits directly on top of it — the
-same button is both halves.
+**Reopened and extended, 2026-09-02.** That structural answer was too broad. It
+excluded ALL non-status ActiveEffects to keep permanents out, which took the
+*temporary* ones with them — and those are the interesting half. A plate could
+tell you a character was concentrating but not on what.
+
+The decision of what belongs on the strip now lives in `conditionBadges()`, in
+`widgets/foundry-api.ts` with the rest of the version-fragile probes, and covers:
+
+- status conditions, still in the world's configured order,
+- **temporary** ActiveEffects that grant no status of their own — Bless, Bardic
+  Inspiration, a Hunter's Mark — marked with a faint accent ring, because a state
+  the character is IN and something running ON them answer different questions,
+- a status's label **enriched from the effect that granted it**, so dnd5e's
+  concentration reads "Concentrating: Hunter's Mark". Where the granting effect
+  merely restates the condition (a "Prone" effect granting `prone`) the
+  condition's own name is kept, so nothing doubles up.
+
+The portrait-burying guard is now `isTemporary` rather than "statuses only":
+`appliedEffects` is already filtered to active, not disabled, not suppressed and
+not expired, and the duration test drops the permanents. Filtering on duration is
+what the original caveat actually asked for; excluding every non-status effect was
+a proxy for it.
+
+Covered by the `conditions` harness (21 checks), including the two fallbacks that
+matter if a Foundry release moves things: an actor without `appliedEffects`, and
+an effect without an `isTemporary` getter.
+
+#5 sits directly on top of this — the same button is both halves.
 
 ## Withdrawn
 

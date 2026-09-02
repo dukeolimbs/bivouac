@@ -34,7 +34,11 @@ import path from "node:path";
 const OUT = "test/.build";
 
 /** Modules the bundle-and-stub harnesses import. */
-const BUNDLES = ["src/plate-tokens.ts", "src/systems.ts"];
+const BUNDLES = [
+  "src/plate-tokens.ts",
+  "src/systems.ts",
+  "src/widgets/foundry-api.ts",
+];
 
 async function bundle() {
   mkdirSync(OUT, { recursive: true });

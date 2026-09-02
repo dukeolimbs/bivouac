@@ -147,10 +147,14 @@ speaking?" without putting tokens on a map.
     to reveal: off, you only, or everyone.
   - *Appearance* — **plate art**, including the wounded variants below.
   - **Remove from the bar.**
-- **Conditions on a plate** — show a character's active conditions as icons on
-  their portrait, revealed per plate: off, GM-only, or to everyone. Only
-  toggleable conditions appear, so a PC's long list of permanent effects can't
-  bury the portrait.
+- **Conditions and running effects on a plate** — show a character's conditions
+  as icons on their portrait, revealed per plate: off, GM-only, or to everyone.
+  Alongside the conditions you get **temporary effects** — Bless, Bardic
+  Inspiration, a Hunter's Mark — marked with a faint ring so you can tell a state
+  the character is *in* from something running *on* them. And where an effect
+  named a condition, the plate says so: concentration reads **Concentrating:
+  Hunter's Mark**, not a bare "Concentrating". Permanent effects stay out, so a
+  PC's racial and feat effects can't bury the portrait.
 - **Wounded states** *(optional, off by default)* — as a character's health
   falls, their plate can switch to **injured** and **critical** art, or, if you
   haven't drawn any, tint the normal portrait instead. A fast read of who needs

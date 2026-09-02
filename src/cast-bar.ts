@@ -15,7 +15,7 @@ import {
 } from "./constants";
 import { formatStat, healthFraction, visibleStats } from "./systems";
 import { readCastBar, writeCastBar } from "./layout";
-import { canView, docImg, sceneActor } from "./widgets";
+import { canView, conditionBadges, docImg, sceneActor } from "./widgets";
 import { isDocDrag, parseDrop } from "./drop";
 import { openPlateArt, pickImageFile, pickImageSource } from "./plate-art";
 import { closePopover, openPopover, repaintPopover } from "./popover";
@@ -1556,14 +1556,14 @@ class CastBar {
     el.appendChild(box);
   }
 
-  /** The actor's active conditions, as icons.
+  /** The actor's conditions and running effects, as icons.
    *
-   *  Unlike the stats this is CORE Foundry, not system data — `actor.statuses` is
-   *  a Set of status ids and `CONFIG.statusEffects` carries their art and labels —
-   *  so it needs no per-system adapter to work anywhere. We walk `statusEffects`
-   *  rather than `statuses` so the order is the world's configured order (stable
-   *  between renders) and anything unrecognised is skipped rather than drawn as a
-   *  broken icon.
+   *  Unlike the stats this is CORE Foundry, not system data — status ids, their
+   *  art, and the actor's ActiveEffects — so it needs no per-system adapter to
+   *  work anywhere. `conditionBadges()` decides what belongs here: the status
+   *  conditions, plus TEMPORARY effects that grant no status, with a status's
+   *  label enriched from the effect that granted it so a plate reads
+   *  "Concentrating: Hunter's Mark" rather than a bare "Concentrating".
    *
    *  Capped per size tier, with a "+n" overflow: a plate already shares its face
    *  with the stats overlay, the name banner and the raised-hand badge, and a
@@ -1580,7 +1580,7 @@ class CastBar {
     if (!plate.conditions || !doc || !cap) return;
     // Conditions on an NPC are GM information — who's poisoned or concentrating
     // is exactly what a table plays to find out — so revealing them is a
-    // PER-PLATE decision (the hover control cycles off → GM only → everyone).
+    // PER-PLATE decision (three states in the plate menu: off, you, everyone).
     //
     // Two ways a player may see them: the GM marked this plate public, or the
     // player could already find out anyway by opening the sheet. The second
@@ -1589,28 +1589,22 @@ class CastBar {
     // know. (Core Foundry has no per-effect "hide from players" flag to honour,
     // so the plate is the right place for this.)
     if (!game.user?.isGM && !plate.conditionsPublic && !canView(doc)) return;
-    const statuses = doc.statuses as Set<string> | undefined;
-    if (!statuses || typeof statuses.has !== "function") return;
-    const cfg = (CONFIG?.statusEffects ?? []) as {
-      id?: string;
-      name?: string;
-      label?: string;
-      img?: string;
-      icon?: string;
-    }[];
-    const found = cfg.filter((s) => s.id && statuses.has(s.id));
+    // Status conditions AND temporary ActiveEffects — see `conditionBadges`. The
+    // decision of WHAT to show lives there, next to the rest of the fragile
+    // Foundry probes; this only draws the answer.
+    const found = conditionBadges(doc);
     if (!found.length) return;
 
     const box = document.createElement("div");
     box.className = "bivouac-plate__conds";
-    for (const s of found.slice(0, cap)) {
+    for (const b of found.slice(0, cap)) {
       const icon = document.createElement("img");
-      icon.className = "bivouac-plate__cond";
-      // `name`/`img` are the v12+ fields; `label`/`icon` are the older ones. Both
-      // are read so this doesn't break on either side of that rename.
-      icon.src = String(s.img ?? s.icon ?? "");
+      icon.className = b.effect
+        ? "bivouac-plate__cond bivouac-plate__cond--effect"
+        : "bivouac-plate__cond";
+      icon.src = b.img;
       icon.alt = "";
-      icon.dataset.tooltip = game.i18n.localize(String(s.name ?? s.label ?? s.id));
+      icon.dataset.tooltip = b.label;
       box.appendChild(icon);
     }
     if (found.length > cap) {
@@ -1619,7 +1613,7 @@ class CastBar {
       more.textContent = `+${found.length - cap}`;
       more.dataset.tooltip = found
         .slice(cap)
-        .map((s) => game.i18n.localize(String(s.name ?? s.label ?? s.id)))
+        .map((b) => b.label)
         .join(", ");
       box.appendChild(more);
     }

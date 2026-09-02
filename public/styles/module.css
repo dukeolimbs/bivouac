@@ -2085,6 +2085,17 @@ body.bivouac-dnd-active .bivouac-card__body iframe {
      must take the pointer even though the strip itself doesn't. */
   pointer-events: auto;
 }
+/* A temporary EFFECT rather than a status condition — Bless, Bardic Inspiration,
+   a Hunter's Mark. Marked with a faint accent ring, because the two answer
+   different questions: a condition is a state the character is IN, an effect is
+   something running ON them, and which one you are looking at changes what you
+   would do about it. Deliberately faint — the tooltip carries the name, and this
+   only has to say "different kind of thing" at a glance. */
+.bivouac-plate__cond--effect {
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.6),
+    inset 0 0 0 1.5px color-mix(in srgb, var(--bivouac-accent) 85%, transparent);
+}
 .bivouac-plate__cond-more {
   padding: 0 3px;
   border-radius: 4px;

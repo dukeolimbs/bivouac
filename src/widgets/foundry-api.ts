@@ -109,3 +109,170 @@ export function sceneActor<T>(doc: T): T {
     return doc;
   }
 }
+
+/** One thing to draw on a plate's condition strip. */
+export interface ConditionBadge {
+  /** Stable-ish key for de-duplication and debugging. */
+  key: string;
+  /** What to show on hover. */
+  label: string;
+  /** Icon path. */
+  img: string;
+  /** True for a timed ActiveEffect that is not a status condition — a spell or
+   *  feature running on this character rather than a state it is in. */
+  effect: boolean;
+}
+
+/**
+ * What a plate should show as "conditions".
+ *
+ * Two sources, deliberately:
+ *
+ *  1. **Status conditions** — `CONFIG.statusEffects` entries present in
+ *     `actor.statuses`. Walked in the world's configured order so the strip is
+ *     stable between renders, and so anything unrecognised is skipped rather
+ *     than drawn as a broken icon.
+ *  2. **Temporary ActiveEffects that grant no status** — Bless, Bardic
+ *     Inspiration, a Hunter's Mark running on this character. These carry real
+ *     information a status list cannot: they are the reason a number on the sheet
+ *     is not the number on the statblock.
+ *
+ * Only TEMPORARY effects, via `appliedEffects` + `isTemporary`. That is the whole
+ * guard against burying the portrait: `appliedEffects` is already filtered to
+ * active (not disabled, not suppressed, not expired), and `isTemporary` then
+ * drops the permanents — a PC's racial and feat effects, which are numerous,
+ * unchanging and of no interest mid-scene. It is also why this can share the
+ * per-plate conditions toggle instead of needing one of its own: the set it adds
+ * is small and it changes for reasons the table cares about.
+ *
+ * **Status labels are enriched from the effect that granted them.** This is the
+ * point of the exercise. dnd5e's concentration applies an effect named
+ * "Concentrating: Hunter's Mark" carrying the `concentrating` status, so the
+ * status alone tells you a character is concentrating while the useful half —
+ * on WHAT — sits in the effect's name. Where a granting effect has a name of its
+ * own, that name is preferred; where it just restates the condition ("Prone"
+ * granting `prone`), the condition's own localised name is used instead.
+ */
+export function conditionBadges(doc: unknown): ConditionBadge[] {
+  const actor = doc as {
+    statuses?: Set<string>;
+    appliedEffects?: Iterable<Eff>;
+    effects?: Iterable<Eff>;
+  } | null;
+  if (!actor) return [];
+
+  const statuses =
+    actor.statuses && typeof actor.statuses.has === "function"
+      ? actor.statuses
+      : new Set<string>();
+
+  // `appliedEffects` is the v11+ getter and already excludes disabled, suppressed
+  // and expired effects. Fall back to the raw collection with the same tests
+  // applied by hand, so a version that drops the getter degrades rather than
+  // showing nothing.
+  const live: Eff[] = [];
+  try {
+    const src = actor.appliedEffects ?? actor.effects ?? [];
+    for (const e of src) {
+      if (!e) continue;
+      if (actor.appliedEffects) live.push(e);
+      else if (!e.disabled && !e.isSuppressed) live.push(e);
+    }
+  } catch {
+    /* an actor shape we don't recognise — statuses alone still work */
+  }
+
+  const temporary = live.filter(isTemporary);
+  const out: ConditionBadge[] = [];
+
+  /* 1. status conditions, in the world's configured order */
+  const cfg = (CONFIG?.statusEffects ?? []) as StatusCfg[];
+  for (const s of cfg) {
+    if (!s?.id || !statuses.has(s.id)) continue;
+    const generic = loc(String(s.name ?? s.label ?? s.id));
+    // Names of the effects that granted this status, minus any that merely
+    // restate it. Usually none (a "Prone" effect granting `prone`), sometimes one
+    // and worth reading ("Concentrating: Hunter's Mark").
+    const named = temporary
+      .filter((e) => hasStatus(e, s.id!))
+      .map((e) => String(e.name ?? "").trim())
+      .filter((n) => n && n !== generic);
+    out.push({
+      key: `status:${s.id}`,
+      label: named.length ? [...new Set(named)].join(" · ") : generic,
+      img: String(s.img ?? s.icon ?? ""),
+      effect: false,
+    });
+  }
+
+  /* 2. temporary effects that granted no status of their own */
+  const spare = temporary
+    .filter((e) => !anyStatus(e))
+    .map((e) => ({
+      key: `effect:${String(e.id ?? e.name ?? "")}`,
+      label: loc(String(e.name ?? "")),
+      img: String(e.img ?? e.icon ?? ""),
+      effect: true,
+    }))
+    .filter((b) => b.label);
+  // Sorted by name: a document collection's order is an accident of when things
+  // were applied, and a strip that reshuffles itself as effects come and go is
+  // harder to read at a glance than one that doesn't.
+  spare.sort((a, b) => a.label.localeCompare(b.label, game.i18n?.lang));
+  out.push(...spare);
+
+  return out;
+}
+
+type StatusCfg = {
+  id?: string;
+  name?: string;
+  label?: string;
+  img?: string;
+  icon?: string;
+};
+
+type Eff = {
+  id?: string;
+  name?: string;
+  img?: string;
+  icon?: string;
+  disabled?: boolean;
+  isSuppressed?: boolean;
+  isTemporary?: boolean;
+  statuses?: Set<string> | string[];
+  duration?: { expiry?: unknown; value?: unknown; rounds?: unknown; seconds?: unknown; turns?: unknown };
+};
+
+function loc(s: string): string {
+  try {
+    return game.i18n?.localize ? game.i18n.localize(s) : s;
+  } catch {
+    return s;
+  }
+}
+
+/** Does this effect have a duration at all?
+ *
+ *  `isTemporary` is the getter to trust when it is there. The fallback mirrors
+ *  what it does (v13: `!!duration.expiry || Number.isFinite(duration.value)`)
+ *  and also accepts the older rounds/seconds/turns shape, so this keeps working
+ *  either side of that change. */
+function isTemporary(e: Eff): boolean {
+  if (typeof e.isTemporary === "boolean") return e.isTemporary;
+  const d = e.duration ?? {};
+  return (
+    !!d.expiry ||
+    Number.isFinite(Number(d.value)) ||
+    Number.isFinite(Number(d.rounds)) ||
+    Number.isFinite(Number(d.seconds)) ||
+    Number.isFinite(Number(d.turns))
+  );
+}
+
+function statusSet(e: Eff): string[] {
+  const s = e.statuses;
+  return s instanceof Set ? [...s] : Array.isArray(s) ? s : [];
+}
+const hasStatus = (e: Eff, id: string): boolean => statusSet(e).includes(id);
+const anyStatus = (e: Eff): boolean => statusSet(e).length > 0;

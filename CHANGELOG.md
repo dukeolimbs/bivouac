@@ -3,6 +3,24 @@
 All notable changes to Bivouac are documented here. This project follows
 [Semantic Versioning](https://semver.org/).
 
+## [1.3.1] — 2026-09-02
+
+### Changed
+
+- **Plates show temporary effects, not just conditions.** A plate's condition
+  strip now includes **temporary ActiveEffects** — Bless, Bardic Inspiration, a
+  Hunter's Mark — alongside the status conditions it already showed, marked with
+  a faint ring so a state the character is *in* is distinguishable from something
+  running *on* them. And where an effect named a condition, the plate now says
+  which: concentration reads **Concentrating: Hunter's Mark** rather than a bare
+  "Concentrating", which was the half that mattered and the half that was
+  missing.
+
+  Permanent effects still stay out. That exclusion is what stops a PC's racial
+  and feat effects burying the portrait, and it was the reason non-status effects
+  were left out wholesale in the first place — the fix was to filter on duration
+  rather than to keep excluding all of them.
+
 ## [1.3.0] — 2026-09-02
 
 Two rounds of reported items, plus a redesign of the Cast Bar plate controls that

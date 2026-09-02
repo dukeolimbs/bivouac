@@ -12,6 +12,7 @@ without a browser, and settles it.
 | Harness | What it pins down |
 | --- | --- |
 | `plate-tokens` | The reconcile pass that backs plates with hidden Tokens: parks one where a plate has no token, adds nothing where a real one exists, withdraws its own when one appears, deletes only its own, one token per actor across both bars, idempotent, sweeps every scene when switched off, and writes nothing from a non-active GM. |
+| `conditions` | What belongs on a plate's condition strip: statuses in the world's configured order, temporary effects that grant no status, a status's label enriched from the effect that granted it (so "Concentrating: Hunter's Mark"), permanents excluded, and the fallbacks for actors without `appliedEffects` or `isTemporary`. |
 | `health` | `healthFraction()` on D&D 5e and Daggerheart: full / half / zero, negative HP and over-max clamped, missing or zero maxima returning "unknown" rather than a number, and Daggerheart's pools read as damage *marked* rather than health remaining. |
 | `health-systems` | The system-agnostic half: 5e temporary HP and `tempmax`; a GM-declared health row on a system with no adapter; a declared row overriding the built-in one; and that the display toggle does not gate the reading. |
 | `layout` | Whether a plate's chrome fits its plate, across every size tier × all four plate shapes × 19 sizes, horizontally and vertically — plus the condition palette's column count and panel size across plausible effect counts. |
@@ -20,7 +21,7 @@ without a browser, and settles it.
 
 Two techniques, and the distinction matters when reading a green run:
 
-- **Bundle-and-stub** (`plate-tokens`, `health`, `health-systems`) — esbuild the
+- **Bundle-and-stub** (`plate-tokens`, `health`, `health-systems`, `conditions`) — esbuild the
   real module, then run it against a faked `game` / `canvas` / `CONFIG`. This
   exercises the shipped code rather than a paraphrase of it, but it proves the
   *logic*, not that the Foundry APIs it calls exist or behave as assumed.

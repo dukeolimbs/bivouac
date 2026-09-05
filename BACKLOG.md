@@ -26,15 +26,14 @@ Round 8 inbox raised 2026-09-01; rounds 9 and 10 raised 2026-09-02.
 | R9 | Wounded states made system-agnostic | Shipped in 1.3.0, simulated — no live pass |
 | R9 | Combat control on each plate | Shipped in 1.3.2, simulated — no live pass |
 | R10 | Two hotkeys, one rename, additive exhaustion | Shipped in 1.4.0 — **no live pass** |
-| R11 | Inspiration badge on a plate | In the working tree — no live pass |
-| R11 | Player leave/rejoin + speak on own plate | In the working tree — first live pass found a missing socket flag |
+| R11 | Inspiration badge on a plate | Shipped in 1.5.0 — styling live-checked, badge logic not |
+| R11 | Player leave/rejoin + speak on own plate | Shipped in 1.5.0 — **both actions live-verified** |
 | FR1 | Notes on a condition icon | **Not started** — see Feature requests |
 | FR2 | Party-inventory tile | **Not started** — see Feature requests |
 
-Rounds 1–9 and round 10 are released (1.4.0); the raised-hand refix and round 11
-are in the working tree, and the two FR items are not started. `npm run check`
-(typecheck, lint and twelve harnesses) passes clean; see **What was checked**
-under round 9 for what that does and does not mean.
+Rounds 1–11 are released (1.5.0); the two FR items are not started. `npm run
+check` (typecheck, lint and twelve harnesses) passes clean; see **What was
+checked** under round 9 for what that does and does not mean.
 
 **Released as 1.3.2, then 1.4.0, on 2026-09-02 with the live pass still
 outstanding.** That was a deliberate call each time, not an oversight. For 1.3.2
@@ -1103,8 +1102,11 @@ answer; the helper that found a character's player colour went with it, so
 anything wanting it later starts from the raised-hand mapping in
 `widgets/foundry-api.ts`.
 
-**Still owed from this pass:** everything in R11.2's live test, which could not run
-until the socket flag existed.
+**Live-verified since:** a player leaving and rejoining the conversation from their
+own plate, and right-clicking it to mark themselves as the speaker — the two halves
+that share the whole relay, both broadcasting to the table. Still owed from R11.2's
+list: acting on ANOTHER plate (must do nothing, and leave the browser menu alone),
+the no-GM-connected notification, and two GMs connected applying a request once.
 
 ### R11.4 Second live pass: the button is still dead, and the bar got bigger
 

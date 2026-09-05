@@ -943,6 +943,23 @@ Hooks.once("ready", () => {
  *  Registered for players too, harmlessly: it costs one dropped message and it
  *  means a player promoted to GM mid-session is already listening. */
 function wirePlateRequests(): void {
+  // Foundry relays `module.<id>` socket traffic only for modules whose MANIFEST
+  // says `"socket": true`, and it reads manifests when the WORLD LAUNCHES. So a
+  // Bivouac updated in place — or a `dist` rebuilt under a running world — has
+  // the code but not the permission, and the failure is perfectly silent: the
+  // sending client emits happily, the server drops it, and no listener anywhere
+  // is ever called. That cost an afternoon once; it should never cost one again.
+  //
+  // The manifest as the SERVER read it is what `game.modules` carries, so this
+  // compares the running world's answer, not the file on disk.
+  const declared = (game.modules?.get?.(MODULE_ID) as { socket?: boolean } | undefined)?.socket;
+  if (declared !== true) {
+    log("socket NOT registered for this world — a player's plate controls will do",
+        "nothing until the world is relaunched (Return to Setup, then launch again)");
+    if (game.user?.isGM) {
+      ui.notifications?.warn(game.i18n.localize("BIVOUAC.Notify.SocketStale"));
+    }
+  }
   try {
     game.socket?.on?.(SOCKET, (msg: unknown) => {
       void handlePlateRequest(msg).then((why) => {

@@ -30,6 +30,19 @@ All notable changes to Bivouac are documented here. This project follows
   inspiration-like token the toggle isn't shown, rather than being a switch that
   does nothing, and an actor that cannot hold inspiration never draws one.
 
+### Changed
+
+- **Plate controls are 15% bigger**, and leaving the conversation now wears a
+  figure stepping out of a frame rather than an arrow. The buttons were sized to
+  the smallest target that stays hittable, which read as fiddly at the distance
+  people actually sit from a Cast Bar.
+
+  One knock-on worth knowing: a plate sheds buttons into its menu slightly
+  earlier than before. The button scales with a plate's height while the bar has
+  to fit its width, so on a tall narrow plate the bar outgrows its room faster —
+  a mid-sized portrait or tarot plate that used to show four controls may now
+  show three, with the fourth still in the ⋯ menu and still on its keybinding.
+
 ### Fixed
 
 - **A player's own-plate controls now actually reach the GM.** The module never

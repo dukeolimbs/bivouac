@@ -1106,6 +1106,46 @@ anything wanting it later starts from the raised-hand mapping in
 **Still owed from this pass:** everything in R11.2's live test, which could not run
 until the socket flag existed.
 
+### R11.4 Second live pass: the button is still dead, and the bar got bigger
+
+**The player's leave button was still dead with `"socket": true` in the manifest —
+because Foundry reads manifests when the WORLD LAUNCHES.** The file on disk said
+`true`; the running world had read the old one, so the server dropped every
+`module.bivouac` message before any client saw it. Perfectly silent from both ends:
+the sender emits without error, and no listener anywhere is called, so there is
+nothing to log. `game.modules.get("bivouac").socket` — the manifest as the SERVER
+read it — reported `false` and named it in one line. Returning to Setup and
+relaunching the world fixed it with no code change.
+
+Five readings of the code had failed to find it, because the code was right. What
+found it was instrumenting each decision point and then asking the two clients
+separately: the player's console proved the request was built and emitted, the GM's
+proved nothing arrived, and the gap between those two facts is server-side by
+elimination. Worth remembering as a method — a distributed path needs evidence from
+BOTH ends before the middle is suspected.
+
+**Now self-reporting.** `wirePlateRequests()` compares the running world's manifest
+against what the feature needs, and warns the GM to relaunch if it is stale, so this
+particular silence cannot happen twice. It is a dev-install trap only: a module
+installed from a release has its manifest read at install time.
+
+The instrumentation is gone again, bar the refusal line and the not-sent line —
+both failure paths, both quiet in normal play. So is `diagnosePlates()`, the
+throwaway console dump that printed each plate's uuid, resolved actor,
+`User#character` and scene write permission: it did its job (it ruled out the
+mismatch theory in one line, showing `isOwnCharacter: true` on the right plate) and
+a table does not need it. It is a twenty-minute rewrite if the next one needs it.
+
+**Controls 15% larger** (`--bivouac-ctrl-sz` 16/0.11/22 → 18/0.127/25), and the
+exit control is now `fa-person-through-window`. The tier widths had to move with
+it, and further than 15%: `TIER_MIN_W` full 110 → 140, compact 78 → 82, min 40 →
+42. The button scales with the plate's HEIGHT while the bar must fit its WIDTH, so
+on a tall narrow shape the bar grows faster than the room for it — tarot at the old
+`full` threshold wanted 129px of bar in 110px of plate. The horizontal model caught
+all five failures the moment the size changed, which is precisely what it is for.
+The cost is a mid-sized narrow plate showing the compact bar where it used to show
+the full one.
+
 ## Feature requests — to do (raised 2026-09-02)
 
 Neither of these is started. They are written up here rather than kept in a chat

@@ -683,6 +683,14 @@ const STAT_CAP: Record<Tier, number> = {
  *  in one place and matched in another, and a typo would silently break the
  *  open/close toggle rather than fail loudly. */
 const CTRL_CONDS = "bivouac-plate__ctrl--conds";
+
+/** One of Foundry's own control icons by key, or null when this version has no
+ *  such key. `CONFIG.controlIcons` is a plain map of key → path that systems and
+ *  modules are free to re-point, so it is read at draw time rather than captured. */
+function controlIcon(key: string): string | null {
+  const v = (CONFIG?.controlIcons as Record<string, unknown> | undefined)?.[key];
+  return typeof v === "string" && v.length ? v : null;
+}
 const CTRL_MENU = "bivouac-plate__ctrl--menu";
 const CTRL_COMBAT = "bivouac-plate__ctrl--combat";
 
@@ -715,15 +723,24 @@ const CTRL_COMBAT = "bivouac-plate__ctrl--combat";
  * and the conditions button on a plate with room for both.
  *
  * The numbers are each tier's measured requirement plus headroom, verified
- * against every size/shape combination:
- *   full     needs 119px across (grip + 4 buttons + padding) and ~120px down
- *   compact  needs  74px across (grip + 3 buttons + padding) and  ~84px down
- *   min      needs  38px across (grip + 1 button  + padding) and  ~46px down
+ * against every size/shape combination by the horizontal model in
+ * `test/layout.test.mjs`:
+ *   full     needs 133px across (grip + 4 buttons + padding) and ~120px down
+ *   compact  needs  81px across (grip + 3 buttons + padding) and  ~84px down
+ *   min      needs  41px across (grip + 1 button  + padding) and  ~46px down
+ *
+ * The widths moved up in step with a 15% bigger button (see `--bivouac-ctrl-sz`).
+ * They had to move FURTHER than 15%, and the reason is worth keeping: the button
+ * scales with the plate's HEIGHT while the bar has to fit its WIDTH, so on a tall
+ * narrow shape the bar grows faster than the room for it. Tarot at the old
+ * `full` threshold is the case that broke — 4 buttons needing 129px in 110px of
+ * plate. The cost is that a mid-sized narrow plate now shows the compact bar
+ * where it used to show the full one; the menu still holds everything either way.
  */
 export const TIERS = ["full", "compact", "min", "none"] as const;
 export type Tier = (typeof TIERS)[number];
 
-const TIER_MIN_W = { full: 110, compact: 78, min: 40 } as const;
+const TIER_MIN_W = { full: 140, compact: 82, min: 42 } as const;
 const TIER_MIN_H = { full: 130, compact: 84, min: 46 } as const;
 
 function tierFor(widthPx: number, heightPx: number): Tier {
@@ -2243,10 +2260,21 @@ class CastBar {
 
     // Exit / rejoin the conversation — the one plate state that changes while
     // people are actually talking.
+    // Wears Foundry's own control icons, like the two buttons below it. A Font
+    // Awesome glyph next to two SVGs is the mismatch you see rather than read: a
+    // different stroke weight, a different optical size, and a hard-edged shape
+    // beside two soft ones. `CONFIG.controlIcons` is also the only list of icon
+    // paths that a world can re-point, so borrowing from it keeps all three
+    // buttons moving together.
+    //
+    // A DOOR for both states — open on the way out, closed on the way back —
+    // which is the nearest thing in that set to a figure leaving a room. Each
+    // falls back to the Font Awesome glyph it replaces if a Foundry version drops
+    // the key, so a missing icon costs the match, not the button.
     btn(
       plate.exited
-        ? "fa-arrow-right-to-bracket"
-        : "fa-arrow-right-from-bracket",
+        ? (controlIcon("doorClosed") ?? "fa-arrow-right-to-bracket")
+        : (controlIcon("doorOpen") ?? "fa-person-through-window"),
       self
         ? plate.exited
           ? "BIVOUAC.CastBar.SelfEnter"
@@ -2397,3 +2425,4 @@ export const castBar2 = new CastBar({
 
 /** Both bars, for mount/refresh fan-out. */
 export const castBars = [castBar, castBar2];
+

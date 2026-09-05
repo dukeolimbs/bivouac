@@ -2697,10 +2697,15 @@ body.bivouac-dnd-active .bivouac-card__body iframe {
    bar's total height follows from this, and is published as --bivouac-ctrl-h so
    the overlays can clear it exactly rather than by a guessed margin. */
 .bivouac-plate {
+  /* 15% up on the original 16/0.11/22: the buttons were sized to the smallest
+     hittable target and read as fiddly at conversation distance. Every number in
+     the ladder follows from this one — --bivouac-ctrl-h, the overlay bound, and
+     the horizontal fit modelled in test/layout.test.mjs — so it is the only one
+     to change, and that model is what says the wider bar still fits its plate. */
   --bivouac-ctrl-sz: clamp(
-    16px,
-    calc(var(--bivouac-castbar-fit, var(--bivouac-castbar-size)) * 0.11),
-    22px
+    18px,
+    calc(var(--bivouac-castbar-fit, var(--bivouac-castbar-size)) * 0.127),
+    25px
   );
   --bivouac-ctrl-h: calc(var(--bivouac-ctrl-sz) + 6px); /* + the bar's padding */
   /* The name banner's line height and total height, published so the overlay

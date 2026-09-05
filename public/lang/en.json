@@ -13,6 +13,7 @@
       "LandingSet": "This scene is now a Landing Page.",
       "LandingCleared": "Landing Page removed from this scene.",
       "NotLanding": "Switch to a Landing Page scene to add tiles.",
+    "SocketStale": "Bivouac needs this world relaunched (Return to Setup, then launch again) before players can use the controls on their own plate — Foundry registers a module's socket when the world starts.",
     "TilesHidden": "Landing tiles hidden for everyone on this scene — press the same key again to bring them back."
     },
     "Confirm": {

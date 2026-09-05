@@ -31,7 +31,7 @@
  * is idempotent and matches the optimistic state the requester already drew.
  */
 
-import { MODULE_ID, type CastBarData } from "./constants";
+import { MODULE_ID, log, type CastBarData } from "./constants";
 import { readCastBar, writeCastBar } from "./layout";
 import { isPlayedBy } from "./widgets/foundry-api";
 
@@ -80,11 +80,15 @@ export function requestPlateAction(
 ): boolean {
   const sceneId = String(canvas?.scene?.id ?? "");
   const userId = String(game.user?.id ?? "");
-  if (!sceneId || !userId || !activeGMPresent()) return false;
+  if (!sceneId || !userId || !activeGMPresent()) {
+    log("plate request NOT sent:", { sceneId, userId, activeGM: activeGMPresent() });
+    return false;
+  }
   const req: PlateRequest = { type: "plate-request", sceneId, flag, plateId, action, value, userId };
   try {
     game.socket?.emit?.(SOCKET, req);
-  } catch {
+  } catch (err) {
+    log("plate request emit threw", err);
     return false; // no socket — nothing to fall back to
   }
   return true;

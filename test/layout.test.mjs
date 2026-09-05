@@ -3,7 +3,7 @@
  *
  * Mirrors the CSS geometry (CSS can't be executed here), so these must match
  * module.css and cast-bar.ts:
- *   --bivouac-ctrl-sz     clamp(16px, fit * 0.11, 22px)
+ *   --bivouac-ctrl-sz     clamp(18px, fit * 0.127, 25px)   (15% up on 16/0.11/22)
  *   --bivouac-ctrl-h      ctrl-sz + 6
  *   --bivouac-name-line   clamp(10px, fit * 0.085, 17px)
  *   --bivouac-name-h      lines * 1.15 * name-line + 10   (lines = 1 at min)
@@ -21,7 +21,7 @@ const SHAPES = { portrait: 3 / 4, tarot: 2 / 3, square: 1, wide: 4 / 3 };
 const BAR_PAD = 3 * 2;
 const GAP = 2;
 
-const ctrlSize = (fit) => Math.min(22, Math.max(16, fit * 0.11));
+const ctrlSize = (fit) => Math.min(25, Math.max(18, fit * 0.127));
 const ctrlH = (fit) => ctrlSize(fit) + 6;
 const gripWidth = (fit) => ctrlSize(fit) * 0.5 + 6;
 
@@ -38,7 +38,7 @@ const COND_CAP = { full: 6, compact: 3, min: 0, none: 0 };
    and 129/130/131/140 below were added to catch it at the two tier floors and are
    worth keeping for whatever lands in that column next. */
 
-const TIER_MIN_W = { full: 110, compact: 78, min: 40 };
+const TIER_MIN_W = { full: 140, compact: 82, min: 42 };
 const TIER_MIN_H = { full: 130, compact: 84, min: 46 };
 function tierFor(w, h) {
   for (const t of ["full", "compact", "min"])

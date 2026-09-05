@@ -24,6 +24,7 @@ import {
   writeBoardHidden,
 } from "./layout";
 import { worldLayer } from "./world-layer";
+import { SOCKET, handlePlateRequest } from "./plate-requests";
 import { dmScreen } from "./dm-screen";
 import {
   castBar,
@@ -622,6 +623,7 @@ Hooks.once("init", () => {
   castKey("castToggleBars", "KeyV", () => castToggleAllVisible());
   castKey("castSpeaker", "KeyS", () => castPlateAction("speaker"));
   castKey("castStats", "KeyT", () => castPlateAction("stats"));
+  castKey("castInspiration", "KeyI", () => castPlateAction("inspiration"));
   castKey("castHidePlate", "KeyH", () => castPlateAction("hidden"));
   castKey("castExitPlate", "KeyE", () => castPlateAction("exited"));
   castKey("castToggleName", "KeyN", () => castPlateAction("name"));
@@ -926,11 +928,35 @@ Hooks.once("ready", () => {
   // controls are gated to controllers inside `mount`).
   castBars.forEach((b) => b.mount());
   wireRaiseHand();
+  wirePlateRequests();
   applyTabSettings();
   applyCastFont();
   applyTextStroke();
   log("Ready");
 });
+
+/** Listen for a player's request to set one of their own plate's states.
+ *
+ *  Every client registers the listener and `handlePlateRequest` drops the message
+ *  unless this client is the ACTIVE GM — the same one-writer rule the parked
+ *  tokens use — so a table with two GMs connected applies each request once.
+ *  Registered for players too, harmlessly: it costs one dropped message and it
+ *  means a player promoted to GM mid-session is already listening. */
+function wirePlateRequests(): void {
+  try {
+    game.socket?.on?.(SOCKET, (msg: unknown) => {
+      void handlePlateRequest(msg).then((why) => {
+        // Only ever logged, never shown: a refused request is either a stale
+        // client or someone poking the socket, and neither is the local GM's
+        // problem to be interrupted about. It is logged because the alternative
+        // is a player reporting "the button does nothing" with nothing to read.
+        if (why) log("plate request refused:", why, msg);
+      });
+    });
+  } catch {
+    /* socket unavailable — a player's own plate controls simply do nothing */
+  }
+}
 
 /** Wire the "Raise My Hand" (raise-my-hand / -plus) integration so a plate's hand
  *  badge tracks live. It fires no hooks, so we hook several signals:

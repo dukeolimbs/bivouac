@@ -35,6 +35,12 @@
      glyph, and a translucent colour would composite denser where copies overlap
      than at the fringe, giving the edge an uneven, muddy falloff. */
   --bivouac-text-stroke-color: #000;
+  /* How far the inspiration die is raised to stand its foot on the name's
+     baseline, in the ICON's own em. Lives here rather than on the rule so it can
+     be tried live from the console — a Font Awesome web-font glyph hangs below
+     the baseline by an amount that is really a property of the font, so this is
+     the number to re-tune if the icon or the Cast Bar font ever changes. */
+  --bivouac-insp-align: 0.13em;
 
   --bivouac-panel-bg: rgba(16, 18, 25, 0.4);
   --bivouac-panel-bg-strong: rgba(16, 18, 25, 0.86);
@@ -807,8 +813,8 @@ body {
   justify-content: center;
   /* 52% of the BAR's own height, times the number-size multiplier. */
   font-size: clamp(6px, calc(52cqh * var(--bivouac-meter-num-scale, 1)), 140px);
-  /* Its drop shadow is set in the text-stroke block, composed with the outline —
-     `text-shadow` can't stack across rules, so it has to be declared once. */
+  /* Its drop shadow is set at the end of the text-stroke block, where the reason
+     it does NOT take the outline is written down with it. */
 }
 
 /* Gauge — dial. */
@@ -2148,13 +2154,70 @@ body.bivouac-dnd-active .bivouac-card__body iframe {
   padding: 0 1px;
   border-radius: 3px;
   background: rgba(0, 0, 0, 0.85);
-  color: #fff;
+  /* RED, because the number is a count of harm — the only levelled condition in
+     play is exhaustion, and "3" there is worth reading as a warning rather than
+     as a neutral tally. Light enough to stay legible on the dark pill. */
+  color: #ff6b5e;
   font-size: clamp(7px, calc(var(--bivouac-castbar-fit, var(--bivouac-castbar-size)) * 0.055), 12px);
   font-weight: 700;
   line-height: 1.15;
   text-align: center;
 }
 
+
+/* Inspiration — a d20 following the NAME, inside the banner rather than in a
+   corner of the portrait. That placement is what makes it free: the banner is a
+   line of text that already exists, so the icon costs no height, competes with no
+   overlay column, and needs nothing from the plate's geometry at any tier.
+
+   No plate, no pill, no border: the banner's own gradient is the backdrop, and a
+   box around a single icon on a line of text reads as a button. What separates it
+   from the artwork instead is a light glow — two soft gold drop-shadows, tight
+   enough to stay a glow rather than a smear at 10px.
+
+   `em`, not the plate scale: sized against the name it leads, so it tracks the
+   banner through every tier and the client font-size setting with no arithmetic
+   of its own. */
+.bivouac-plate__insp {
+  margin-left: 0.32em;
+  /* A shade smaller than the name it follows: the d20's outline plus its pip
+     numbers carry more detail than a letter does, so matching the name's size
+     made it read as the loudest thing on the banner. */
+  font-size: 0.81em;
+  /* BOTTOMS aligned: the foot of the die on the foot of the lettering.
+     A Font Awesome WEB-FONT glyph does not sit on the baseline — it is centred in
+     the em box and hangs about 0.125em below it, which is why Font Awesome's own
+     SVG build applies `-0.125em`: to imitate the web font, not to correct it. So
+     `vertical-align: baseline` leaves the die SUNK below the text, and the fix is
+     a positive shift of about that much, in the icon's own em.
+     Tuneable without a rebuild: set `--bivouac-insp-align` on :root (or any
+     ancestor) to try another value live, then bake the one that looks right in
+     here as the default. */
+  vertical-align: var(--bivouac-insp-align, 0.13em);
+  /* Its own colour, so the controller's hover preview — which sets the name to
+     `transparent` to show what a hidden name looks like — does not take the die
+     with it. Players still see it on a hidden name, so the preview is more honest
+     with it left in.
+     One gold for every plate, deliberately: tinting it per player was tried and
+     read as noise on a bar of five, where the colours competed with the portraits
+     and with each other for a badge that means the same thing on every plate. */
+  color: #ffd76a;
+  /* The banner's nameplate shadow is a black halo; under a gold glow the two
+     fight, so this opts out of it and carries its own. `filter` rather than more
+     `text-shadow` for exactly that reason — it replaces nothing and stacks
+     cleanly on the glyph.
+     In `em`, so the glow stays the same fraction of the icon at every plate size
+     and the client font-size setting: a fixed 6px is a halo on a 200px plate and
+     a smudge on a 60px one. */
+  text-shadow: none;
+  /* Two alphas are what keep it a glow: a tight near-solid halo to lift the glyph
+     off the artwork, and a wide faint one to bloom. */
+  filter:
+    drop-shadow(0 0 0.17em rgba(255, 205, 90, 0.95))
+    drop-shadow(0 0 0.5em rgba(255, 185, 40, 0.55));
+  /* The tooltip is the only thing that names it. */
+  pointer-events: auto;
+}
 
 /* ============================================================================
    PLATE PANELS — the shared shell (see src/popover.ts), then the two bodies.
@@ -2273,7 +2336,7 @@ body.bivouac-dnd-active .bivouac-card__body iframe {
   padding: 0 2px;
   border-radius: 3px;
   background: rgba(0, 0, 0, 0.85);
-  color: #fff;
+  color: #ff6b5e; /* the same red as the plate's badge — one number, two places */
   font-size: 10px;
   font-weight: 700;
   line-height: 1.2;
@@ -2608,6 +2671,13 @@ body.bivouac-dnd-active .bivouac-card__body iframe {
 .bivouac-castbar--editable .bivouac-plate:hover .bivouac-plate__controls {
   opacity: 1;
 }
+/* A player's OWN plate reveals its bar the same way, without the bar-wide
+   `--editable` class: that one is the controller's, and a player must get the
+   controls on their own plate and on no one else's. The plate carries the class
+   (see `mine` in #renderPlate), so the selector cannot spill sideways. */
+.bivouac-plate--mine:hover .bivouac-plate__controls {
+  opacity: 1;
+}
 .bivouac-plate__grip {
   display: inline-flex;
   align-items: center;
@@ -2737,7 +2807,14 @@ body.bivouac-dnd-active .bivouac-card__body iframe {
    legible at once and neither is ever covered.
    ========================================================================== */
 .bivouac-castbar--editable .bivouac-plate:hover .bivouac-plate__stats,
-.bivouac-castbar--editable .bivouac-plate:hover .bivouac-plate__conds {
+.bivouac-castbar--editable .bivouac-plate:hover .bivouac-plate__conds,
+/* A player hovering their OWN plate raises the same bar, so the overlays have to
+   clear it there too — otherwise the bar's gradient sits over the condition
+   icons (it is z-index 4 to their 2) and dims them for as long as the pointer
+   rests on the plate. Same shift, same var, so the vertical model in
+   test/layout.test.mjs covers both cases without knowing there are two. */
+.bivouac-plate--mine:hover .bivouac-plate__stats,
+.bivouac-plate--mine:hover .bivouac-plate__conds {
   transform: translateY(var(--bivouac-ctrl-h));
 }
 
@@ -3110,7 +3187,6 @@ body.bivouac-dnd-active .bivouac-card__body iframe {
 .bivouac-meter__num,
 .bivouac-cards__name,
 .bivouac-placeholder__label,
-.bivouac-plate__stat, /* the NAME takes the token nameplate's shadow instead — see its rule */
 .bivouac-stroke-on {
   /* Ring radius. `--bivouac-text-ring-scale` is 1 for a hard stroke and small in
      blur mode: a halo wants its copies pulled in toward the glyph, because a
@@ -3171,8 +3247,14 @@ body.bivouac-dnd-active .bivouac-card__body iframe {
 .bivouac-meter__bar .bivouac-meter__num {
   text-shadow: var(--bivouac-ring), 0 1px 3px rgba(0, 0, 0, calc(0.75 * var(--bivouac-text-shadow-a, 1)));
 }
+/* The stat rows are the exception the block above describes: text on a PANEL, not
+   text on artwork. The box behind them is `rgba(0,0,0,0.55)` with a backdrop blur,
+   which is already the whole of their legibility — an outline on top only thickens
+   9px digits into a smudge, and the soft-glow mode does it worse. So they keep the
+   plain drop shadow they had before the outline feature existed, and take no part
+   in it. The plate NAME still does, since that sits directly on the portrait. */
 .bivouac-plate__stat {
-  text-shadow: var(--bivouac-ring), 0 1px 2px rgba(0, 0, 0, calc(0.9 * var(--bivouac-text-shadow-a, 1)));
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
 }
 
 /* ----------------------------------------------------------- mini sheet */

@@ -35,6 +35,7 @@ const OUT = "test/.build";
 
 /** Modules the bundle-and-stub harnesses import. */
 const BUNDLES = [
+  "src/plate-requests.ts",
   "src/plate-tokens.ts",
   "src/systems.ts",
   "src/widgets/foundry-api.ts",

@@ -13,7 +13,7 @@ Round 8 inbox raised 2026-09-01; rounds 9 and 10 raised 2026-09-02.
 
 | # | Item | Status |
 |---|------|--------|
-| 1 | Everyone-raising-hand bug | Landed (`83558ab`) — no live pass |
+| 1 | Everyone-raising-hand bug | Reopened by the live pass 2026-09-02, refixed — see below |
 | 2 | Sheet-opening vs. speaker selection | Landed (`83558ab`) — no live pass |
 | 3 | GM-only stats overlay | Shipped in 1.3.0 — no live pass |
 | 4 | Treat Plates as Tokens in the Scene | Shipped in 1.3.0, simulated — **no live pass** |
@@ -26,12 +26,15 @@ Round 8 inbox raised 2026-09-01; rounds 9 and 10 raised 2026-09-02.
 | R9 | Wounded states made system-agnostic | Shipped in 1.3.0, simulated — no live pass |
 | R9 | Combat control on each plate | Shipped in 1.3.2, simulated — no live pass |
 | R10 | Two hotkeys, one rename, additive exhaustion | Shipped in 1.4.0 — **no live pass** |
+| R11 | Inspiration badge on a plate | In the working tree — no live pass |
+| R11 | Player leave/rejoin + speak on own plate | In the working tree — first live pass found a missing socket flag |
 | FR1 | Notes on a condition icon | **Not started** — see Feature requests |
 | FR2 | Party-inventory tile | **Not started** — see Feature requests |
 
-Rounds 1–10 are committed and released; the two FR items are not started.
-`npm run check` (typecheck, lint and nine harnesses) passes clean; see **What was
-checked** under round 9 for what that does and does not mean.
+Rounds 1–9 and round 10 are released (1.4.0); the raised-hand refix and round 11
+are in the working tree, and the two FR items are not started. `npm run check`
+(typecheck, lint and twelve harnesses) passes clean; see **What was checked**
+under round 9 for what that does and does not mean.
 
 **Released as 1.3.2, then 1.4.0, on 2026-09-02 with the live pass still
 outstanding.** That was a deliberate call each time, not an oversight. For 1.3.2
@@ -75,6 +78,57 @@ the real module is not installed on the dev machine.
 both on plates. Player A raises → only A's plate shows the badge. A lowers → it
 clears. A client connecting *after* a raise reads the existing state correctly.
 Confirm the wave animation doesn't restart on unrelated refreshes.
+
+#### Reopened 2026-09-02: it was still raising every PC's hand — and the fallbacks were never the cause
+
+The live pass this item had been waiting for found the symptom unchanged, and the
+GM's own guess was right: it was permissions. Both of the fixes above were real,
+but they were fixes to the *fallback heuristics* for reading WHO has a hand up.
+The bug was in the other half — deciding WHICH PLATE a raise belongs to — and
+that half was matching on OWNERSHIP:
+
+```
+raised.some(uid => doc.testUserPermission(game.users.get(uid), "OWNER"))
+```
+
+Three reasons that can never be right, any one of which is enough:
+
+- a player may own several actors (a second character, a familiar, a shared NPC);
+- `testUserPermission` honours an actor's **default** ownership, so a party whose
+  sheets the whole table can open tests as owned by the whole table — which is
+  exactly the world this was reported in;
+- ownership answers "may this user act on this actor", which is a different
+  question from "is this user playing it".
+
+Confirmed at the table twice over: the symptom went away when the GM dropped the
+other PCs from Owner to Observer, which is the workaround, not the fix.
+
+**Now matched on `User#character`** — the actor assigned to a user in Foundry's
+Players configuration, the one field that says which actor a user is playing.
+`raisedCharacters()` and `isPlayedBy()` in `widgets/foundry-api.ts`, composed by
+`#handUp` in `cast-bar.ts`. Ownership is not consulted at all any more, so no
+world needs its permissions arranged a particular way and the Observer workaround
+can be undone.
+
+Two deliberate consequences:
+
+- **A raiser with no character assigned gets no badge.** That is the one case this
+  rule cannot serve, and silence there would look exactly like the bug it
+  replaced — so it is logged once per session, naming the user, rather than
+  dropped quietly.
+- **GMs are no longer excluded.** They were only excluded because a GM owns
+  everything and so matched every plate; with an exact character match, a GM who
+  is also running a PC gets the badge on that PC and nowhere else.
+
+Pinned by `test/raised-hands.test.mjs` (20 checks), in which every actor has
+`ownership.default: OWNER` and a `testUserPermission` that says yes to
+everything — so if the rule ever drifts back to permissions, those checks fail.
+What it cannot prove is the half that needs the module: that `raisedHandUserIds()`
+reads the real raise feed correctly.
+
+**Live test (still owed).** Player A raises → A's plate only, with the party still
+at Owner. Assign a user no character, raise → no badge, and one console line
+naming them. A GM with an assigned character raises → their PC only.
 
 ### 2. Sheet-opening vs. speaker selection
 
@@ -868,6 +922,189 @@ Unverified by anything, as usual: every DOM and keybinding path. Nothing in this
 round has been executed by Foundry — in particular the two new keybindings, the
 broadcast hide (including on a second client), the palette's right-click and both
 level badges.
+
+## Round 11 — inspiration, and a player's own plate
+
+Raised 2026-09-02, in the working tree, released nowhere yet. First live pass
+2026-09-05 — see R11.3 for what it found.
+
+### R11.1 An inspiration badge, per plate
+
+A glowing gold d20 after the character's name while they hold inspiration (a gold
+star in the plate's corner, in the first cut — see R11.3). `plate.inspiration` (a per-plate toggle beside `stats` in the menu's
+Overlays group, and `Shift+I` over a hovered plate) says whether this table tracks
+it; the badge appears only when the toggle is on AND the character actually holds
+one.
+
+**System knowledge stays in `systems.ts`.** A new optional adapter hook,
+`inspiration(doc): boolean | null`, implemented for dnd5e as
+`system.attributes.inspiration` — verified against the installed dnd5e 5.3.3,
+where it is a `BooleanField` on the CHARACTER data model (`dnd5e.mjs:71974`) and
+absent from NPCs. That absence is why the hook is three-valued: `false` is a
+character who has spent it, `null` is an actor that was never asked. Both draw
+nothing, and keeping them apart is what stops a future `Boolean(v)` from making
+every vehicle and shop answer the question.
+
+`systemHasInspiration()` gates the MENU ROW, so a Daggerheart table is not offered
+a switch that can never do anything. Nothing here invents an equivalent for other
+systems: if a system wants one, it implements the hook.
+
+**Shown to everyone, with no reveal state** — unlike the stats overlay (controller
+only) and the conditions strip (three-state). A character's inspiration is already
+a button on their own player's sheet, so there is nothing to protect, and a table
+that can see who still holds one is the entire point of putting it on the bar.
+
+**Position was the only hard part.** Both top corners are taken (stats left,
+conditions right) and the hover control bar shifts both down, so the badge sits in
+the band above the name banner, offset by the `--bivouac-name-h` the plate already
+publishes. Vertically it therefore stacks with the STATS column, which is why:
+
+- it is sized on the stat-row scale (`clamp(9px, fit*0.072, 14px)`), not the
+  larger condition-icon scale;
+- it is drawn at the `full` tier only. Not a priority judgement, a measurement: at
+  the compact tier's floor (fit 84) the left column has room for one stat row and
+  the banner and nothing else. It is the newest and least load-bearing thing in
+  that column, so it is the one the ladder drops first.
+
+`test/layout.test.mjs` now models it (`INSP` per tier, added into the left
+column's height) and its size list gained 83/84/85 and 129/130/131/140 — the two
+tier floors, which is exactly where a new box in that column would first overflow.
+At fit 130 the badge IS the binding constraint (left column 64px against the
+conditions' 58px) and the plate still has 4px spare.
+
+**Checked.** `npm run check` — typecheck, lint, eleven harnesses, clean. New:
+`test/inspiration.test.mjs` (14 checks) on the adapter hook — the boolean read,
+`false` vs `null`, an NPC, a non-boolean value, which systems offer the toggle, and
+the GM's `castSystem` override being honoured rather than just `game.system.id`.
+
+**Live test.** dnd5e, a PC with inspiration ticked on their sheet: turn the plate's
+Overlays → Inspiration on → star appears bottom-left, tooltip names it. Spend the
+inspiration on the sheet → the star goes without touching the plate. `Shift+I` over
+a hovered plate does the same as the menu row. Shrink the bar until the tier drops
+to compact → the star goes and the stat rows stay. An NPC plate: the menu row is
+offered (the system has inspiration) but no badge ever appears. Unlinked token of a
+PC: confirm the badge follows the TOKEN's copy, not the sidebar prototype. On
+Daggerheart, confirm the menu row is absent entirely.
+
+### R11.2 A player's own plate: leave / rejoin, and right-click to speak
+
+Asked for as buttons; the reason they did not already exist was not policy but
+**permissions**. Cast Bar state is a Scene flag, and updating a Scene needs
+ownership of it, which players do not have — so `#mutate` and `#setSpeaker` were
+gated on `canControl()` and a player's press would have thrown a Foundry
+permission error rather than doing nothing. A button that errors is worse than no
+button, which is why they were GM-only.
+
+So the player asks and the GM writes. `src/plate-requests.ts` holds the whole
+protocol: the player's client emits on `module.bivouac`, and the ACTIVE GM's
+client — one writer, chosen the way `plate-tokens.ts` chooses one — validates and
+makes the write, which broadcasts back through the flag as usual.
+
+**Which plate is "theirs"** is `User#character`, the same rule the raised-hand
+badge now uses (`isOwnCharacter` → `isPlayedBy`). Not ownership, and deliberately
+so: this world's PCs are owned by the whole table, and gating on ownership would
+have handed every player a leave button on every plate — the same defect as the
+raised-hand bug, in a place where it would have written to the scene.
+
+**What the GM re-derives** rather than trusting: the scene, the plate, that the
+action is one of the two self-service ones, and that the claimed user is playing
+that plate's character. **What it cannot check** is the identity claim itself —
+Foundry does not stamp a sender onto module socket messages, so `userId` is the
+sender's word for it. A hand-crafted message could make another player's plate
+leave the conversation or start speaking. That is the ceiling, and it is written
+into the module's own header: two cosmetic, reversible states, on a plate whose
+player could set them anyway, and never anything an Actor, Token or Combatant can
+see. Worth knowing before anyone extends the protocol — the flag allow-list
+(`castBar` / `castBar2`) and the action allow-list are what keep it there.
+
+Requests carry the DESIRED VALUE, not "toggle", so a double click, a stale client
+or a dropped message cannot leave the flag inverted; the write is idempotent and
+matches the optimistic highlight the player already saw. With no GM connected
+nothing is sent, the player is told, and the optimistic highlight is not drawn.
+
+Two smaller pieces that had to move with it:
+
+- **`canWriteScene()`** (in the Foundry seam) decides direct-write vs relay, asked
+  of the scene document rather than inferred from the role — so a GM writes
+  directly, a player is relayed, and a trusted player who genuinely owns the scene
+  writes directly too. `canControl()` could not answer this: it is a UI gate on a
+  role, not a permission on a document.
+- **The hover reveal** is `.bivouac-castbar--editable .bivouac-plate:hover`, which
+  is the controller's. A player's own plate carries `--mine` instead, so the bar
+  appears on that plate and no other; the overlay shift got the same treatment,
+  or the bar's gradient (z 4) would sit over the condition icons (z 2) while the
+  pointer rested there.
+
+**Checked.** `test/plate-requests.test.mjs` (35 checks) drives the real handler:
+both actions in both directions, idempotence, someone else's plate, a user playing
+nothing, ten malformed or out-of-range messages, the non-active-GM drop, and the
+emit path with and without a GM connected. Twelve harnesses, all clean.
+
+**Live test.** A player with an assigned character, that character on the bar:
+hover their own plate → one button, no grip; press it → the plate darkens for
+everyone. Right-click it → they highlight as speaker for everyone; right-click
+again → clears. Hover and right-click ANOTHER plate → nothing, and the browser's
+own context menu still appears. Disconnect the GM and try both → a notification,
+no highlight left behind. Two GMs connected → the action applies once. As GM,
+confirm the full bar and every other control are unchanged.
+
+### R11.3 What the first live pass found
+
+Four notes, one of them a real defect that no harness here could have caught.
+
+**The player's controls did nothing, because the manifest never declared a
+socket.** Foundry drops socket traffic from a module without `"socket": true` in
+`module.json` — silently, before it leaves the sending client — so the request was
+emitted into nothing and the GM's refusal log stayed empty, which is what made it
+look like a dead button rather than a blocked message. Bivouac had never used a
+socket for anything of its own (the raise-hand integration only LISTENS to another
+module's channel, which needs no declaration), so the flag had never been needed.
+Added.
+
+Worth remembering for anyone testing this next: a manifest change is not picked up
+by a reload. Foundry reads `module.json` when the world launches, so it takes a
+return to Setup and a relaunch.
+
+The other three were style, all of them from seeing it in a real scene rather than
+in a model:
+
+- **The inspiration badge moved into the name banner** and lost its box. It was a
+  pilled star in the bottom-left corner, sized against the plate and hidden below
+  the `full` tier because it had to share the left column with the stat rows. (The
+  star became a d20 once it was on the banner: at that size a die reads as "a roll
+  is waiting here", where a star read as a rating.)
+  Inside the banner it costs no height at all, so it needs no tier ladder, no
+  column arithmetic and no entry in the vertical model — the sizes that entry
+  added (83/84/85, 129/130/131/140, the two tier floors) are kept, because they
+  are the right sizes to test whatever lands in that column next. It leads the
+  name rather than trailing it: the banner clamps with an ellipsis, and a trailing
+  star on a long name is the character that gets cut. It carries its own colour
+  and its own glow so the controller's hide-the-name hover preview (which sets the
+  name `transparent`) leaves it alone — players see the star on a hidden name, so
+  the preview is more honest with it left in — and it swallows its own clicks,
+  because the name it sits in is the controller's click-to-hide target.
+- **The levelled-condition number is red**, on the plate and in the palette. The
+  only levelled condition in play is exhaustion, where the number is a count of
+  harm rather than a neutral tally.
+- **The stat overlay is out of the text-outline feature.** Those rows sit on their
+  own `rgba(0,0,0,0.55)` panel with a backdrop blur, which is already the whole of
+  their legibility; the outline only thickened 9px digits, and the soft-glow mode
+  did it worse. They keep the plain drop shadow they had before that feature
+  existed. This is the rule the outline block already stated — prose and text on
+  solid panels are excluded, text over artwork is not — applied to a case that had
+  been left on the wrong side of it. The plate NAME still takes its nameplate
+  shadow, since that does sit on the portrait.
+
+**Tried and reverted, same day:** tinting the die and its glow with `User#color`,
+so each player's inspiration wore their own colour. It read as noise — five
+plates, five colours, competing with the portraits and with each other for a
+badge that means the same thing on every plate. One gold for everyone is the
+answer; the helper that found a character's player colour went with it, so
+anything wanting it later starts from the raised-hand mapping in
+`widgets/foundry-api.ts`.
+
+**Still owed from this pass:** everything in R11.2's live test, which could not run
+until the socket flag existed.
 
 ## Feature requests — to do (raised 2026-09-02)
 

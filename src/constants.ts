@@ -253,6 +253,16 @@ export interface Plate {
    *  effect unless `conditions` is on, and none for an actor the player can
    *  already inspect (their own character's conditions are theirs regardless). */
   conditionsPublic?: boolean;
+  /** Show an inspiration badge on this plate when its character holds
+   *  inspiration (dnd5e `system.attributes.inspiration`, via the active system
+   *  adapter). Off by default; a per-plate toggle like `stats` and `conditions`.
+   *
+   *  Unlike those two there is no reveal state, and it is drawn for EVERYONE
+   *  rather than controllers only: a character's inspiration is their own
+   *  player's to see (it is a button on their sheet), and a table that can see
+   *  who still holds one is the point of putting it on a plate. What the toggle
+   *  decides is whether this table tracks inspiration on the bar at all. */
+  inspiration?: boolean;
 }
 
 /** Cast Bar state for one Scene. */

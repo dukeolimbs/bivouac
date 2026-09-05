@@ -133,6 +133,17 @@ export interface SystemAdapter {
   /** The full at-a-glance readout for the Mini Sheet. Optional: an adapter
    *  without one falls back to the `stats` rows alone. */
   statblock?(doc: Record<string, unknown>): StatBlock | null;
+  /** Does this actor hold INSPIRATION (or whatever this system calls its
+   *  one-shot "spend this for an advantage" token)? A boolean, not a stat row,
+   *  because that is what it is: there is nothing to read as a number and no
+   *  maximum to measure it against.
+   *
+   *  Three answers, all meaningful: `true` has it, `false` does not, and `null`
+   *  the question doesn't apply — a system without the concept, or an actor type
+   *  without the attribute (an NPC, a vehicle). Only the plates of actors that
+   *  can answer it at all get the badge, and only systems that implement this
+   *  offer the toggle. */
+  inspiration?(doc: Record<string, unknown>): boolean | null;
 }
 
 /** Localize a CONFIG entry that may be a bare i18n key, an already-localized
@@ -252,6 +263,13 @@ const dnd5e: SystemAdapter = {
       },
     },
   ],
+  // dnd5e keeps inspiration as a boolean on the actor, and only character-type
+  // actors have the attribute at all — so `undefined` (an NPC) reads as null,
+  // "this actor has no such thing", rather than as false, "it has none".
+  inspiration: (d) => {
+    const v = at(sys(d), "attributes.inspiration");
+    return typeof v === "boolean" ? v : null;
+  },
   /**
    * Verified against the installed dnd5e 5.3.3 (`dnd5e.mjs`), not from memory:
    *
@@ -776,4 +794,35 @@ export async function setStatusLevel(
   if (next === statusLevel(doc, id)) return false;
   await update.call(doc, { [def.path]: next });
   return true;
+}
+
+/* ------------------------------------------- inspiration ---------------- */
+
+/** Does the active system have an inspiration-like token at all? Gates the
+ *  per-plate TOGGLE: a "show inspiration" row on a system with no such concept
+ *  is a switch that can never do anything. */
+export function systemHasInspiration(): boolean {
+  return typeof activeAdapter().inspiration === "function";
+}
+
+/**
+ * Does this actor currently hold inspiration? `null` when the question doesn't
+ * apply — an unsupported system, or an actor type without the attribute.
+ *
+ * The three-way answer is the point. `false` draws nothing but says the plate
+ * COULD show something later, which is what a GM watching a party wants; `null`
+ * means don't ask again about this actor. Both draw the same blank, so the
+ * distinction is for callers, not for the eye.
+ *
+ * Defensive like `statblockFor`: this reads a system's data shape, and a schema
+ * change between versions must cost the badge, not the plate.
+ */
+export function inspirationOf(doc: Record<string, unknown> | null): boolean | null {
+  if (!doc) return null;
+  try {
+    return activeAdapter().inspiration?.(doc) ?? null;
+  } catch (err) {
+    console.warn("bivouac | inspiration read failed", err);
+    return null;
+  }
 }

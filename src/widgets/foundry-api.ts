@@ -73,6 +73,92 @@ export function canView(doc: unknown): boolean {
   }
 }
 
+/** May this client write to the scene itself?
+ *
+ *  Asked of the DOCUMENT rather than assumed from the role, because all three
+ *  answers occur: a GM can, a player who owns the scene can, and a plain player
+ *  cannot — and the last is the normal case, which is why a player's plate
+ *  actions are relayed to a GM instead (see `plate-requests.ts`). Falls back to
+ *  "am I a GM" if the method is missing, which is the conservative answer for the
+ *  only two callers that matter. */
+export function canWriteScene(scene: unknown): boolean {
+  const s = scene as { canUserModify?: (u: unknown, a: string) => boolean } | null;
+  try {
+    return s?.canUserModify
+      ? !!s.canUserModify(game.user, "update")
+      : !!game.user?.isGM;
+  } catch {
+    return !!game.user?.isGM;
+  }
+}
+
+/* ------------------------------------------------- raised hands --------- */
+
+/** Which characters have their hand up, and which raisers could not be answered.
+ *
+ *  `User#character` is the actor assigned to a user in Foundry's Players
+ *  configuration — literally "this is who I am playing" — and it is the only
+ *  thing that maps a raised hand to ONE actor.
+ *
+ *  OWNERSHIP cannot, which is what this replaced. A player may own several
+ *  actors, a GM owns all of them, and `testUserPermission` honours
+ *  `ownership.default`, so a party whose sheets are readable by the whole table
+ *  is owned by the whole table: "any raised owner" then put every hand up from a
+ *  single raise. Ownership answers "may this user act on this actor", which is a
+ *  different question from "is this user playing it".
+ *
+ *  GMs are NOT excluded any more. They were, because a GM owns everything and so
+ *  matched every plate; with an exact character match a GM's raise can only ever
+ *  reach the one actor they are assigned, which is the right answer for the GM
+ *  who is also running a PC.
+ *
+ *  `unassigned` is returned rather than dropped so the caller can say out loud
+ *  that a raise landed nowhere. A user with no character assigned is the one case
+ *  this rule cannot serve, and silence there looks exactly like the bug it
+ *  replaced. */
+export function raisedCharacters(userIds: Iterable<string>): {
+  characters: Set<string>;
+  unassigned: Set<string>;
+} {
+  const characters = new Set<string>();
+  const unassigned = new Set<string>();
+  for (const uid of userIds) {
+    const user = game.users?.get?.(uid) as { character?: { id?: string } | null } | null;
+    if (!user) continue; // a stale id — a user who has since disconnected or gone
+    const id = user.character?.id;
+    if (id) characters.add(String(id));
+    else unassigned.add(uid);
+  }
+  return { characters, unassigned };
+}
+
+/** Is this document one of those characters?
+ *
+ *  Two ids are accepted because a plate can be pointed at either end of the same
+ *  character: its own (a sidebar Actor, or a LINKED token's actor, which is the
+ *  same document) and, for an UNLINKED token's synthetic actor, the sidebar actor
+ *  it was made from. An assigned character on an unlinked token is unusual, but
+ *  the check costs one property read. */
+export function isPlayedBy(doc: unknown, characterIds: Set<string>): boolean {
+  if (!characterIds.size) return false;
+  const d = doc as {
+    id?: string;
+    token?: { baseActor?: { id?: string } | null } | null;
+  } | null;
+  if (!d) return false;
+  if (d.id && characterIds.has(String(d.id))) return true;
+  const base = d.token?.baseActor?.id;
+  return !!base && characterIds.has(String(base));
+}
+
+/** Is this document the actor the CURRENT user is playing? The same rule as the
+ *  raised-hand badge (`User#character`, not ownership), because it answers the
+ *  same question: which one plate is this user's own. */
+export function isOwnCharacter(doc: unknown): boolean {
+  const id = (game.user as { character?: { id?: string } | null } | null)?.character?.id;
+  return !!id && isPlayedBy(doc, new Set([String(id)]));
+}
+
 /**
  * The version of an Actor that actually exists **in the current scene**.
  *

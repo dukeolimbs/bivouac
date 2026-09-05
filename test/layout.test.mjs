@@ -13,6 +13,7 @@
  *   stats / conds         max-width 46%, max-height overlay-max
  *   stat row              clamp(9px, fit*0.072, 14px) * 1.1, gap 1, padding 6
  *   cond icon             clamp(10px, fit*0.1, 22px), gap 2, WRAPS into columns
+ *   insp star             INSIDE the name banner, so it adds no height at all
  *   plate                 height = fit, width = fit * aspect
  *   tier                  on min(width, height)
  */
@@ -30,6 +31,12 @@ const gripWidth = (fit) => ctrlSize(fit) * 0.5 + 6;
 const BUTTONS = { full: 4, compact: 3, min: 1, none: 0 };
 const STAT_CAP = { full: 4, compact: 1, min: 0, none: 0 };
 const COND_CAP = { full: 6, compact: 3, min: 0, none: 0 };
+/* The inspiration star is NOT modelled, and that is the point of where it sits:
+   it leads the name INSIDE the banner, whose height is already counted below, so
+   it takes no column, no band and no tier of its own. It was briefly a badge in
+   the bottom-left corner, which did have to be counted here — the sizes 83/84/85
+   and 129/130/131/140 below were added to catch it at the two tier floors and are
+   worth keeping for whatever lands in that column next. */
 
 const TIER_MIN_W = { full: 110, compact: 78, min: 40 };
 const TIER_MIN_H = { full: 130, compact: 84, min: 46 };
@@ -40,7 +47,13 @@ function tierFor(w, h) {
 }
 
 let fails = 0;
-const FITS = [24, 30, 40, 50, 60, 67, 68, 80, 90, 100, 119, 120, 121, 150, 180, 200, 260, 340, 520];
+// 129/130 and 131 straddle the `full` tier floor on height, which is where the
+// left column (stats + the inspiration badge) is at its tightest against the
+// plate — the badge appears there and nowhere smaller.
+const FITS = [
+  24, 30, 40, 50, 60, 67, 68, 80, 83, 84, 85, 90, 100, 119, 120, 121, 129, 130, 131, 140, 150,
+  180, 200, 260, 340, 520,
+];
 
 console.log("HORIZONTAL — the control bar against the plate width\n");
 console.log("fit    shape      width   tier      needs   avail   verdict");
@@ -61,7 +74,9 @@ for (const fit of FITS) {
 }
 
 console.log("\n\nVERTICAL — overlays (shifted clear of the hover bar) + name banner\n");
-console.log("fit   shape      tier      statsH  cols  condsH  condsW/max  nameH   used/fit   verdict");
+console.log(
+  "fit   shape      tier      statsH  cols  condsH  condsW/max  nameH   used/fit   verdict",
+);
 console.log("-".repeat(88));
 for (const fit of FITS) {
   for (const [shape, aspect] of Object.entries(SHAPES)) {

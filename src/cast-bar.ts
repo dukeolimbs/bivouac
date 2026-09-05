@@ -9,6 +9,7 @@ import {
   MODULE_ID,
   SETTINGS,
   canControl,
+  log,
   plateAspect,
   type CastBarData,
   type Plate,
@@ -16,20 +17,27 @@ import {
 import {
   formatStat,
   healthFraction,
+  inspirationOf,
   levelledStatus,
   setStatusLevel,
   statusLevel,
+  systemHasInspiration,
   visibleStats,
 } from "./systems";
 import { readCastBar, writeCastBar } from "./layout";
 import {
   canView,
+  canWriteScene,
   conditionBadges,
   docImg,
   inCombat,
+  isOwnCharacter,
+  isPlayedBy,
+  raisedCharacters,
   sceneActor,
   toggleCombat,
 } from "./widgets";
+import { requestPlateAction, type SelfAction } from "./plate-requests";
 import { isDocDrag, parseDrop } from "./drop";
 import { openPlateArt, pickImageFile, pickImageSource } from "./plate-art";
 import { closePopover, openPopover, repaintPopover } from "./popover";
@@ -137,6 +145,39 @@ function raisedHandUserIds(): Set<string> {
   return out;
 }
 
+/** Raisers already grumbled about in the console, so an unanswerable raise is
+ *  reported once per session rather than on every plate of every render. */
+const warnedNoCharacter = new Set<string>();
+
+/**
+ * The CHARACTERS whose players have their hands up.
+ *
+ * The mapping used to be ownership, and it was wrong in a way that only showed up
+ * at a real table: one raise put a hand on every PC's plate. A player can own
+ * several actors, a GM owns all of them, and Foundry's own permission test
+ * honours an actor's DEFAULT ownership — so a party whose sheets the whole table
+ * can open is, as far as that test is concerned, owned by the whole table.
+ *
+ * `User#character` — the actor assigned in Foundry's Players configuration — is
+ * the one field that says which actor a user is playing, so it is the one this
+ * asks. A raise from a user with no character assigned therefore shows on no
+ * plate; that is the intended behaviour, and it is logged (once) rather than left
+ * to look like the bug it replaced.
+ */
+function raisedHandCharacters(): Set<string> {
+  const { characters, unassigned } = raisedCharacters(raisedHandUserIds());
+  for (const uid of unassigned) {
+    if (warnedNoCharacter.has(uid)) continue;
+    warnedNoCharacter.add(uid);
+    log(
+      `raised hand from "${game.users?.get?.(uid)?.name ?? uid}" shows on no plate:`,
+      "that user has no character assigned in Foundry's Players configuration,",
+      "and the Cast Bar matches a raise to the character its user is playing.",
+    );
+  }
+  return characters;
+}
+
 /** Per-instance wiring so multiple Cast Bars (e.g. party + NPCs) can coexist: each
  *  has its own scene flag, dock/size/tab settings, and DOM ids. CSS vars are scoped
  *  to the instance's own elements (not the document root), so they don't clash. */
@@ -163,6 +204,7 @@ export type PlateAction =
   | "hidden"
   | "stats"
   | "conditions"
+  | "inspiration"
   | "combat"
   | "menu"
   | "art"
@@ -514,6 +556,16 @@ function openPlateMenu(
         get: () => !!plate.stats,
         set: () => bar.plateAction(plate.id, "stats"),
       });
+      // Offered only where the system HAS inspiration (dnd5e, so far). A switch
+      // that provably cannot change anything is worse than an absent one: it
+      // reads as a broken feature rather than an inapplicable one.
+      if (systemHasInspiration()) {
+        check(ov, {
+          label: t("BIVOUAC.CastBar.MenuInspiration"),
+          get: () => !!plate.inspiration,
+          set: () => bar.plateAction(plate.id, "inspiration"),
+        });
+      }
 
       // The reveal states as radios rather than a cycling button. `conditions`
       // and `conditionsPublic` are two booleans in the data but only three of
@@ -1326,6 +1378,8 @@ class CastBar {
         return this.#mutate(id, (p) => (p.hidden = !p.hidden));
       case "stats":
         return this.#mutate(id, (p) => (p.stats = !p.stats));
+      case "inspiration":
+        return this.#mutate(id, (p) => (p.inspiration = !p.inspiration));
       case "conditions":
         this.openConditions(id);
         return;
@@ -1497,6 +1551,41 @@ class CastBar {
     const d = this.#read();
     d.speakerId = d.speakerId === id ? null : id; // click the speaker again to clear
     await this.#write(d);
+  }
+
+  /**
+   * Set the speaker outright rather than toggling it — what a relayed request
+   * needs (it carries the state the player already saw applied) and what the
+   * right-click path can express without re-reading the flag.
+   */
+  async #setSpeakerTo(id: string, speaking: boolean): Promise<void> {
+    if (!canControl()) return;
+    const d = this.#read();
+    const next = speaking ? id : null;
+    if (d.speakerId === next) return;
+    d.speakerId = next;
+    await this.#write(d);
+  }
+
+  /**
+   * One of the two states a player may set on their OWN plate — in/out of the
+   * conversation, and who is talking.
+   *
+   * Written directly when this client can write the scene, and otherwise asked
+   * of the active GM over the socket, because a player normally cannot update a
+   * Scene at all (see `plate-requests.ts`). The caller gets `false` when there
+   * was nobody to ask, so it can leave its optimistic feedback undrawn rather
+   * than showing a state that will never arrive.
+   */
+  #selfAction(plateId: string, action: SelfAction, value: boolean): boolean {
+    if (canWriteScene(canvas?.scene)) {
+      if (action === "exited") void this.#mutate(plateId, (p) => (p.exited = value));
+      else void this.#setSpeakerTo(plateId, value);
+      return true;
+    }
+    if (requestPlateAction(this.#cfg.flag, plateId, action, value)) return true;
+    ui.notifications?.warn(game.i18n.localize("BIVOUAC.CastBar.NoGM"));
+    return false;
   }
 
   /** Apply a mutation to one plate and persist. */
@@ -1795,26 +1884,68 @@ class CastBar {
     el.appendChild(box);
   }
 
-  /** Show a raised-hand badge (top-right) when a player who OWNS this actor has
-   *  their hand up (via an active raised-hand module). */
-  /** Whether a NON-GM user who OWNS this actor currently has their hand raised. */
+  /**
+   * The inspiration die, on the name's line.
+   *
+   * Drawn only when the plate's toggle is on AND the character actually holds
+   * inspiration. `null` from `inspirationOf` (an NPC, an unsupported system) and
+   * `false` (a character who has spent it) both draw nothing; the toggle says
+   * this table is tracking inspiration, not that this character has one.
+   *
+   * Read off the SCENE actor for the same reason the stats and conditions are: an
+   * unlinked token keeps its own copy, and inspiration handed out in play is
+   * written there.
+   *
+   * INSIDE the banner rather than in a corner of the portrait, which is what
+   * makes it free: the banner is a line of text that already exists at every tier
+   * that has one, so the icon costs no height, competes with no overlay column
+   * and needs nothing from the plate's geometry.
+   *
+   * TRAILING the name. The one cost of that side is the banner's ellipsis: a name
+   * long enough to fill its clamp is truncated from the end, and the icon goes
+   * with it — a leading one cannot be cut. Names that long are rare enough that
+   * reading as a suffix to the name is worth it; if it starts biting, the fix is
+   * to anchor it to the banner's right edge rather than to the text.
+   *
+   * Appended AFTER the name text is set, because `textContent` replaces every
+   * child: this must stay the last word on that element in a render pass. It
+   * survives a name hidden from players (they see "?" with the die beside it) on
+   * purpose — inspiration is public, and the two facts are unrelated.
+   *
+   * A d20 rather than the star it started as: on a plate at conversation size the
+   * die reads as "a roll is waiting here", which is what inspiration is, where a
+   * star read as a rating.
+   */
+  #renderInspiration(
+    el: HTMLElement,
+    plate: Plate,
+    doc: Record<string, unknown> | null,
+  ): void {
+    const name = el.querySelector(".bivouac-plate__name");
+    if (!name) return;
+    name.querySelector(".bivouac-plate__insp")?.remove();
+    if (!plate.inspiration || inspirationOf(doc) !== true) return;
+    const mark = document.createElement("i");
+    mark.className = "fa-solid fa-dice-d20 bivouac-plate__insp";
+    mark.dataset.tooltip = game.i18n.localize("BIVOUAC.CastBar.Inspiration");
+    mark.setAttribute("aria-label", game.i18n.localize("BIVOUAC.CastBar.Inspiration"));
+    // The die is inside the name, and for a controller the name is the
+    // click-to-hide-it-from-players target. Swallow clicks on it so that hovering
+    // for the tooltip and then clicking cannot hide a character's name by
+    // accident.
+    mark.addEventListener("click", (e) => e.stopPropagation());
+    name.append(mark);
+  }
+
+  /** Show a raised-hand badge (top-right) when the player PLAYING this character
+   *  has their hand up (via an active raised-hand module).
+   *
+   *  Matched on the user's ASSIGNED CHARACTER, not on ownership — see
+   *  `raisedCharacters`. Ownership answers a different question, and answered it
+   *  with every plate at once. */
   #handUp(doc: Record<string, unknown> | null): boolean {
     if (!doc) return false;
-    const raised = raisedHandUserIds();
-    if (!raised.size) return false;
-    const ownership =
-      (doc.ownership as Record<string, number> | undefined) ?? {};
-    const OWNER = CONST?.DOCUMENT_OWNERSHIP_LEVELS?.OWNER ?? 3;
-    const test = (
-      doc as { testUserPermission?: (u: unknown, p: string) => boolean }
-    ).testUserPermission;
-    return [...raised].some((uid) => {
-      const user = game.users?.get?.(uid);
-      if (!user || user.isGM) return false;
-      return test
-        ? !!test.call(doc, user, "OWNER")
-        : (ownership[uid] ?? 0) >= OWNER;
-    });
+    return isPlayedBy(doc, raisedHandCharacters());
   }
 
   /** Add/remove the hand overlay ONLY on a real state change, so frequent updates
@@ -1864,6 +1995,14 @@ class CastBar {
     if (d.speakerId === plate.id) el.classList.add("bivouac-plate--speaker");
     if (plate.exited) el.classList.add("bivouac-plate--exited");
     if (plate.hidden) el.classList.add("bivouac-plate--hidden"); // controllers only reach here
+
+    // Is this the viewer's OWN character? Resolved synchronously and not from
+    // `fill()`, for the same reason the combat button's actor is: the controls
+    // are built before the async resolve finishes, and an actor that cannot
+    // resolve synchronously (a compendium entry) cannot be anybody's assigned
+    // character anyway — so `false` is the right answer in exactly the cases
+    // this returns null for.
+    const mine = isOwnCharacter(fromUuidSync(plate.uuid));
 
     const img = document.createElement("img");
     img.className = "bivouac-plate__img";
@@ -1934,6 +2073,7 @@ class CastBar {
       }
       this.#renderStats(el, plate, live, controller);
       this.#renderConditions(el, plate, live);
+      this.#renderInspiration(el, plate, live);
       this.#renderHand(el, doc);
     };
     // World docs (sidebar actors) resolve synchronously → no placeholder flash on
@@ -1976,19 +2116,36 @@ class CastBar {
       if (doc && canView(doc)) (doc.sheet as { render?: (b: boolean) => void })?.render?.(true);
     });
 
-    // Right-click toggles the speaker. `preventDefault` runs only when we
-    // actually act on the click, so a player — who has no speaker control — keeps
-    // their normal browser menu instead of having it silently swallowed.
+    // Right-click toggles the speaker — for a controller on any plate, and for a
+    // player on the one plate they are playing: saying "I'm talking" is the
+    // player's own business, and it is the most-used action on the bar.
+    // `preventDefault` runs only when we actually act on the click, so a player
+    // right-clicking anyone ELSE'S plate keeps their normal browser menu instead
+    // of having it silently swallowed.
     el.addEventListener("contextmenu", (e) => {
       const target = e.target as HTMLElement;
-      if (!controller || target.closest(".bivouac-plate__controls")) return;
+      if (!(controller || mine) || target.closest(".bivouac-plate__controls")) return;
       e.preventDefault();
-      // The highlight moves IMMEDIATELY (optimistic) so it feels instant, then
-      // the write broadcasts it.
       const makeSpeaker = !el.classList.contains("bivouac-plate--speaker");
-      this.#applySpeakerHighlight(makeSpeaker ? plate.id : null);
-      void this.#setSpeaker(plate.id);
+      // The highlight moves IMMEDIATELY (optimistic) so it feels instant, then
+      // the write broadcasts it. A player's write is a request to the GM, so it
+      // is drawn only once that has actually gone out — see `#selfAction`.
+      if (controller) {
+        this.#applySpeakerHighlight(makeSpeaker ? plate.id : null);
+        void this.#setSpeaker(plate.id);
+      } else if (this.#selfAction(plate.id, "speaker", makeSpeaker)) {
+        this.#applySpeakerHighlight(makeSpeaker ? plate.id : null);
+      }
     });
+
+    if (mine && !controller) {
+      // A player's own plate gets the hover bar too, holding the one control that
+      // is theirs to press. The class is on the PLATE, not the bar, because the
+      // bar-wide `--editable` reveal is the controller's: a player must get their
+      // own plate's controls and no one else's.
+      el.classList.add("bivouac-plate--mine");
+      el.appendChild(this.#controls(plate, el, true));
+    }
 
     if (controller) {
       // Click the name → toggle whether players see it (they get "?").
@@ -2030,10 +2187,12 @@ class CastBar {
    * Every control the menu absorbed keeps its keybinding, so nothing became
    * unreachable — which is also what makes the `min` and `none` tiers safe.
    */
-  #controls(plate: Plate, el: HTMLElement): HTMLElement {
+  #controls(plate: Plate, el: HTMLElement, self = false): HTMLElement {
     const bar = document.createElement("div");
     bar.className = "bivouac-plate__controls";
 
+    // No grip in self mode: reordering the bar is the GM's arrangement of the
+    // scene, not a player's view of it.
     const grip = document.createElement("span");
     grip.className = "bivouac-plate__grip";
     grip.draggable = true;
@@ -2050,7 +2209,7 @@ class CastBar {
       el.classList.remove("bivouac-plate--dragging");
       this.#clearDropMarks();
     });
-    bar.appendChild(grip);
+    if (!self) bar.appendChild(grip);
 
     // `icon` is either a Font Awesome class (`fa-…`) or an image path. A path is
     // recognised by containing a slash, which no FA class does — that lets a
@@ -2088,10 +2247,23 @@ class CastBar {
       plate.exited
         ? "fa-arrow-right-to-bracket"
         : "fa-arrow-right-from-bracket",
-      plate.exited ? "BIVOUAC.CastBar.Enter" : "BIVOUAC.CastBar.Exit",
+      self
+        ? plate.exited
+          ? "BIVOUAC.CastBar.SelfEnter"
+          : "BIVOUAC.CastBar.SelfExit"
+        : plate.exited
+          ? "BIVOUAC.CastBar.Enter"
+          : "BIVOUAC.CastBar.Exit",
       "bivouac-plate__ctrl--exit",
-      () => void this.#mutate(plate.id, (p) => (p.exited = !p.exited)),
+      () =>
+        self
+          ? void this.#selfAction(plate.id, "exited", !plate.exited)
+          : void this.#mutate(plate.id, (p) => (p.exited = !p.exited)),
     );
+
+    // A player's bar is that one button. Everything below is the GM's: the
+    // encounter, the condition palette, and the menu of things set up once.
+    if (self) return bar;
 
     // Enter / leave the encounter, beside the exit-the-conversation button — the
     // two are the same kind of decision about where a character stands, one in

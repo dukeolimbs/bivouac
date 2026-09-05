@@ -33,7 +33,9 @@ strip of character portraits that shows who's in the scene and who's talking.
   when its character is badly hurt.
 - **Players can join in.** Card collections and tiles can be handed to players
   or trusted players to arrange, and every tile respects Foundry's normal
-  ownership rules — a player never sees a document they don't have access to.
+  ownership rules — a player never sees a document they don't have access to. On
+  the Cast Bar, a player can leave and rejoin the conversation from their own
+  plate and right-click it to mark themselves as talking.
 - **Undo and redo.** `Ctrl+Z` / `Ctrl+Y` on the board, so a mistaken drag or
   delete is never a problem.
 - **Look past it when you need to.** `Shift+L` takes the tiles off the table's
@@ -153,8 +155,10 @@ speaking?" without putting tokens on a map.
   - *Visibility* — in the conversation, **hidden from players** (gone from their
     view entirely), **name shown to players** (otherwise they see **?**). New
     plates start name-hidden, and Bivouac remembers your choice per actor.
-  - *Overlays* — the **stat overlay**, and how much of the **conditions** display
-    to reveal: off, you only, or everyone.
+  - *Overlays* — the **stat overlay**, how much of the **conditions** display to
+    reveal (off, you only, or everyone), and — on a system that has it — an
+    **inspiration** die, a glowing gold d20 after the character's name while they
+    hold one — shown to everyone.
   - *Appearance* — **plate art**, including the wounded variants below.
   - **Remove from the bar.**
 - **Conditions and running effects on a plate** — show a character's conditions
@@ -194,16 +198,29 @@ speaking?" without putting tokens on a map.
   checking someone's passive Perception doesn't announce itself to the table.
 - **Raise My Hand tie-in** — if the [Raise My
   Hand](https://foundryvtt.com/packages/raise-my-hand) module is active, a player
-  raising their hand shows a large hand on their character's plate.
+  raising their hand shows a large hand on their character's plate. "Their
+  character" means the actor assigned to them in Foundry's Players configuration,
+  so a user with none assigned raises no badge — deliberately, because ownership
+  is not who is playing a character, and matching on it put one raise on every
+  PC's plate.
 - **During combat** — optionally hide the Cast Bar automatically while a combat
   encounter is running.
 - **Keyboard** — with the pointer over a plate: `Shift+S` speaker, `Shift+E`
   exit, `Shift+F` fight (add / remove from the encounter), `Shift+H` hide,
-  `Shift+N` name, `Shift+T` stats, `Shift+C` conditions, `Shift+A` plate art,
-  `Shift+M` menu. Remove ships unbound on purpose. All of those are inert unless
-  you're hovering a plate, so they fall through to Foundry otherwise. For the
-  bars themselves: `Shift+B` shows or hides the bar **under the pointer**, and
-  `Shift+V` shows or hides **both bars** from wherever the pointer is.
+  `Shift+N` name, `Shift+T` stats, `Shift+I` inspiration, `Shift+C` conditions,
+  `Shift+A` plate art, `Shift+M` menu. Remove ships unbound on purpose. All of
+  those are inert unless you're hovering a plate, so they fall through to Foundry
+  otherwise. For the bars themselves: `Shift+B` shows or hides the bar **under
+  the pointer**, and `Shift+V` shows or hides **both bars** from wherever the
+  pointer is.
+
+- **What a player can do** — on the plate of the character they are playing (the
+  one assigned to them in Foundry's Players configuration), and nowhere else:
+  hover it for a **leave / rejoin the conversation** button, and **right-click**
+  it to mark themselves as the one talking. Everything else on a plate stays with
+  whoever the *Who can control Bivouac* setting allows. Cast Bar state lives on
+  the scene, which players cannot write, so a player's press is relayed to the
+  GM's client — it needs a GM connected, and tells the player if there isn't one.
 
 Bar visibility is per-scene and the GM broadcasts it to everyone.
 
@@ -345,6 +362,7 @@ src/
   plate-tokens.ts   Optional hidden Tokens backing each plate (reconcile, not callbacks)
   plate-art.ts      Which image a plate shows: the drop prompt, file picker, art editor
   popover.ts        The floating panels a plate opens (condition palette, plate menu)
+  plate-requests.ts A player's own-plate actions, relayed to the GM's client to write
   systems.ts        Per-system adapters: stat rows, health, statblocks, item info
   custom-stats.ts   GM-defined stat rows + their editor
   settings-ui.ts    Regroups Foundry's flat settings list into labelled sections

@@ -3,6 +3,60 @@
 All notable changes to Bivouac are documented here. This project follows
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- **Players can leave and rejoin the conversation, and mark themselves as
+  talking.** Hovering your own plate now shows a leave/rejoin button, and
+  right-clicking it highlights you as the speaker — the two states that were
+  always the player's to say and were nonetheless GM-only.
+
+  Only on the plate of the character you are playing (the actor assigned to you
+  in Foundry's Players configuration), and only those two states: everything else
+  on a plate stays the GM's. Under the hood a player's press is a request to the
+  GM's client, because Cast Bar state lives in a Scene flag and players cannot
+  write scenes — so it needs a GM connected, and says so if there isn't one.
+
+- **An inspiration badge on a plate** (dnd5e). Turn it on per plate — the plate
+  menu's *Overlays* group, or `Shift+I` over a hovered plate — and a softly
+  glowing gold d20 follows the character's name while they hold inspiration, and
+  goes when they spend it. Everyone at the table sees it, deliberately: a
+  character's inspiration is already a button on their own sheet, and knowing who
+  still has one is the reason to put it on the bar.
+
+  Being on the name's line means it costs no space on the portrait and survives
+  every plate size the name itself survives. On a system with no
+  inspiration-like token the toggle isn't shown, rather than being a switch that
+  does nothing, and an actor that cannot hold inspiration never draws one.
+
+### Fixed
+
+- **A player's own-plate controls now actually reach the GM.** The module never
+  declared `"socket": true` in its manifest, and Foundry silently drops socket
+  traffic from a module that hasn't — so the leave/rejoin button and the
+  right-click speaker toggle emitted a request that was thrown away before it
+  left the client, with nothing logged anywhere to say so. (Only ever affected
+  the unreleased player controls; nothing else in Bivouac used a socket.)
+
+- **One player raising their hand
+ no longer raises every PC's hand.** The badge
+  was matched on OWNERSHIP — any raised user who owned the actor — and ownership
+  is not who is playing a character. A player can own several actors, a GM owns
+  all of them, and Foundry's permission test honours an actor's *default*
+  ownership, so a party whose sheets the whole table can open was, as far as that
+  test could tell, owned by the whole table: one raise, every plate.
+
+  A raise now matches the raiser's **assigned character** — the actor set against
+  that user in Foundry's Players configuration — so it can only ever reach one
+  plate. Nothing needs changing in your world; if you dropped the party to
+  Observer to work around this, you can put them back.
+
+  Two consequences worth knowing: a user with **no character assigned** now gets
+  no badge anywhere (the console says so, once, naming them), and a **GM who is
+  also playing a PC** does get one, where before GMs were excluded outright
+  because a GM owns everything.
+
 ## [1.4.0] — 2026-09-02
 
 1.3.3 was tagged nowhere and released as nothing — it was committed and then
@@ -50,6 +104,15 @@ first time. There is no v1.3.3 to go looking for.
 
 - **Plate names now carry the token nameplate's drop shadow** instead of the text
   outline used elsewhere, matching what a name looks like on the canvas.
+
+- **The stat overlay no longer takes the text outline.** Those rows sit on their
+  own dark panel, not on artwork, and an outline only thickens 9px digits into a
+  smudge — the soft-glow mode worse still. They keep a plain drop shadow, and the
+  plate NAME, which does sit on the portrait, is unaffected.
+
+- **A levelled condition's number is red** — on the plate and in the palette. The
+  only one in play is exhaustion, where "3" is worth reading as a warning rather
+  than as a neutral tally.
 
 ## [1.3.3] — 2026-09-02
 

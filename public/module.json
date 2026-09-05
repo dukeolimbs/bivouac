@@ -11,6 +11,7 @@
     "verified": "14"
   },
   "esmodules": ["module.js"],
+  "socket": true,
   "styles": [{ "src": "styles/module.css" }],
   "languages": [
     { "lang": "en", "name": "English", "path": "lang/en.json" }

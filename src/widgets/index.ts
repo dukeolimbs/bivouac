@@ -59,7 +59,11 @@ export { applyCardOp, refsUuid } from "./card-model";
 export {
   canView,
   conditionBadges,
+  canWriteScene,
   inCombat,
+  isOwnCharacter,
+  isPlayedBy,
+  raisedCharacters,
   sceneActor,
   sceneTokensOf,
   toggleCombat,

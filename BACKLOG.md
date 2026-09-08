@@ -1233,6 +1233,176 @@ Design questions, with a recommendation each:
   items between actors from the tile. That is a write path into other people's
   sheets and deserves its own round.
 
+## Round 12 inbox — raised 2026-09-02
+
+Nine items, straight from play. **Untriaged except where a note says otherwise** —
+four were located cheaply enough to be worth recording now, and the rest say
+plainly that nobody has looked yet. The point of the distinction is that a
+located item can be picked up cold, and an unlocated one still needs the
+investigation doing first; conflating the two is how a backlog starts lying.
+
+### Bugs
+
+#### R12.1 Inspiration is pushed offscreen on plates with long names
+
+**Reported.** The inspiration die disappears on a plate whose character has a
+long name.
+
+**Located, high confidence.** The die is an *inline* element inside the name
+banner (`.bivouac-plate__insp`: `margin-left: 0.32em`, baseline-shifted to stand
+its foot on the lettering). The banner is `-webkit-line-clamp: 2` with
+`overflow: hidden`. So the die sits *after* the name in the same clamped flow: a
+name that fills both lines pushes the die past the clamp, and it is clipped
+rather than wrapped.
+
+The trade-off to decide is what the die is. Baseline-aligning it to the lettering
+is why it looks right, and that is exactly what makes it share the name's fate.
+Two ways out:
+
+- Reserve a gutter: `padding-right` on the banner sized for the die, with the die
+  absolutely positioned into it. Keeps the vertical alignment, costs the name some
+  width on every plate whether or not there is a die.
+- Make it a badge outside the banner, like the raised hand. Never clipped, but it
+  loses the "foot on the lettering" relationship that was deliberately tuned.
+
+Whichever, check it against a name long enough to fill both lines AND the `min`
+tier, where the banner is clamped to one line.
+
+#### R12.2 The plate menu doesn't live-update its own selection
+
+**Reported.** Pressing the Conditions options in the plate menu doesn't update
+the selection highlight.
+
+**Located, and it is worse than reported — this is my bug, from round 9.**
+`openPlateMenu(anchor, bar, plate, name)` captures the `plate` **object**, and
+every row's `get:` and every `onRepaint` closure reads state off that captured
+object (`plate.conditions`, `plate.conditionsPublic`, `plate.hidden`,
+`plate.stats`). But `#read()` goes through `normalizeCastBar`, which
+`foundry.utils.deepClone`s — so every read returns a *fresh* object, and
+`#mutate` writes to a different one. The object the menu closed over can never
+change.
+
+So `repaintPopover()` works exactly as designed and faithfully re-renders a
+snapshot frozen at the moment the menu opened. The conditions radios are the most
+visible symptom because they show three states, but **every checkbox in the menu
+has the same bug** — Hidden from players and Name shown to players are equally
+stale, and the reporter simply hit the radios first.
+
+The fix is for the menu to read through the bar rather than over a captured
+object: have the rows call something like `bar.plateById(id)` on each repaint, so
+they see the current roster. Worth checking `openConditionPalette` at the same
+time — it captures an `actor` document, which Foundry mutates in place, so that
+one is fine, but the asymmetry is only obvious once you know to look.
+
+Cheap to cover in a harness once the reading is behind a function.
+
+#### R12.3 Text size in Note tiles does nothing
+
+**Reported.** The Note tile's text size setting has no visible effect.
+
+**Narrowed, not confirmed.** The setting is wired end to end: `textScale` is
+stored and clamped (`widget-config.ts`), applied as `--bivouac-note-scale`
+(`types/note.ts`), and read by
+`font-size: clamp(9px, calc(6.5cqmin * var(--bivouac-note-scale, 1)), 64px)`.
+
+So the multiplier reaches the CSS, and the suspect is the **clamp swallowing it**.
+A missing container-query context was the other candidate and is ruled out —
+`container-type: size` is declared in six places, so `cqmin` resolves.
+
+Worth doing the arithmetic before touching anything: at a container min of 100px,
+`6.5cqmin` is 6.5px, so *every* scale from 0.5 up to about 1.38 lands under the
+9px floor and renders identically. That would present exactly as "does nothing"
+over most of the slider's range while technically working at the top of it. Check
+what the floor and the ceiling actually bite at for a typical tile size, then
+decide whether the fix is a lower floor, a scale applied outside the clamp, or a
+clamp expressed in terms of the scale.
+
+#### R12.4 A tile snaps back to its pre-edit state while being moved or resized
+
+**Reported.** While editing, moving or resizing a tile makes it visibly revert to
+its pre-edit appearance until the edits are saved.
+
+**Not investigated.** Likely somewhere in `world-layer.ts`'s drag/resize path
+re-rendering from persisted layout mid-gesture rather than from the live values,
+but nobody has looked. Note when picking this up that the board has undo/redo
+over layout, so whatever the gesture does with intermediate state has to stay
+compatible with that.
+
+#### R12.5 LOD on webview tiles doesn't appear to work
+
+**Reported.** Level-of-detail on web view tiles doesn't seem to do anything.
+
+**Located only.** It is implemented — `world-layer.ts:319` reads
+`SETTINGS.lodMinWebviews` — so this is a behaviour question, not a missing
+feature. Things to establish before changing anything: how many live web views
+the test actually had against what the setting was set to (the whole mechanism is
+a *threshold*, so under it nothing should happen and that is correct), whether the
+placeholder swap depends on a zoom level that was never crossed, and whether it
+works on the DM screen but not the board or vice versa.
+
+### Requests
+
+#### R12.6 Let a meter tile's icon change the pip
+
+**Asked for.** The icon option on meter tiles should be able to change the pip,
+not just the centre icon.
+
+**Located.** `m.icon` currently draws one icon in the middle of the meter
+(`widgets/meter/shapes.ts`, `.bivouac-meter__icon`), and the pips are drawn
+separately by each of the five shapes.
+
+The design question is whether this replaces the centre icon or is a second
+setting. Two icons — one in the middle, one per pip — is more control but another
+field on a tile that already has several; one field with a "where does it go"
+choice is simpler and probably what was meant. Also worth deciding what a
+*filled* versus *empty* pip looks like when it is an icon rather than a shape:
+the fill/empty distinction is the entire point of a meter, and an icon that only
+changes colour may not carry it as well as a shape that changes fill.
+
+#### R12.7 A GM button on a web view to adopt the page they have navigated to
+
+**Asked for.** A button, GM only, that sets the tile's stored URL to whatever
+page the GM has navigated to inside it.
+
+**Not investigated, and there is a known obstacle worth flagging first.** A
+cross-origin iframe does not report its current location to the parent — reading
+`iframe.contentWindow.location.href` throws for anything not same-origin, which
+is nearly every site a web view would point at. So this may not be implementable
+in the general case, and the honest answer might be a small "set this tile's URL"
+field or a paste-the-URL prompt instead of an adopt-what-I'm-looking-at button.
+
+Establish that first: if the URL genuinely cannot be read, the request needs
+re-framing rather than building, and that is much better to find out before
+writing any UI.
+
+#### R12.8 Plutonium / 5etools-enabled tiles for the DM screen
+
+**Asked for.** Tiles for the DM screen that work with Plutonium / 5etools
+content.
+
+**Nothing established.** This needs scoping before anything else — it is the only
+item here that depends on a third-party module's API, and "enabled" could mean
+several different things (rendering 5etools content, linking to it, importing from
+it). Worth writing down what specifically is wanted, and checking what Plutonium
+actually exposes to other modules, before it gets an estimate.
+
+#### R12.9 Centre the Cast Bar on the screen, not the play area
+
+**Asked for.** A setting to centre the Cast Bar horizontally on the whole screen
+— like Foundry's macro hotbar — as an alternative to the current behaviour, which
+centres it on the play area (clear of the sidebar and the scene controls).
+
+**Located.** `#placeAndBand()` in `cast-bar.ts` is the single place that decides
+where the bar sits and how much room it has, and it deliberately measures
+Foundry's own UI to stay clear of it. A new setting branches there.
+
+Two things to get right: the value it returns is also what `#fit()` divides up to
+size the plates, so a screen-centred bar has *more* room and the fit maths has to
+use the same number the placement did or the plates will be sized for the wrong
+width. And a screen-centred bar can end up underneath the sidebar, which is the
+exact problem the current behaviour exists to avoid — so the setting is opting
+into that, and its hint should say so.
+
 ## Verification debt
 
 **Nothing in rounds 7, 8 or 9 has run in a live Foundry world.** That is the whole

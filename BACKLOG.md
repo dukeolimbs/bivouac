@@ -1236,8 +1236,9 @@ Design questions, with a recommendation each:
 ## Round 12 inbox — raised 2026-09-02
 
 Nine items, straight from play. **Untriaged except where a note says otherwise** —
-four were located cheaply enough to be worth recording now, and the rest say
-plainly that nobody has looked yet. The point of the distinction is that a
+four were located cheaply enough to be worth recording immediately, R12.7 has
+since been investigated properly and **cannot be built as asked**, and the rest
+say plainly that nobody has looked yet. The point of the distinction is that a
 located item can be picked up cold, and an unlocated one still needs the
 investigation doing first; conflating the two is how a backlog starts lying.
 
@@ -1364,16 +1365,88 @@ changes colour may not carry it as well as a shape that changes fill.
 **Asked for.** A button, GM only, that sets the tile's stored URL to whatever
 page the GM has navigated to inside it.
 
-**Not investigated, and there is a known obstacle worth flagging first.** A
-cross-origin iframe does not report its current location to the parent — reading
-`iframe.contentWindow.location.href` throws for anything not same-origin, which
-is nearly every site a web view would point at. So this may not be implementable
-in the general case, and the honest answer might be a small "set this tile's URL"
-field or a paste-the-URL prompt instead of an adopt-what-I'm-looking-at button.
+**Investigated 2026-09-02. It cannot be built as asked, on either client.** Not
+"probably not" — checked, against the browser security model and against
+Foundry's own Electron configuration in this install.
 
-Establish that first: if the URL genuinely cannot be read, the request needs
-re-framing rather than building, and that is much better to find out before
-writing any UI.
+**Why not, in the browser.** The tile renders a plain `<iframe>`
+(`widgets/types/webview.ts`). `frame.src` is the *attribute*: it holds what we
+set and does not change when the user navigates. The live value lives at
+`frame.contentWindow.location.href`, and reading that across origins throws —
+same-origin policy, universally implemented, not a quirk to work around. The
+tile's `sandbox="… allow-same-origin …"` does not help: it preserves readability
+for content that is *genuinely* same-origin, and an external site is cross-origin
+regardless of what the sandbox says.
+
+**Why not on the desktop app either**, which is the answer someone would
+reasonably expect to differ. Electron's `<webview>` element does expose
+`getURL()` and `did-navigate`, which is exactly what this feature would need —
+but Foundry does not enable it. From
+`resources/app/dist/interface/electron.mjs`:
+
+```
+webPreferences: { autoplayPolicy: "no-user-gesture-required",
+                  contextIsolation: true, nodeIntegration: false,
+                  sandbox: true, spellcheck: false }
+```
+
+No `webviewTag`, and Electron has defaulted it to `false` since v5, so
+`<webview>` is unavailable. The same block closes the other routes: no
+`nodeIntegration`, `contextIsolation` on, `sandbox` on, and no `contextBridge` /
+`exposeInMainWorld` anywhere in the file — so there is no preload bridge through
+which a module could reach the main process's `webContents` API either.
+
+**What IS possible, and what each is worth:**
+
+- **Same-origin pages are readable.** Something served from the Foundry host —
+  a GM's own wiki behind the same hostname — can be read. Real, but a small
+  minority of what a web view points at, and a button that works for a few sites
+  and fails opaquely for the rest is worse than no button.
+- **Navigation can be DETECTED but not read.** The `<iframe>` element fires
+  `load` in the parent document on every in-frame document load, cross-origin
+  included. So "this tile is no longer showing its saved page" is knowable; "and
+  here is the page it is showing" is not. That asymmetry is genuinely useful (see
+  the recommendation) but it cannot satisfy the request on its own.
+- **A same-origin proxy is the clever answer, and it is a dead end.** Routing the
+  page through the Foundry host would make everything readable. Foundry modules
+  are client-side and cannot register server routes, so there is nowhere to put
+  it — and proxying arbitrary third-party sites breaks their auth and CSP and
+  makes Bivouac responsible for the traffic. Recorded so nobody spends an evening
+  discovering it.
+
+**A finding that changes how the pop-out button should be understood.** Foundry's
+`setWindowOpenHandler` **denies** in-app windows for any `http(s)` URL and hands
+it to `electron.shell.openExternal` — so the existing pop-out opens the page in
+the user's real OS browser, which has an address bar. And the desktop app builds
+only an application menu (`Menu.buildFromTemplate` → Edit/Undo/Copy…), with **no
+`context-menu` handler at all**, so there is no right-click "open frame in new
+tab" on desktop.
+
+Put together: on the desktop client the pop-out is not merely a fallback for
+sites that refuse embedding — it is the **only** way a GM can get a URL out of a
+web view at all. Worth knowing before anyone "tidies it away".
+
+**Recommendation — replace the request rather than approximate it.** A GM-only
+URL bar on the tile itself: type or paste a URL, and it both navigates the iframe
+and saves it to `config.url` in one action. That makes the divergence the request
+is about mostly stop arising, because navigation goes *through* Bivouac instead of
+around it. It is small — `config.url` already exists and is already read and
+written (`widget-config.ts:106` and `:367`), so this is a second, faster entry
+point to a field that works, not new plumbing.
+
+Pair it with two things:
+
+- the existing pop-out, which is how you find a deep URL: pop out, browse, copy,
+  paste back. Clunky, and the only route that reaches an arbitrary page.
+- optionally, the `load`-event signal above as a quiet marker that the tile has
+  been navigated away from its saved page — so a GM knows the tile will show
+  something else on reload. Honest, cheap, and it turns the one thing we *can*
+  detect into the one thing the GM actually needed to know.
+
+Worth putting to the requester before building: the ask was a one-click adopt, and
+this is a paste. If what they wanted was "stop making me open the config dialog",
+the URL bar delivers it. If it was "I have browsed three pages deep inside the
+tile and want to keep this", nothing can.
 
 #### R12.8 Plutonium / 5etools-enabled tiles for the DM screen
 
